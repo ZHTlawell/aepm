@@ -125,6 +125,7 @@ curl -s "https://gitee.com/api/v5/repos/turningsyn/ae-pm/contents/CHANGELOG.md?a
 | App 差异比对验证 | `/verify-app` — E2E 对比 demo vs 成品，自动归因差异 | 可用 |
 | 提需求 | `/submit-requirement` — 提交标准化的可复用能力需求 | 可用 |
 | 提 Bug | `/submit-bug` — 通过 CLI 提交 bug 报告到 Gitee | 可用 |
+| 批量提 Bug | `/file-bugs` — 从 verify-app diff report 自动生成 issue，PM 确认后批量提交 | 可用 |
 | 查收更新 | 查看 CHANGELOG.md 了解更新内容 | 可用 |
 
 ### 调用 Dev Agent 生成成品

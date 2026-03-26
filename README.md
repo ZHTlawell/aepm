@@ -96,6 +96,7 @@ Dev Agent 会自动执行：验证 speckit → 生成 OpenAPI 契约 → 生成 
 | App 差异验证 | `/verify-app` | E2E 对比两个 app 的功能差异，自动归因到提取/生成/约束环节 |
 | 提交需求 | `/submit-requirement` | 向 AE Team 提交新能力需求（必须是可复用机制） |
 | 提交 Bug | `/submit-bug` 或 `ae pm submit-bug` | 提交 bug 报告到 ae-pm repo |
+| 批量提 Bug | `/file-bugs` 或 `ae pm file-bugs` | 从 verify 报告自动生成 issue 并批量提交 |
 | 查收更新 | 直接告诉 agent | 查看 CHANGELOG 了解最新版本更新 |
 
 ## 技术选型约束
@@ -246,7 +247,7 @@ git pull origin main
 
 查看 [CHANGELOG.md](CHANGELOG.md) 了解完整更新记录。
 
-当前版本：**v0.7.0**
+当前版本：**v0.8.0**
 
 ## 由谁维护
 

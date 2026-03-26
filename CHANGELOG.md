@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.8.0 (2026-03-26) — verify-app → 自动提 bug
+
+### 新增能力
+- **`/file-bugs` skill** — 读取 verify-app 的 diff report，自动生成 issue 草稿（含归因前缀、验证级别、case ID），PM 确认后批量提交
+- **`ae pm file-bugs` CLI 命令** — 解析 diff-report.json，交互式选择后批量调用 Gitee API 提交
+
+### 改进
+- **`/submit-bug` 前缀兼容** — 支持 `[GEN-BUG]`、`[SPECKIT-GAP]`、`[CONSTRAINT-GAP]`、`[DEMO-BUG]` 前缀，不再强制覆盖为 `[BUG]`
+
+### 设计意图
+PM 跑完 `/verify-app` 后说"提 bug"，agent 自动从 diff report 生成所有 issue，PM 只需确认。**PM 不做流程 QA。**
+
 ## v0.7.0 (2026-03-26) — Bug 反馈质量升级
 
 ### 重要变更
