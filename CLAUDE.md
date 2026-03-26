@@ -19,6 +19,19 @@ PM vibe coding demo（在约束下）→ /demo-to-speckit → Speckit → Dev Ag
 
 反馈方式：使用 `/submit-requirement` skill（新能力需求）或直接提 issue（bug/疑问）到 ae-pm repo。**AE Team 会研究、增加和修复所有合理的反馈。**
 
+## 使用方式
+
+本文件通常位于用户项目的 `ae-pm/` 子目录中（通过 `git clone` 安装）。你可能同时需要遵守用户项目自身的 CLAUDE.md / AGENTS.md 指令。
+
+**优先级规则：**
+- 用户项目自身的指令优先（如项目特定的架构决策）
+- ae-pm 的技术选型约束其次（如 iOS 必须用 SwiftUI）
+- 当两者冲突时，提醒用户并建议通过 ae-pm issue 反馈
+
+**Skill 加载：**
+- Skills 位于 `ae-pm/.claude/skills/` 目录（如通过软链接挂载到项目 `.claude/skills/`，则可直接使用 `/skill-name` 触发）
+- 如果 skills 未通过软链接挂载，用户可以说"使用 ae-pm 的 /demo-to-speckit skill"来触发，你需要读取 `ae-pm/.claude/skills/demo-to-speckit.md` 并按其流程执行
+
 ## 环境配置
 
 PM 使用前需要配置 Gitee access token。token 存储在 `~/.config/ae-pm/credentials.env` 中：

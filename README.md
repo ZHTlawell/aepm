@@ -68,14 +68,31 @@ PM vibe coding demo 原型（在约束下）
 - AI 编码工具（Claude Code / Codex / Cursor 任选其一）
 - Gitee 账号 + access token（[生成地址](https://gitee.com/profile/personal_access_tokens)，需要 `issues` 和 `repo` 权限）
 
-### 安装
+### Step 1: 在你的项目中安装
+
+你大概率已经有了自己的项目目录和 AI 编码工具配置。ae-pm 作为子目录 clone 进来：
 
 ```bash
+cd 你的项目目录       # 比如 ~/Projects/ShoeLens
 git clone https://gitee.com/turningsyn/ae-pm.git
-cd ae-pm
 ```
 
-### 配置 Token
+你的项目结构会变成：
+
+```
+你的项目/
+├── ae-pm/              ← 新增：AE PM Agent
+│   ├── CLAUDE.md
+│   ├── .claude/skills/
+│   ├── README.md
+│   └── CHANGELOG.md
+├── .claude/            ← 你现有的 agent 配置（如有）
+├── CLAUDE.md           ← 你现有的项目指令（如有）
+├── ShoeLens/           ← 你的项目代码
+└── ...
+```
+
+### Step 2: 配置 Token
 
 ```bash
 mkdir -p ~/.config/ae-pm
@@ -85,23 +102,55 @@ EOF
 chmod 600 ~/.config/ae-pm/credentials.env
 ```
 
-### 使用
+### Step 3: 让你的 Agent 加载 ae-pm
 
-根据你的 AI 编码工具：
+根据你使用的 AI 编码工具：
 
-| 工具 | 操作 |
-|------|------|
-| **Claude Code** | 在 ae-pm 目录下运行 `claude`，或将 `CLAUDE.md` + `.claude/` 目录拷贝到你的项目 |
-| **Codex** | 将 `CLAUDE.md` 内容合并到你的项目 `AGENTS.md` 中 |
-| **Cursor** | 将约束部分拷贝到 `.cursorrules` |
+**Claude Code**
 
-### 验证
+在你的项目根目录的 `CLAUDE.md` 中添加一行引用：
+
+```markdown
+<!-- 加在你现有 CLAUDE.md 的末尾 -->
+请同时遵守 ae-pm/CLAUDE.md 中的约束和流程。Skills 定义在 ae-pm/.claude/skills/ 中。
+```
+
+或者创建软链接（推荐，这样 ae-pm 更新后自动生效）：
+
+```bash
+# 如果你还没有 .claude/skills/ 目录
+mkdir -p .claude/skills
+ln -sf ../ae-pm/.claude/skills/* .claude/skills/
+```
+
+**Codex**
+
+将 `ae-pm/CLAUDE.md` 的核心内容（愿景、约束、行为准则）合并到你的 `AGENTS.md` 中。
+
+**Cursor**
+
+将 `ae-pm/CLAUDE.md` 中的技术选型约束部分拷贝到 `.cursorrules`。
+
+**Antigravity / 其他工具**
+
+将约束内容粘贴到工具的项目设定 / system prompt 中。
+
+### Step 4: 验证
 
 启动 AI 编码工具后，说：
 
-> "帮我完成入驻确认"
+> "帮我完成 ae-pm 入驻确认"
 
-Agent 会在 Gitee issue 下方发 comment，确认你的配置成功。
+Agent 会读取 `ae-pm/CLAUDE.md`，在 Gitee issue 下方发 comment，确认配置成功。
+
+### 更新
+
+```bash
+cd 你的项目目录/ae-pm
+git pull origin main
+```
+
+Skills 通过软链接会自动更新。如果没有软链接，需要重新拷贝。
 
 ## 反馈与贡献
 
