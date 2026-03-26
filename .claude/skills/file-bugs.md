@@ -68,6 +68,10 @@
 {如果有 demo_screenshot 和 prod_screenshot，列出路径}
 {如果没有截图，标注"截图待补充 — 可通过 runner.py 重新采集"}
 
+## 验收标准
+- 重新运行 `/verify-app`，Case {case.id} 状态从 {case.status} 变为 pass
+{如果是 UI 类差异，补充具体的视觉验收条件，如"卡片圆角与 demo 一致（16px）"}
+
 ## 环境信息
 - 项目: {从 report 或 test cases 推断}
 - ae-pm 版本: {读取 CHANGELOG.md 最新版本}
