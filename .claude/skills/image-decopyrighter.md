@@ -16,18 +16,15 @@
 
 ## 前置条件
 
-**默认方案（免费）**：ANTHROPIC_API_KEY + GEMINI_API_KEY，图片生成用 Google Imagen 4.0（免费层 50 张/天）。
-
-**备选方案**：Together AI（$0.003/张）、DALL-E 3（$0.04/张）。
+**全程只需一个 key**：`GEMINI_API_KEY`。语义提取用 Gemini 2.5 Flash Vision，图片生成用 Imagen 4.0。
 
 ```bash
-# 默认配置（Gemini — 免费）：
-export ANTHROPIC_API_KEY="sk-ant-..."
-export GEMINI_API_KEY="AIza..."      # Google AI Studio 获取
+# 默认配置 — 只需一个 key：
+export GEMINI_API_KEY="AIza..."      # Google AI Studio 获取，或向管理员领取
 
 # 备选后端（按需配置）：
-export TOGETHER_API_KEY="..."        # Together AI
-export OPENAI_API_KEY="sk-..."       # DALL-E 3
+export TOGETHER_API_KEY="..."        # Together AI ($0.003/张)
+export OPENAI_API_KEY="sk-..."       # DALL-E 3 ($0.04/张)
 ```
 
 建议写入 `~/.config/ae-pm/credentials.env` 以便持久化。
@@ -143,7 +140,6 @@ python3 "$AE_HOME/cli/lib/image_decopyrighter.py" generate "<prompt>" <output_pa
 | `GEMINI_API_KEY not set` | 配置 Gemini API Key（向管理员获取或从 Google AI Studio 创建）|
 | `TOGETHER_API_KEY not set` | 仅 `--backend together` 时需要 |
 | `OPENAI_API_KEY not set` | 仅 `--backend dalle` 时需要 |
-| `ANTHROPIC_API_KEY not set` | 配置 Anthropic API Key |
 | 生成图片语义偏差大 | 用 `describe` 单独提取 prompt，手动修改后 `generate` |
 | 图片内容被 DALL-E 拒绝 | DALL-E 有内容策略限制，尝试修改 prompt 去除敏感元素 |
 | 生成速度慢 | DALL-E 3 单张约 15-30 秒，批量处理按顺序执行 |
