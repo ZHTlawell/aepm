@@ -121,18 +121,47 @@ Dev Agent 会自动执行：验证 speckit → 生成 OpenAPI 契约 → 生成 
 ### 前置要求
 
 - AI 编码工具（Claude Code / Codex / Cursor / Antigravity 任选）
-- Gitee 账号 + access token（[生成地址](https://gitee.com/profile/personal_access_tokens)，需要 `issues` 和 `repo` 权限）
+- Gitee 账号（[注册地址](https://gitee.com)）
 
-### Step 1: 全局安装（只需一次）
+### 一键搭建（推荐）
 
-ae-pm 安装到 `~/.ae/pm/`，所有项目共享同一份：
+```bash
+# 1. 安装 ae CLI（只需一次）
+curl -sSL https://raw.githubusercontent.com/ligenjian001-ai/ae-platform/master/cli/install.sh | sh
+
+# 2. 一键搭建环境（安装依赖 + 配置 Token + 入驻确认）
+ae setup
+```
+
+`ae setup` 会自动完成：
+- 克隆 ae-pm / ae-dev 仓库到 `~/.ae/`
+- 交互式配置 Gitee Token（引导你生成并验证）
+- 环境健康检查
+- 自动完成入驻确认
+
+```bash
+# 3. 在你的项目中启用
+cd 你的项目目录
+ae link pm .
+```
+
+搞定！打开 AI 编码工具即可使用所有 AE PM 能力。
+
+### 手动搭建
+
+如果 `ae setup` 不适用，可以手动操作：
+
+<details>
+<summary>展开手动步骤</summary>
+
+**Step 1: 全局安装**
 
 ```bash
 mkdir -p ~/.ae
 git clone https://gitee.com/turningsyn/ae-pm.git ~/.ae/pm
 ```
 
-### Step 2: 配置 Token（只需一次）
+**Step 2: 配置 Token**
 
 ```bash
 mkdir -p ~/.config/ae-pm
@@ -142,40 +171,40 @@ EOF
 chmod 600 ~/.config/ae-pm/credentials.env
 ```
 
-### Step 3: 在你的项目中启用
+Token 生成地址：https://gitee.com/profile/personal_access_tokens（需要 `issues` 和 `projects` 权限）
 
-在你需要使用 ae-pm 能力的项目中，运行以下命令接入：
-
-**Claude Code**
+**Step 3: 在项目中启用**
 
 ```bash
 cd 你的项目目录
+ae link pm .
+```
 
-# 1. 链接 skills（推荐，更新自动生效）
+或手动链接：
+
+```bash
 mkdir -p .claude/skills
 ln -sf ~/.ae/pm/.claude/skills/* .claude/skills/
-
-# 2. 在你的 CLAUDE.md 中引用 ae-pm 约束（加在末尾）
 echo '' >> CLAUDE.md
 echo '## AE PM 约束' >> CLAUDE.md
 echo '请同时遵守 ~/.ae/pm/CLAUDE.md 中的技术选型约束和工作流。' >> CLAUDE.md
 ```
 
-**Codex / Cursor / Antigravity**
+**Step 4: 验证**
 
-将 `~/.ae/pm/CLAUDE.md` 中的约束部分拷贝到你的工具对应配置中（`AGENTS.md` / `.cursorrules` / 项目设定）。
+```bash
+ae doctor
+```
 
-### Step 4: 验证
-
-启动 AI 编码工具后，说：
-
-> "帮我完成 ae-pm 入驻确认"
+</details>
 
 ### 更新（一次更新，所有项目生效）
 
 ```bash
-cd ~/.ae/pm && git pull origin main
+ae update
 ```
+
+或手动：`cd ~/.ae/pm && git pull origin main`
 
 通过软链接挂载的 skills 自动更新，无需逐项目操作。
 
@@ -247,7 +276,7 @@ git pull origin main
 
 查看 [CHANGELOG.md](CHANGELOG.md) 了解完整更新记录。
 
-当前版本：**v0.8.0**
+当前版本：**v0.9.0**
 
 ## 由谁维护
 

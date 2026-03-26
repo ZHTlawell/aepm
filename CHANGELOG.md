@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.9.0 (2026-03-26) — 一键搭建 + 自动提 bug
+
+### 新增能力
+- **`ae setup` 命令** — 一键完成环境搭建：安装依赖 → 克隆仓库 → 配置 Token（交互式 + 自动验证）→ 环境检查 → 入驻确认
+  - Token 配置改为必填（不再允许跳过），输入后立即验证有效性
+  - 入驻确认自动完成（通过 API 发 comment），不再需要让 agent 代劳
+  - 支持角色选择：`ae setup pm` / `ae setup dev` / `ae setup both`
+- **`/file-bugs` skill + `ae pm file-bugs` CLI** — 从 verify-app diff report 自动生成 issue 草稿，PM 确认后批量提交
+
+### 修正
+- **doctor token 检查** — 修复 subshell 导致 token 无效时不影响最终检查结果的问题
+- **curl 超时** — doctor 和 setup 的 API 调用统一加 `--max-time 10`
+
+### 改进
+- **README 快速开始重写** — 从 6 步手动操作简化为 `ae setup` + `ae link pm .` 两步
+
 ## v0.8.0 (2026-03-26) — verify-app → 自动提 bug
 
 ### 新增能力
