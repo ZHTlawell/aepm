@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.3.0 (2026-03-26)
+
+### 重要变更
+- **愿景声明** — CLAUDE.md 开头新增愿景与定位，明确反馈机制：凡与愿景有偏差的情况都应反馈给 AE Team
+- **README 重写** — 从纯安装指引升级为完整产品介绍（理念、全链路、能力清单、反馈方式）
+
+### 新增能力
+- **iOS 编译验证 skill** (`/ios-build-verify`) — xcodebuild 编译 + 自动修复 loop
+- **iOS UI 测试 skill** (`/ios-ui-test`) — AXe + simctl 自动化测试（Native/WebView 双模式）
+- **Speckit 接收生成 skill** (`/speckit-receive`) — 从 speckit 生成 iOS + 后端项目
+
+### 改进
+- 跨平台说明：README 中增加 Claude Code / Codex / Cursor 三种工具的使用方式
+
 ## v0.2.0 (2026-03-26)
 
 ### 新增能力
