@@ -100,13 +100,43 @@
 | strategic_context | ./CLAUDE.md | not_found → fallback: ae-platform defaults |
 ```
 
+### Step 1.8: 数据源发现
+
+扫描项目目录，定位所有数据源文件。**这一步的目的是确保模块 05/06 能完整描述数据层，避免成品使用 mock 数据而忽略真实数据源。**
+
+**扫描规则：**
+
+| 文件类型 | 匹配模式 | 处理方式 |
+|---------|---------|---------|
+| CSV | `*.csv` | 读取表头 + 前 5 行 + 统计行数 |
+| JSON | `*.json`（排除 package.json/tsconfig 等配置） | 读取结构 + 统计记录数 |
+| SQLite | `*.sqlite`, `*.db` | 列出所有表 + 各表记录数 |
+| Plist | `*.plist`（排除 Info.plist） | 读取 key 列表 |
+| CoreData | `*.xcdatamodeld` | 读取 entity 定义 |
+
+**扫描位置（按优先级）：**
+1. 项目根目录
+2. `data/`, `assets/`, `resources/`, `mock/` 子目录
+3. 项目同级目录（PM 可能把数据文件放在项目外）
+
+**输出：** 将发现的数据源记录到 `00-context-manifest.md` 中，并在 Step 3 提取模块 05/06 时使用：
+
+```markdown
+| 类型 | 路径 | 记录数 | 字段摘要 |
+|------|------|--------|---------|
+| data_source | ./ShoeLens_Final_Database.csv | 2486 行 | brand, model, colorway, sku, price... |
+| data_source | ./mock/shoes.json | 10 条 | id, name, brand, image_url |
+```
+
+**重要：** 如果发现了真实数据文件（行数 > 100 或文件名含 final/prod/real），必须在模块 05 中标注为主数据源，并在模块 06 中说明数据导入方式。忽略数据源会导致成品只使用 mock 数据。
+
 ### Step 2: 读取全部源码
 
 **必须读完所有源码文件**，不能只看部分。具体策略：
 
 - JS/Swift 文件：完整读取（分 chunk 如果超过 2000 行）
 - CSS 文件：重点读取变量定义和组件样式
-- 数据文件：读取 schema（前 50 行）+ 数据量统计
+- 数据文件：读取 schema（前 50 行）+ 数据量统计（Step 1.8 已定位）
 - 配置文件：完整读取
 - **产品文档**（Step 1.5 找到的）：完整读取，提取产品定位、用户画像、商业决策
 - **设计资产**（Step 1.5 找到的）：提取 token 定义（颜色、字体、间距精确值）
@@ -139,12 +169,19 @@
 - 提取主要数据结构的 schema
 - 统计数据量（记录数、文件大小）
 - 识别品牌/分类等枚举值
+- **数据源标注（关键）** — 将 Step 1.8 发现的数据文件写入此模块：
+  - 真实数据源（CSV/DB）→ 标注为 `[PRIMARY DATA SOURCE]`，含文件路径、行数、字段列表
+  - Mock 数据 → 标注为 `[MOCK]`，说明与真实数据的差异
+  - 如果同时存在真实数据和 mock 数据，必须说明成品应使用哪个
 
 **模块 06 — API 规范**
 - 找到所有 fetch/XMLHttpRequest/API 调用
 - 找到所有 mock 实现
 - 找到 AI prompt 模板（如有）
 - 推断未来需要的真实 API
+- **数据导入方式** — 如果 Step 1.8 发现了真实数据文件，必须在此模块说明：
+  - 成品启动时如何加载这些数据（导入 CSV → DB？直接读取 JSON？API 返回？）
+  - 数据文件的位置和格式要求
 
 ### Step 4: 运行 demo 补充验证（可选）
 
