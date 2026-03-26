@@ -65,34 +65,19 @@ PM vibe coding demo 原型（在约束下）
 
 ### 前置要求
 
-- AI 编码工具（Claude Code / Codex / Cursor 任选其一）
+- AI 编码工具（Claude Code / Codex / Cursor / Antigravity 任选）
 - Gitee 账号 + access token（[生成地址](https://gitee.com/profile/personal_access_tokens)，需要 `issues` 和 `repo` 权限）
 
-### Step 1: 在你的项目中安装
+### Step 1: 全局安装（只需一次）
 
-你大概率已经有了自己的项目目录和 AI 编码工具配置。ae-pm 作为子目录 clone 进来：
+ae-pm 安装到 `~/.ae/pm/`，所有项目共享同一份：
 
 ```bash
-cd 你的项目目录       # 比如 ~/Projects/ShoeLens
-git clone https://gitee.com/turningsyn/ae-pm.git
+mkdir -p ~/.ae
+git clone https://gitee.com/turningsyn/ae-pm.git ~/.ae/pm
 ```
 
-你的项目结构会变成：
-
-```
-你的项目/
-├── ae-pm/              ← 新增：AE PM Agent
-│   ├── CLAUDE.md
-│   ├── .claude/skills/
-│   ├── README.md
-│   └── CHANGELOG.md
-├── .claude/            ← 你现有的 agent 配置（如有）
-├── CLAUDE.md           ← 你现有的项目指令（如有）
-├── ShoeLens/           ← 你的项目代码
-└── ...
-```
-
-### Step 2: 配置 Token
+### Step 2: 配置 Token（只需一次）
 
 ```bash
 mkdir -p ~/.config/ae-pm
@@ -102,38 +87,28 @@ EOF
 chmod 600 ~/.config/ae-pm/credentials.env
 ```
 
-### Step 3: 让你的 Agent 加载 ae-pm
+### Step 3: 在你的项目中启用
 
-根据你使用的 AI 编码工具：
+在你需要使用 ae-pm 能力的项目中，运行以下命令接入：
 
 **Claude Code**
 
-在你的项目根目录的 `CLAUDE.md` 中添加一行引用：
-
-```markdown
-<!-- 加在你现有 CLAUDE.md 的末尾 -->
-请同时遵守 ae-pm/CLAUDE.md 中的约束和流程。Skills 定义在 ae-pm/.claude/skills/ 中。
-```
-
-或者创建软链接（推荐，这样 ae-pm 更新后自动生效）：
-
 ```bash
-# 如果你还没有 .claude/skills/ 目录
+cd 你的项目目录
+
+# 1. 链接 skills（推荐，更新自动生效）
 mkdir -p .claude/skills
-ln -sf ../ae-pm/.claude/skills/* .claude/skills/
+ln -sf ~/.ae/pm/.claude/skills/* .claude/skills/
+
+# 2. 在你的 CLAUDE.md 中引用 ae-pm 约束（加在末尾）
+echo '' >> CLAUDE.md
+echo '## AE PM 约束' >> CLAUDE.md
+echo '请同时遵守 ~/.ae/pm/CLAUDE.md 中的技术选型约束和工作流。' >> CLAUDE.md
 ```
 
-**Codex**
+**Codex / Cursor / Antigravity**
 
-将 `ae-pm/CLAUDE.md` 的核心内容（愿景、约束、行为准则）合并到你的 `AGENTS.md` 中。
-
-**Cursor**
-
-将 `ae-pm/CLAUDE.md` 中的技术选型约束部分拷贝到 `.cursorrules`。
-
-**Antigravity / 其他工具**
-
-将约束内容粘贴到工具的项目设定 / system prompt 中。
+将 `~/.ae/pm/CLAUDE.md` 中的约束部分拷贝到你的工具对应配置中（`AGENTS.md` / `.cursorrules` / 项目设定）。
 
 ### Step 4: 验证
 
@@ -141,16 +116,41 @@ ln -sf ../ae-pm/.claude/skills/* .claude/skills/
 
 > "帮我完成 ae-pm 入驻确认"
 
-Agent 会读取 `ae-pm/CLAUDE.md`，在 Gitee issue 下方发 comment，确认配置成功。
-
-### 更新
+### 更新（一次更新，所有项目生效）
 
 ```bash
-cd 你的项目目录/ae-pm
-git pull origin main
+cd ~/.ae/pm && git pull origin main
 ```
 
-Skills 通过软链接会自动更新。如果没有软链接，需要重新拷贝。
+通过软链接挂载的 skills 自动更新，无需逐项目操作。
+
+### 项目结构示意
+
+```
+~/.ae/                          ← 全局安装（只有一份）
+├── pm/                         ← ae-pm
+│   ├── CLAUDE.md
+│   ├── .claude/skills/
+│   │   ├── demo-to-speckit.md
+│   │   ├── verify-app.md
+│   │   └── submit-requirement.md
+│   ├── README.md
+│   └── CHANGELOG.md
+└── dev/                        ← ae-dev（开发者用）
+    ├── CLAUDE.md
+    └── .claude/skills/
+
+~/Projects/ShoeLens/            ← 你的项目（任意多个）
+├── .claude/skills/             ← 软链接到 ~/.ae/pm/.claude/skills/
+├── CLAUDE.md                   ← 你的项目指令 + ae-pm 引用
+├── ShoeLens/
+└── ...
+
+~/Projects/AnotherApp/          ← 另一个项目
+├── .claude/skills/             ← 同样软链接
+├── CLAUDE.md
+└── ...
+```
 
 ## 反馈与贡献
 

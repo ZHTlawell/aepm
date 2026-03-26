@@ -21,7 +21,7 @@ PM vibe coding demo（在约束下）→ /demo-to-speckit → Speckit → Dev Ag
 
 ## 使用方式
 
-本文件通常位于用户项目的 `ae-pm/` 子目录中（通过 `git clone` 安装）。你可能同时需要遵守用户项目自身的 CLAUDE.md / AGENTS.md 指令。
+本文件全局安装在 `~/.ae/pm/`，通过软链接挂载到各项目中。你可能同时需要遵守用户项目自身的 CLAUDE.md / AGENTS.md 指令。
 
 **优先级规则：**
 - 用户项目自身的指令优先（如项目特定的架构决策）
@@ -29,8 +29,9 @@ PM vibe coding demo（在约束下）→ /demo-to-speckit → Speckit → Dev Ag
 - 当两者冲突时，提醒用户并建议通过 ae-pm issue 反馈
 
 **Skill 加载：**
-- Skills 位于 `ae-pm/.claude/skills/` 目录（如通过软链接挂载到项目 `.claude/skills/`，则可直接使用 `/skill-name` 触发）
-- 如果 skills 未通过软链接挂载，用户可以说"使用 ae-pm 的 /demo-to-speckit skill"来触发，你需要读取 `ae-pm/.claude/skills/demo-to-speckit.md` 并按其流程执行
+- Skills 通过软链接从 `~/.ae/pm/.claude/skills/` 挂载到项目 `.claude/skills/`，可直接用 `/skill-name` 触发
+- 如果未挂载，用户说"使用 ae-pm 的 /demo-to-speckit skill"即可，你需要读取 `~/.ae/pm/.claude/skills/demo-to-speckit.md` 并按其流程执行
+- 完整 CLAUDE.md 位于 `~/.ae/pm/CLAUDE.md`，如需查阅完整约束可直接读取
 
 ## 环境配置
 
