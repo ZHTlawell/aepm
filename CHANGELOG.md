@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.11.0 (2026-03-26) — 图片去版权化工具
+
+### 新增能力
+- **图片去版权化** (`/image-decopyrighter`, `ae pm image-decopyright`) — 将有版权风险的图片通过 AI 重绘生成可商用替代图片 `#IHQQOZ`
+  - Claude Vision 提取图片语义 → 图片生成 API 重绘 → 输出可商用替代
+  - 默认使用 Google Imagen 4.0（免费层 50 张/天），支持切换 Together AI / DALL-E 3
+  - 支持单张、批量处理，可指定风格（illustration, watercolor 等）和尺寸
+  - 配置 `GEMINI_API_KEY` 即可使用
+
 ## v0.10.0 (2026-03-26) — Backlog 推进（validator + 数据发现 + 后端验证）
 
 ### 新增能力
