@@ -8,6 +8,10 @@
 
 **Speckit 是整条 demo→成品 流水线的关键衔接件。** 提取质量直接决定成品质量。遗漏任何功能都会导致成品缺失该功能，最终在 E2E 验证中被发现。
 
+## 参照示例
+
+在提取前，先参考 `gitee.com/turningsyn/ae-speckit-examples` 中的已验证示例（如 ShoeLens），了解每个模块的预期格式、深度和质量标准。
+
 ## 输入
 
 - **demo 项目目录**：PM 的 vibe coding 产出（iOS Xcode 项目或独立前端项目）
