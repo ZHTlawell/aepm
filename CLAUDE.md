@@ -120,6 +120,63 @@ curl -s "https://gitee.com/api/v5/repos/turningsyn/ae-pm/contents/CHANGELOG.md?a
 
 对比本地与远端版本号，如果有新版本，直接执行 `cd ~/.ae/pm && git pull origin main` 并汇报更新内容。
 
+### 更新后反馈（关键）
+
+拉取更新并汇报 CHANGELOG 内容后，**必须执行以下反馈引导流程**：
+
+**Step 1: 提取关联 issue**
+
+从本次更新的 CHANGELOG 条目中提取所有 issue 编号（格式 `#IHQXXX`）。
+
+**Step 2: 展示待验证列表**
+
+向用户展示：
+
+```
+本次更新关联了以下 issue，请逐个验证：
+
+1. #IHQXXX — [功能描述]（试一下 /xxx 或 ae pm xxx）
+2. #IHQXXY — [功能描述]（检查 xxx 是否符合预期）
+...
+
+请试用后告诉我哪些 OK、哪些有问题。
+```
+
+对每个 issue，根据 CHANGELOG 描述给出**具体的验证建议**（运行什么命令、试用哪个 skill、检查什么效果）。
+
+**Step 3: 收集反馈并回写 issue**
+
+用户验证后：
+
+- **验证通过** — 在对应 issue 上发 comment 确认：
+  ```bash
+  source ~/.config/ae-pm/credentials.env
+  unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
+
+  curl -s -X POST "https://gitee.com/api/v5/repos/turningsyn/{repo}/issues/{number}/comments" \
+    -H "Content-Type: application/json" \
+    -d "{\"access_token\": \"$GITEE_TOKEN\", \"body\": \"**[用户名] 验收确认：** 已在 v{version} 中验证通过，功能符合预期。请 AE Team 关闭此 issue。\"}"
+  ```
+- **验证有问题** — 在对应 issue 上发 comment 说明问题，不要关闭：
+  ```bash
+  curl -s -X POST "https://gitee.com/api/v5/repos/turningsyn/{repo}/issues/{number}/comments" \
+    -H "Content-Type: application/json" \
+    -d "{\"access_token\": \"$GITEE_TOKEN\", \"body\": \"**[用户名] 验收反馈：** 在 v{version} 中验证未通过。\\n\\n问题描述：{用户描述的问题}\"}"
+  ```
+
+**Step 4: 汇总**
+
+全部验证完成后，展示汇总：
+
+```
+验证汇总：
+- ✅ #IHQXXX — 已确认，等 AE Team 关闭
+- ❌ #IHQXXY — 已反馈问题，等 AE Team 修复
+- ⏭️ #IHQXXZ — 暂未验证（用户跳过）
+```
+
+**注意：** 如果 CHANGELOG 条目没有关联 issue 编号，提醒用户："这条更新没有关联 issue，无法追踪验收。建议反馈给 AE Team 要求 CHANGELOG 条目带上 issue 链接。"
+
 ## 当前能力
 
 | 能力 | 说明 | 状态 |
@@ -186,6 +243,59 @@ PM 在使用 vibe coding 工具（Antigravity 等）生成 demo 原型时，必�
 |------|------|------|
 | **暗黑主题** | 优先深色模式 | 设计系统一致性 |
 | **中英文** | 界面默认英文，支持中文切换 | 国际化基础 |
+
+## 协作评审
+
+当收到 Gitee issue 或 comment 链接，并被要求「评审」「review」「看一下」「帮忙审」时，执行以下流程：
+
+### 流程
+
+1. **读取 issue** — 通过 Gitee API 获取 issue 内容和已有 comment：
+   ```bash
+   source ~/.config/ae-pm/credentials.env
+   unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
+
+   # 从链接中提取 owner/repo/issue_number
+   curl -s "https://gitee.com/api/v5/repos/{owner}/{repo}/issues/{number}?access_token=$GITEE_TOKEN"
+   curl -s "https://gitee.com/api/v5/repos/{owner}/{repo}/issues/{number}/comments?access_token=$GITEE_TOKEN&per_page=100"
+   ```
+
+2. **与用户讨论** — 向用户摘要 issue 内容，讨论以下关键要素：
+   - **业务合理性** — 需求是否合理？对用户/业务有没有价值？
+   - **优先级** — 是否紧急？与当前工作的关系？
+   - **完整性** — 描述是否清晰？验收标准是否可测？
+   - **影响范围** — 影响哪些模块或团队？
+
+   **PM 不懂技术是正常的。** 讨论时侧重业务和需求层面的判断。如果用户表示某个技术点不清楚或不确定，不要追问，直接在 Step 3 的 comment 中标注该点「需技术方确认」，把技术问题抛回给评审发起人。
+
+3. **发 comment** — 讨论达成一致后，直接在 Gitee issue 上发布评审意见：
+   ```bash
+   curl -s -X POST "https://gitee.com/api/v5/repos/{owner}/{repo}/issues/{number}/comments" \
+     -H "Content-Type: application/json" \
+     -d "{\"access_token\": \"$GITEE_TOKEN\", \"body\": \"评审意见内容\"}"
+   ```
+
+4. **回复发起人** — 把 comment 链接告知用户，由用户转发给评审发起人。
+
+### 评审意见格式
+
+```markdown
+**[用户名] 评审意见：**
+
+✅ 业务层面：
+- （分点列出业务/需求层面的判断）
+
+❓ 需技术方确认：
+- （列出用户无法判断的技术点，抛回给发起人）
+```
+
+如果用户能判断所有要素，可省略「需技术方确认」部分。
+
+### 注意
+
+- **不要反问流程** — 收到链接 + 评审请求 = 直接执行上述步骤，不需要问"怎么操作"。
+- **不懂就说不懂** — PM 说"不清楚"、"我不懂技术"时，不要为难他，agent 应帮用户把不确定的点整理好，在 comment 中标注「需技术方确认」抛回给发起人。
+- **有疑问先说** — 如果 issue 内容不清楚，在 Step 2 向用户提出，不要在 comment 里写"看不懂"。
 
 ## 行为准则
 
