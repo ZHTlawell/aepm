@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.6.0 (2026-03-26) — Bug 提交收归 CLI
+
+### 新增能力
+- **`/submit-bug` skill** — 引导 agent 收集 bug 信息后通过 `ae` CLI 自动提交到 Gitee，杜绝本地 issue 文件
+- **`ae pm submit-bug` CLI 命令** — 直接调用 Gitee API 提交 bug 报告，支持 `--repo` 指定目标仓库
+
+### 重要变更
+- **Gitee API 调用收归 CLI** — CLAUDE.md 明确禁止 agent 创建本地 issue 文件或直接调用 curl/Gitee API，统一通过 `ae` CLI 完成
+- **`_pm_gitee_create_issue()` 通用函数** — CLI 内部抽出 Gitee issue 创建的通用函数，后续 `submit-requirement` 可复用
+- **curl 加固** — 增加 `--max-time 30` 超时防止代理未清除时挂死，token 通过 `os.environ` 安全传递
+
+### 修正
+- 修复 agent 按 README 提 bug 时 fallback 为创建本地 markdown 文件的问题
+
 ## v0.5.0 (2026-03-26) — Pipeline v0.2
 
 ### 机制升级（4 项同步升级）
