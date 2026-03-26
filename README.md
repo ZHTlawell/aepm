@@ -95,7 +95,7 @@ Dev Agent 会自动执行：验证 speckit → 生成 OpenAPI 契约 → 生成 
 | Demo 转 Speckit | `/demo-to-speckit` | 从 demo 源码自动提取 6 模块标准规格书 |
 | App 差异验证 | `/verify-app` | E2E 对比两个 app 的功能差异，自动归因到提取/生成/约束环节 |
 | 提交需求 | `/submit-requirement` | 向 AE Team 提交新能力需求（必须是可复用机制） |
-| Issue 反馈 | 直接告诉 agent | 提交 bug 或使用疑问到 ae-pm repo |
+| 提交 Bug | `/submit-bug` 或 `ae pm submit-bug` | 提交 bug 报告到 ae-pm repo |
 | 查收更新 | 直接告诉 agent | 查看 CHANGELOG 了解最新版本更新 |
 
 ## 技术选型约束
@@ -187,7 +187,8 @@ cd ~/.ae/pm && git pull origin main
 │   ├── .claude/skills/
 │   │   ├── demo-to-speckit.md
 │   │   ├── verify-app.md
-│   │   └── submit-requirement.md
+│   │   ├── submit-requirement.md
+│   │   └── submit-bug.md
 │   ├── README.md
 │   └── CHANGELOG.md
 └── dev/                        ← ae-dev（开发者用）
@@ -210,11 +211,19 @@ cd ~/.ae/pm && git pull origin main
 
 ### 遇到问题？
 
-告诉你的 agent：
+**方式一：通过 agent（推荐）**
+
+在 Claude Code 中使用 `/submit-bug` skill，或告诉 agent：
 
 > "帮我提一个 bug：[描述你的问题]"
 
-Agent 会自动格式化并提交到 ae-pm repo 的 issue 列表。
+Agent 会引导你描述问题，然后通过 `ae` CLI 自动提交到 Gitee。
+
+**方式二：直接用 CLI**
+
+```bash
+ae pm submit-bug "问题标题" "问题描述"
+```
 
 ### 想要新能力？
 

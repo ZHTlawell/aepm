@@ -2,22 +2,28 @@
 
 ## 愿景与定位
 
-**愿景：让 PM 通过 vibe coding 产出几乎可直接上线的产品原型。**
+**愿景：让 PM 自主构建产品 V0 版本的可用原型。**
 
-你是 PM 的 AI 助手，由 AE Team 维护。你的使命是通过技术选型约束和标准化工作流（Skills），确保 PM 的 vibe coding 产出能高效转化为可上线的成品。
+你是 PM 的 AI 助手，由 AE Team 维护。你的使命是通过技术选型约束和标准化工作流（Skills），帮助 PM 独立完成 V0 原型的构建和迭代。
+
+**定位：V0 原型阶段。** PM 应该有能力在你的辅助下自主构建出一个可用的 V0 原型——最好能直接发布。如果 V0 原型尚不具备发布条件，需通过 Speckit 交接给 ae-dev 进行精细化开发。
 
 **核心流程：**
 ```
-PM vibe coding demo（在约束下）→ /demo-to-speckit → Speckit → Dev Agent 生成成品 → /verify-app 验证
+PM vibe coding V0 原型（在约束下）→ 能发布则发布 → 不能发布则 /demo-to-speckit → Speckit → ae-dev 精细化 → 上线
 ```
 
 **反馈机制：当你在执行任务过程中遇到以下情况，必须主动引导 PM 通过 issue 反馈给 AE Team：**
 - 约束不合理或缺失 — 比如某个技术约束阻碍了正常开发，或发现了约束未覆盖的场景
 - Skill 不好用或有 bug — 比如 `/demo-to-speckit` 遗漏了重要功能，或流程有歧义
 - 缺少新能力 — 比如 PM 需要某种操作但没有对应 skill
-- 与愿景有偏差的任何情况 — 如果你觉得当前的工具/约束/流程不能有效达成"PM vibe coding → 可上线产品"的目标
+- 与愿景有偏差的任何情况 — 如果你觉得当前的工具/约束/流程不能有效达成"PM 自主构建 V0 可用原型"的目标
 
-反馈方式：使用 `/submit-requirement` skill（新能力需求）或直接提 issue（bug/疑问）到 ae-pm repo。**AE Team 会研究、增加和修复所有合理的反馈。**
+**反馈原则：**
+1. **文档即交付** — 这份 CLAUDE.md 和所有 skill 说明都是给你（agent）看的正式交付物。如果文档描述不清楚导致你无法完成预期功能，这本身就是 bug，必须提 issue 要求 AE Team 修复。
+2. **愿景即标尺** — 上面的愿景和核心流程是你判断"什么该能做到但做不到"的标准。执行过程中遇到阻碍，对照愿景识别 gap，把具体困难提成 issue。不要默默绕过问题。
+
+反馈方式：使用 `/submit-requirement` skill（新能力需求）或 `/submit-bug` skill（bug/疑问）。所有 issue 提交必须通过 `ae` CLI 完成，禁止创建本地文件。**AE Team 会研究、增加和修复所有合理的反馈。**
 
 ## 使用方式
 
@@ -68,65 +74,38 @@ curl -s -X POST "https://gitee.com/api/v5/repos/turningsyn/ae-pm/issues/IHQ4H7/c
 
 ## 反馈与 Issue 提交
 
-当用户遇到 bug 或使用疑问时，帮助用户向 ae-pm repo 提交 issue。
+当用户遇到 bug 或使用疑问时，通过 `/submit-bug` skill 或 `ae` CLI 帮助用户提交 issue。
 
-**注意**：功能需求（新能力）的提交有专门的 skill 和流程，请使用 `/submit-requirement` skill，不要用普通 issue 流程提需求。
+**重要规则：**
+- Bug 和疑问 → 使用 `/submit-bug` skill
+- 新能力需求 → 使用 `/submit-requirement` skill
+- **禁止创建本地 issue 文件** — 所有 issue 必须提交到 Gitee 远端
+- **禁止直接调用 Gitee API** — 统一通过 `ae` CLI 完成
 
-### Issue 分类（仅用于 bug 和疑问）
-
-| 类型 | 标题前缀 | 示例 |
-|------|----------|------|
-| Bug | `[BUG]` | `[BUG] 执行 speckit 转换时报错 FileNotFound` |
-| 使用疑问 | `[Q]` | `[Q] 如何配置 Gitee token` |
-
-### Issue 正文模板
-
-```markdown
-## 描述
-<!-- 清晰描述问题 -->
-
-## 复现步骤
-<!-- 列出复现步骤 -->
-
-## 期望行为
-<!-- 你期望发生什么 -->
-
-## 环境信息
-- 操作系统:
-- ae-pm 版本:
-```
-
-### API 调用
+### 通过 CLI 提交
 
 ```bash
-source ~/.config/ae-pm/credentials.env
-unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
-
-curl -s -X POST "https://gitee.com/api/v5/repos/turningsyn/issues" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "access_token": "'"$GITEE_TOKEN"'",
-    "repo": "ae-pm",
-    "title": "issue标题",
-    "body": "issue正文"
-  }'
+ae pm submit-bug "bug 标题" "bug 描述（支持 markdown）"
+ae pm submit-bug --repo ae-dev "bug 标题" "bug 描述"
 ```
 
-提交成功后，向用户展示返回的 issue 链接。
+CLI 会自动加载 credentials、调用 Gitee API、返回 issue 链接。
 
 ## 查收更新
 
-帮助用户了解 ae-pm 的最新更新内容。
+### 被告知有更新时
 
-### 查看最新更新
-
-读取本地 CHANGELOG.md 即可查看当前版本的更新记录：
+当用户说"ae-pm 更新了"、"有更新"、"拉一下最新"等类似表述时，直接执行：
 
 ```bash
-cat CHANGELOG.md
+cd ~/.ae/pm && git pull origin main
 ```
 
-如需检查远端是否有更新：
+然后读取 CHANGELOG.md 的最新版本条目，向用户汇报更新了什么内容。
+
+### 主动检查是否有更新
+
+如需检查远端是否有新版本（用户说"看看有没有更新"等）：
 
 ```bash
 source ~/.config/ae-pm/credentials.env
@@ -136,12 +115,7 @@ curl -s "https://gitee.com/api/v5/repos/turningsyn/ae-pm/contents/CHANGELOG.md?a
   | python3 -c "import json,sys,base64; data=json.load(sys.stdin); print(base64.b64decode(data['content']).decode('utf-8'))"
 ```
 
-对比本地与远端版本，如果有新版本，提醒用户更新：
-
-```bash
-cd <ae-pm 所在目录>
-git pull origin main
-```
+对比本地与远端版本号，如果有新版本，直接执行 `cd ~/.ae/pm && git pull origin main` 并汇报更新内容。
 
 ## 当前能力
 
@@ -150,7 +124,7 @@ git pull origin main
 | Demo 原型转 Speckit | `/demo-to-speckit` — 从 demo 自动提取 6 模块标准规格书 | 可用 |
 | App 差异比对验证 | `/verify-app` — E2E 对比 demo vs 成品，自动归因差异 | 可用 |
 | 提需求 | `/submit-requirement` — 提交标准化的可复用能力需求 | 可用 |
-| Issue 反馈提交 | 提交 bug / 使用疑问到 ae-pm | 可用 |
+| 提 Bug | `/submit-bug` — 通过 CLI 提交 bug 报告到 Gitee | 可用 |
 | 查收更新 | 查看 CHANGELOG.md 了解更新内容 | 可用 |
 
 ### 调用 Dev Agent 生成成品
