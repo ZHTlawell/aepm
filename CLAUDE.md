@@ -41,12 +41,15 @@ PM vibe coding V0 原型（在约束下）→ 能发布则发布 → 不能发�
 
 ## 环境配置
 
-PM 使用前需要配置 Gitee access token。token 存储在 `~/.config/ae-pm/credentials.env` 中：
+PM 使用前需要配置以下 token。所有 token 统一存储在 `~/.config/ae-pm/credentials.env` 中：
 
 ```bash
 # ~/.config/ae-pm/credentials.env
 GITEE_TOKEN=your_gitee_access_token
+GEMINI_API_KEY=your_gemini_api_key    # 图片去版权化等 AI 能力需要
 ```
+
+当用户提供 token 时，你应该直接帮他写入该文件（`mkdir -p ~/.config/ae-pm && echo 'KEY=value' >> ~/.config/ae-pm/credentials.env`）。
 
 访问 Gitee API 前必须加载 credentials 并清除代理：
 
