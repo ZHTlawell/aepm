@@ -17,9 +17,31 @@
 - **demo 项目目录**：PM 的 vibe coding 产出（iOS Xcode 项目或独立前端项目）
 - **iOS 模拟器**（可选）：用于运行 demo 截图辅助提取
 
+## Context Manifest
+
+代码只告诉你 WHAT exists，不告诉你 WHY。提取前必须系统性搜集 4 类上下文：
+
+| 上下文类型 | 发现规则 | 用途 | 降级策略 |
+|-----------|---------|------|---------|
+| **codebase** | demo 项目目录（用户提供） | 所有 6 模块的主要提取来源 | 无降级，缺失则终止 |
+| **product_doc** | 搜索项目根目录及上一级: `README.md`, `PRD.md`, `endgoal.*`, `docs/`, `*.prd` | 模块 01 定位、模块 02 场景的补充 | 仅从代码推断，标注 `[inferred]` |
+| **design_asset** | 搜索 `assets/`, `design/`, `*.figma`, `tokens.*`；代码中的颜色/字体常量 | 模块 04 设计规范的精确值 | 从 CSS/SwiftUI 代码提取，标注 `[extracted]` |
+| **strategic_context** | 搜索 `CLAUDE.md`, `AGENTS.md`, `.cursor/rules/`, 项目级指令文件 | 了解项目特殊约束和优先级 | 使用 ae-platform 默认约束 |
+
+### 来源置信度标注
+
+提取的每个字段标注来源，让下游（Dev agent、验证）知道信息的可靠程度：
+
+| 置信度 | 含义 | 标注方式 |
+|--------|------|---------|
+| `confirmed` | 直接从代码或文档中找到明确定义 | 无标注（默认） |
+| `extracted` | 从代码结构推断，未有文档确认 | 字段后标注 `[extracted]` |
+| `inferred` | 无直接证据，从上下文推断 | 字段后标注 `[inferred]` |
+| `missing` | 无法提取，需 PM 补充 | 字段后标注 `[NEEDS INPUT]` |
+
 ## 输出
 
-6 个标准模块的 markdown 文件，写入 `speckit/` 目录：
+6 个标准模块的 markdown 文件 + 1 个上下文追溯文件，写入 `speckit/` 目录：
 
 | 模块 | 文件 | 内容 |
 |------|------|------|
@@ -29,8 +51,20 @@
 | 04 | `04-design-spec.md` | 色彩系统、字体、间距、圆角、特效、组件库 |
 | 05 | `05-data-model.md` | 数据 schema、字段定义、关系、数据量级 |
 | 06 | `06-api-spec.md` | 已集成 API、Mock 实现、AI Prompt、未来 API 规划 |
+| -- | `00-context-manifest.md` | 上下文来源追溯（非标准模块，供追溯用） |
 
 ## 执行流程
+
+### Step 0: 约束合规预检
+
+开始提取前，读取 `content/constraints/` 下所有约束文件的 Detection Rules（`before:demo-to-speckit` 阶段），逐条执行：
+
+- iOS 约束: ios-001（SwiftUI Native）、ios-002（无 WebView）、ios-003（accessibilityIdentifier）、ios-004（权限声明）、ios-005（文件行数）
+- 数据约束: data-001（数据未硬编码在 UI）
+
+将违规项汇总告知 PM：
+- **block 级违规**（如 WebView 包装为主 UI）→ 建议 PM 先修复再提取
+- **warn 级违规**（如个别缺少 accessibilityIdentifier）→ 记录并继续
 
 ### Step 1: 识别项目类型
 
@@ -43,6 +77,29 @@
 | `package.json` + React/Vue/Next | Web SPA |
 | `build.gradle` + Spring Boot | Java Backend |
 
+### Step 1.5: 搜集上下文
+
+按 Context Manifest 声明，系统性搜集 4 类上下文：
+
+1. 扫描项目目录和父目录，按发现规则定位所有上下文源
+2. 对找到的每个上下文源，记录: `{type, path, found: true/false}`
+3. 对未找到的上下文类型，执行降级策略
+4. 将上下文清单写入 `speckit/00-context-manifest.md`
+
+`00-context-manifest.md` 格式：
+
+```markdown
+# Context Manifest
+
+| 类型 | 路径 | 状态 |
+|------|------|------|
+| codebase | ./ShoeLens/ | found |
+| product_doc | ./README.md | found |
+| product_doc | ./endgoal.md | not_found → fallback: inferred from code |
+| design_asset | 代码内 Color/Font 常量 | extracted |
+| strategic_context | ./CLAUDE.md | not_found → fallback: ae-platform defaults |
+```
+
 ### Step 2: 读取全部源码
 
 **必须读完所有源码文件**，不能只看部分。具体策略：
@@ -51,6 +108,8 @@
 - CSS 文件：重点读取变量定义和组件样式
 - 数据文件：读取 schema（前 50 行）+ 数据量统计
 - 配置文件：完整读取
+- **产品文档**（Step 1.5 找到的）：完整读取，提取产品定位、用户画像、商业决策
+- **设计资产**（Step 1.5 找到的）：提取 token 定义（颜色、字体、间距精确值）
 
 ### Step 3: 提取各模块
 
@@ -96,13 +155,27 @@
 
 ### Step 5: 输出并自检
 
-生成 speckit 后，自检清单：
+生成 speckit 后，执行两轮检查：
+
+**功能自检清单：**
 - [ ] 所有 tab 都有对应描述
 - [ ] 所有 Toast 消息都已列出
 - [ ] 所有导航路径都已覆盖
 - [ ] CSS 变量完整提取
 - [ ] 数据 schema 字段无遗漏
 - [ ] API/Mock 全部列出
+- [ ] `00-context-manifest.md` 已生成，列出所有上下文源
+
+**Schema 质量校验：**
+
+对照 `content/speckit-schema.yaml` 逐模块检查：
+- 所有 `required_sections` 是否都有内容
+- `quality_indicators` 是否满足（如 min_word_count, min_scenarios 等）
+- 不满足的项目标注并告知 PM
+
+**置信度检查：**
+- `[inferred]` 标注的字段不超过总字段的 30%
+- `[NEEDS INPUT]` 标注的字段汇总列出，提示 PM 补充
 
 ## 验证标准
 

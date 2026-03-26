@@ -20,18 +20,20 @@
 
 ## 输出
 
-- **verify-cases.yaml**：从 speckit 提取的结构化测试用例
+- **verify-cases.yaml**：从 speckit 提取的结构化测试用例（含 `level` 字段）
 - **diff report (JSON)**：每个 case 的 pass/missing/different 状态 + 归因 + 截图路径
-- **coverage %**：通过率 = pass / total
+- **coverage**：三维通过率（structural / behavioral / functional 分别计算）
+- **constraint_violations**：约束合规预检结果
 
 ## 执行流程
 
 ### Step 1: 提取测试用例
 
-从 speckit/02-user-scenarios.md 提取功能点，生成 verify-cases.yaml：
+从 speckit/02-user-scenarios.md 提取功能点，生成 verify-cases.yaml。每个 case 必须标注 `level`：
 
 ```yaml
 - id: unique_case_id
+  level: structural | behavioral | functional
   source: speckit/02#场景X
   description: "功能描述"
   precondition: at_which_page
@@ -41,6 +43,22 @@
   checks:
     - expect: "预期看到的内容"
 ```
+
+**Level 分类标准：**
+
+| Level | 含义 | 验证方式 | 可 mock? |
+|-------|------|---------|---------|
+| **structural** | UI 元素存在，可交互 | AXe / Vision 截图 | 可以 |
+| **behavioral** | 操作产生正确状态变更 | 截图前后对比 | 部分可以 |
+| **functional** | 业务逻辑返回正确结果 | 需要真实服务/AI | 不可以 |
+
+### Step 1.5: 约束合规预检
+
+验证执行前，读取 `content/constraints/` 下所有约束文件中 `before:verify-app` 阶段的 Detection Rules，逐条执行：
+
+1. 执行 `ios-008`（AXe UI Tree 可用性预检）
+2. 将所有违规项记入 diff report 的 `constraint_violations` 字段
+3. 如果 AXe 不可用（WebView hybrid），在 report 中标注所有 tap case 的可靠性为 `degraded`
 
 ### Step 2: 执行验证（交互式 Vision-guided）
 
@@ -75,7 +93,13 @@
   "iteration": N,
   "summary": { "total_cases": 25, "pass": 18, "missing": 4, "different": 3 },
   "coverage": "72%",
+  "coverage_by_level": {
+    "structural": { "total": 8, "pass": 8, "coverage": "100%" },
+    "behavioral": { "total": 14, "pass": 10, "coverage": "71%" },
+    "functional": { "total": 3, "pass": 0, "coverage": "0%" }
+  },
   "cases": [...],
+  "constraint_violations": [...],
   "constraint_discoveries": [...]
 }
 ```

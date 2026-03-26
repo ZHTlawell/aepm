@@ -34,6 +34,60 @@ PM vibe coding demo 原型（在约束下）
   可上线的产品
 ```
 
+## 各步骤操作说明
+
+### Step 1: Vibe Coding Demo
+
+用 AI 编码工具（Antigravity / Claude Code / Cursor）做出 demo 原型。ae-pm 的技术选型约束会确保 demo 符合工程规范。
+
+### Step 2: Demo → Speckit
+
+在 demo 项目中执行：
+
+```bash
+# 在 Claude Code 中
+/demo-to-speckit
+```
+
+产出 `speckit/` 目录，包含 6 个标准模块文件。
+
+### Step 3: Speckit → 成品（调用 ae-dev）
+
+**这一步需要切换到 Dev Agent 的工作环境。** 具体做法：
+
+```bash
+# 1. 创建成品项目目录
+mkdir -p ~/Projects/ShoeLens-prod
+cd ~/Projects/ShoeLens-prod
+
+# 2. 链接 ae-dev（如未链接过）
+ae link dev .
+# 或手动：
+#   mkdir -p .claude/skills
+#   ln -sf ~/.ae/dev/.claude/skills/* .claude/skills/
+#   echo '请同时遵守 ~/.ae/dev/CLAUDE.md 中的技术选型和生成流程。' >> CLAUDE.md
+
+# 3. 打开 Claude Code，告诉它 speckit 位置
+claude
+# 然后说：从 ~/Projects/ShoeLens/speckit/ 生成项目
+```
+
+或者用 `ae` CLI 一步完成：
+
+```bash
+ae dev speckit-receive ~/Projects/ShoeLens/speckit/
+```
+
+Dev Agent 会自动执行：验证 speckit → 生成 OpenAPI 契约 → 生成 Spring Boot 后端 → 生成 SwiftUI iOS → 编译验证。
+
+### Step 4: 验证
+
+回到 demo 项目，E2E 对比：
+
+```bash
+/verify-app
+```
+
 ## 已有能力
 
 | Skill | 命令 | 说明 |

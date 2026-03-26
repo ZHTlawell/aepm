@@ -147,19 +147,29 @@ git pull origin main
 
 | 能力 | 说明 | 状态 |
 |------|------|------|
+| Demo 原型转 Speckit | `/demo-to-speckit` — 从 demo 自动提取 6 模块标准规格书 | 可用 |
+| App 差异比对验证 | `/verify-app` — E2E 对比 demo vs 成品，自动归因差异 | 可用 |
+| 提需求 | `/submit-requirement` — 提交标准化的可复用能力需求 | 可用 |
 | Issue 反馈提交 | 提交 bug / 使用疑问到 ae-pm | 可用 |
 | 查收更新 | 查看 CHANGELOG.md 了解更新内容 | 可用 |
-| 提需求 | 通过 `/submit-requirement` skill 提交标准化需求 | 可用 |
 
-### 规划中的能力
+### 调用 Dev Agent 生成成品
 
-以下能力已作为需求提交，将通过 AE Team 开发后以 skill 形式交付：
+Speckit 生成后，需要切换到 ae-dev 环境来生成 iOS + 后端成品项目。操作方式：
 
-- **Demo 原型转 Speckit** — 将 Antigravity vibe coding 产品 demo 原型转化为 speckit
-- **Speckit One-Shot 生成** — 用 speckit 通过 dev agent 一次性生成高质量成品项目
-- **App 差异比对验证** — 比对两个 app 的差异，用于最终 verify
+**方式一：`ae` CLI（推荐）**
+```bash
+ae dev speckit-receive <speckit_dir>
+```
 
-后续能力根据 issue 反馈逐步补充，所有能力必须经过流程检验后才会正式发布。
+**方式二：手动切换**
+1. 创建成品项目目录，链接 ae-dev（`ae link dev .`）
+2. 打开 Claude Code，告诉它 speckit 路径
+3. Dev Agent 自动执行验证 → 生成 → 编译
+
+详见 ae-dev README。
+
+后续能力根据 issue 反馈逐步补充。
 
 ## 技术选型约束
 
