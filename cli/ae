@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ae — unified CLI for AE Platform (PM + Dev agent infrastructure)
+# https://gitee.com/turningsyn/ae-pm
+
+AE_VERSION="0.1.0"
+AE_HOME="${AE_HOME:-$HOME/.ae}"
+AE_CLI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AE_LIB_DIR="$AE_CLI_DIR/lib"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+info()  { echo -e "${BLUE}[ae]${NC} $*"; }
+ok()    { echo -e "${GREEN}[ae]${NC} $*"; }
+warn()  { echo -e "${YELLOW}[ae]${NC} $*"; }
+err()   { echo -e "${RED}[ae]${NC} $*" >&2; }
+
+usage() {
+    cat <<EOF
+${BOLD}ae${NC} v${AE_VERSION} — AE Platform CLI
+
+${BOLD}USAGE${NC}
+    ae <command> [args...]
+
+${BOLD}COMMANDS${NC}
+    ${BOLD}setup${NC} [role]          一键搭建环境（install + creds + doctor + 入驻）
+    ${BOLD}install${NC}              安装所有依赖（AXe、Java 17 等）
+    ${BOLD}doctor${NC}               检查环境是否就绪
+    ${BOLD}update${NC}               更新 ae-pm + ae-dev + ae-speckit-examples
+
+    ${BOLD}pm${NC} <subcommand>      PM 工作流
+        demo-to-speckit <demo_dir>     从 demo 提取 speckit
+        verify-app <demo> <prod>       E2E 对比 demo vs 成品
+        submit-requirement             提交可复用能力需求
+        submit-bug <title> [body]      提交 bug 报告
+        file-bugs <report.json>        从 verify 报告批量提 bug
+        validate-speckit <dir>         校验 speckit 格式
+
+    ${BOLD}dev${NC} <subcommand>     Dev 工作流
+        speckit-receive <speckit_dir>  从 speckit 生成项目
+        ios-build <project_dir>        iOS 编译验证
+        ios-test <app_path>            iOS UI 测试
+        backend-build <project_dir>   后端编译+启动验证
+
+    ${BOLD}link${NC} <role> [dir]    在项目中启用 ae-pm 或 ae-dev
+    ${BOLD}version${NC}              显示版本
+    ${BOLD}help${NC}                 显示帮助
+
+${BOLD}EXAMPLES${NC}
+    ae setup                          # 一键搭建环境
+    ae install                        # 安装所有依赖
+    ae doctor                         # 检查环境
+    ae pm demo-to-speckit ./ShoeLens  # 提取 speckit
+    ae link pm .                      # 在当前项目启用 ae-pm
+
+${BOLD}ENVIRONMENT${NC}
+    AE_HOME    安装目录（默认 ~/.ae）
+EOF
+}
+
+# Source sub-module
+source_lib() {
+    local lib="$AE_LIB_DIR/$1.sh"
+    if [[ ! -f "$lib" ]]; then
+        err "缺少模块: $lib"
+        exit 1
+    fi
+    source "$lib"
+}
+
+# Main dispatch
+main() {
+    if [[ $# -eq 0 ]]; then
+        usage
+        exit 0
+    fi
+
+    local cmd="$1"
+    shift
+
+    case "$cmd" in
+        setup)
+            source_lib "setup"
+            ae_setup "$@"
+            ;;
+        install)
+            source_lib "install"
+            ae_install "$@"
+            ;;
+        doctor)
+            source_lib "doctor"
+            ae_doctor "$@"
+            ;;
+        update)
+            source_lib "update"
+            ae_update "$@"
+            ;;
+        pm)
+            source_lib "pm"
+            ae_pm "$@"
+            ;;
+        dev)
+            source_lib "dev"
+            ae_dev "$@"
+            ;;
+        link)
+            source_lib "link"
+            ae_link "$@"
+            ;;
+        version|--version|-v)
+            echo "ae v${AE_VERSION}"
+            ;;
+        help|--help|-h)
+            usage
+            ;;
+        *)
+            err "未知命令: $cmd"
+            echo ""
+            usage
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"

@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+# ae doctor — check environment readiness
+
+ae_doctor() {
+    local all_ok=true
+    local role="${1:-all}"
+
+    info "检查 AE 环境..."
+    echo ""
+
+    # ── Core ──
+    echo -e "${BOLD}核心环境${NC}"
+    _check "git"          "git --version"
+    _check "python3"      "python3 --version"
+    _check "curl"         "curl --version | head -1"
+    _check "AE_HOME 目录" "test -d '$AE_HOME' && echo '$AE_HOME'"
+    echo ""
+
+    # ── ae-pm ──
+    if [[ "$role" == "all" || "$role" == "pm" ]]; then
+        echo -e "${BOLD}ae-pm${NC}"
+        _check "ae-pm 已安装"      "test -f '$AE_HOME/pm/CLAUDE.md' && echo '$AE_HOME/pm/'"
+        _check "PM skills"         "ls '$AE_HOME/pm/.claude/skills/'*.md 2>/dev/null | wc -l | tr -d ' '"
+        _check "Gitee credentials" "test -f '$HOME/.config/ae-pm/credentials.env' && echo '已配置'"
+        _check_gitee_token
+        echo ""
+    fi
+
+    # ── ae-dev ──
+    if [[ "$role" == "all" || "$role" == "dev" ]]; then
+        echo -e "${BOLD}ae-dev${NC}"
+        _check "ae-dev 已安装"     "test -f '$AE_HOME/dev/CLAUDE.md' && echo '$AE_HOME/dev/'"
+        _check "Dev skills"        "ls '$AE_HOME/dev/.claude/skills/'*.md 2>/dev/null | wc -l | tr -d ' '"
+        echo ""
+
+        echo -e "${BOLD}iOS 开发环境${NC}"
+        _check "Xcode"            "xcodebuild -version 2>/dev/null | head -1"
+        _check "simctl"           "xcrun simctl list devices 2>/dev/null | head -1"
+        _check "AXe CLI"          "which axe 2>/dev/null && axe --version 2>/dev/null || echo ''"
+        echo ""
+
+        echo -e "${BOLD}后端开发环境${NC}"
+        _check "Java 17+"         "java -version 2>&1 | head -1"
+        _check "Gradle"           "gradle --version 2>/dev/null | grep 'Gradle' | head -1"
+        echo ""
+    fi
+
+    # ── AI Tool ──
+    echo -e "${BOLD}AI 工具链${NC}"
+    _check "Claude Code"   "claude --version 2>/dev/null"
+    _check_any "或其他 AI 工具" \
+        "codex --version 2>/dev/null" \
+        "cursor --version 2>/dev/null"
+
+    # Figma MCP（PM 需要）
+    if [[ "$role" == "all" || "$role" == "pm" ]]; then
+        if command -v claude &>/dev/null; then
+            _check "Figma MCP" "claude mcp list 2>/dev/null | grep -qi figma && echo '已连接'"
+        else
+            printf "  ${YELLOW}△${NC} %-22s %s\n" "Figma MCP" "跳过（需先安装 Claude Code）"
+        fi
+    fi
+
+    # Scripts（预处理脚本）
+    if [[ "$role" == "all" || "$role" == "pm" ]]; then
+        _check "预处理脚本" "test -f '$AE_HOME/pm/scripts/demo-to-figma-prepare.sh' && echo '已就绪 ($(ls \"$AE_HOME/pm/scripts/\"*.sh 2>/dev/null | wc -l | tr -d \" \") 个)'"
+    fi
+
+    # CLI
+    _check "ae CLI" "test -f '$AE_HOME/pm/cli/ae' && echo '已就绪' || (test -f '$AE_HOME/dev/cli/ae' && echo '已就绪')"
+    echo ""
+
+    # ── Summary ──
+    if $all_ok; then
+        ok "环境就绪 ✓"
+    else
+        warn "部分依赖缺失，运行 ${BOLD}ae install${NC} 安装"
+        return 1
+    fi
+}
+
+_check() {
+    local name="$1"
+    local cmd="$2"
+    local result
+    result=$(eval "$cmd" 2>/dev/null) || result=""
+
+    if [[ -n "$result" ]]; then
+        printf "  ${GREEN}✓${NC} %-22s %s\n" "$name" "$result"
+    else
+        printf "  ${RED}✗${NC} %-22s %s\n" "$name" "未找到"
+        all_ok=false
+    fi
+}
+
+_check_any() {
+    local name="$1"
+    shift
+    for cmd in "$@"; do
+        local result
+        result=$(eval "$cmd" 2>/dev/null) || result=""
+        if [[ -n "$result" ]]; then
+            printf "  ${GREEN}✓${NC} %-22s %s\n" "$name" "$result"
+            return
+        fi
+    done
+    printf "  ${YELLOW}△${NC} %-22s %s\n" "$name" "未检测到（至少需要一个 AI 编码工具）"
+}
+
+_check_gitee_token() {
+    local cred="$HOME/.config/ae-pm/credentials.env"
+    if [[ ! -f "$cred" ]]; then
+        printf "  ${RED}✗${NC} %-22s %s\n" "Gitee Token" "未配置"
+        all_ok=false
+        return
+    fi
+
+    # Source and test token (without proxy)
+    # Save and restore proxy vars to avoid side effects
+    local _saved_http_proxy="${http_proxy:-}" _saved_https_proxy="${https_proxy:-}"
+    source "$cred"
+    unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
+
+    local resp
+    resp=$(curl -s --max-time 10 -o /dev/null -w "%{http_code}" \
+        "https://gitee.com/api/v5/user?access_token=$GITEE_TOKEN" 2>/dev/null) || resp="000"
+
+    # Restore proxy
+    [[ -n "$_saved_http_proxy" ]] && export http_proxy="$_saved_http_proxy"
+    [[ -n "$_saved_https_proxy" ]] && export https_proxy="$_saved_https_proxy"
+
+    if [[ "$resp" == "200" ]]; then
+        printf "  ${GREEN}✓${NC} %-22s %s\n" "Gitee Token" "有效"
+    else
+        printf "  ${RED}✗${NC} %-22s %s\n" "Gitee Token" "无效 (HTTP $resp)"
+        all_ok=false
+    fi
+}
