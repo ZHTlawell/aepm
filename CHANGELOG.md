@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.13.0 (2026-03-31) — 交付完整性修复 + demo-to-figma 预处理管线
+
+### 重大修复
+- **PM 交付完整性修复** — ae-pm 之前只包含 skills 和文档，PM 拿到后无法使用任何 CLI 命令或预处理脚本 `#IHUYQ4`
+  - build.sh 改造：构建 PM 包时自动打包 **完整 CLI**（ae 命令 + 9 个 lib 模块）和 **所有工具脚本**
+  - ae-pm 从 10 个文件扩充到 26 个文件，PM 拿到后可完成全部自助安装和使用
+
+### 新增能力
+- **demo-to-figma 预处理管线** — 5 个脚本将确定性提取工作脚本化，LLM 只需读取 JSON `#IHUYQ4`
+  - `demo-to-figma-prepare.sh` — 编排器，一键运行以下 4 个脚本
+  - `discover-pages.sh` → pages.json（HTML + JS 路由扫描，过滤 action handler 噪音）
+  - `extract-tokens.sh` → tokens.json（CSS :root 变量 → 分类 tokens，颜色自动转 rgb01）
+  - `extract-images.sh` → images.json + *.b64（5 种图片引用模式 + 可选 base64 编码）
+  - `extract-svgs.sh` → svgs.json（内联 SVG content 提取）
+- **demo-to-figma skill 更新** — Step 1-2 改为调用预处理脚本，颜色直接用 tokens.json 的 rgb01
+
+### 改进
+- **setup.sh 新增 AI 工具链检查**（Step 2）— 检测 Claude Code 安装状态 + Figma MCP 连接状态，交互式引导安装
+- **doctor.sh 新增 4 项检查** — Claude Code / Figma MCP / 预处理脚本就绪 / ae CLI 就绪
+- **install.sh 改用 Gitee 源** — 从 GitHub 改为 Gitee，国内访问更稳定，错误提示人话化
+
+### Figma MCP 调研结论
+- `createImageAsync(url)` 在 MCP 沙箱中被明确禁用
+- `generate_figma_design` 可截取简单页面（含图片），但复杂页面会 crash
+- 最佳实践：**图片用色块占位 + SVG 图标通过 `createNodeFromSvg()` 完美还原**，设计师后续替换图片
+
 ## v0.12.0 (2026-03-31) — Figma 图层组织规范
 
 ### 改进
