@@ -24,33 +24,44 @@
 - **页面截图**：每个页面的 Figma 截图（供 PM 确认还原度）
 - **限制说明**：图片为占位色块、无交互原型等已知限制
 
+## 预处理管线
+
+以下脚本将流程化的提取工作前置完成，LLM 只需读取 JSON 结果：
+
+| 脚本 | 输出 | 做什么 |
+|------|------|--------|
+| `scripts/demo-to-figma-prepare.sh` | output_dir/ | 编排器，串联下面 4 个脚本 |
+| `scripts/discover-pages.sh` | pages.json | HTML 文件 + JS 路由扫描 → 页面清单 |
+| `scripts/extract-tokens.sh` | tokens.json | CSS `:root` 变量 → 分类 tokens（颜色含 rgb01） |
+| `scripts/extract-images.sh` | images.json + images/*.b64 | 图片引用提取 + 可选 base64 编码 |
+| `scripts/extract-svgs.sh` | svgs.json | 内联 SVG content + SVG 文件引用 |
+
 ## 执行流程
 
-### Step 1: 项目识别与页面发现
+### Step 1: 预处理 — 运行提取管线
 
-1. 判断项目类型：
-   - **Web SPA**：扫描 `*.html` 文件、JS 路由配置（`case 'xxx':`、`route:` 等）、tab 导航结构
-   - **iOS**：扫描 SwiftUI View 文件、`NavigationStack`/`TabView` 结构
-2. 列出所有页面清单（名称 + 入口文件）
-3. 展示页面清单，询问 PM：全部转换还是选择部分页面？
+执行预处理脚本，一次性完成所有确定性提取工作：
 
-### Step 2: 设计规范提取
+```bash
+./scripts/demo-to-figma-prepare.sh <demo_dir> /tmp/figma-prepare
+```
 
-从代码中提取 design tokens，不凭空编造任何值：
+脚本自动完成：
+- **页面发现**（`discover-pages.sh`）→ `pages.json`：扫描 HTML 文件 + JS 路由（`case 'xxx':` + `renderXxx()` 模式），过滤 action handler 噪音
+- **Design Token 提取**（`extract-tokens.sh`）→ `tokens.json`：解析 CSS `:root` 变量，分类为 colors/radius/fonts/effects，颜色自动转 Figma 可用的 rgb01 格式
+- **图片引用提取**（`extract-images.sh`）→ `images.json`：5 种匹配模式（src/url/img/background-image），检查本地文件存在性
+- **SVG 图标提取**（`extract-svgs.sh`）→ `svgs.json`：提取内联 SVG content + 独立 SVG 文件引用
 
-**Web 项目（CSS 变量）：**
-- `:root` 中的 CSS 变量（`--bg-primary`、`--text-primary`、`--accent-*` 等）
-- 字体族（`font-family`）
-- 间距/圆角（`--radius-*`、`padding`）
-- 画布宽度（`max-width` 或 viewport 设置，移动端通常 430px）
+如需同时生成图片 base64 编码文件（供后续 Image Loader Agent 使用）：
+```bash
+./scripts/demo-to-figma-prepare.sh <demo_dir> /tmp/figma-prepare --with-b64
+```
 
-**iOS 项目（SwiftUI）：**
-- `Color` 定义和 `Assets.xcassets` 中的颜色集
-- `.font()` 修饰符提取字体规范
-- `.cornerRadius()`、`.padding()` 提取间距/圆角
-- 画布宽度固定 393px（iPhone 15 Pro）
+### Step 2: 确认页面清单
 
-输出设计规范摘要供后续步骤使用。
+1. 读取 `pages.json`，向 PM 展示页面清单（名称 + 入口文件 + render 函数）
+2. 询问 PM：全部转换还是选择部分页面？
+3. 读取 `tokens.json`，展示 design token 摘要（颜色数、圆角、字体、画布尺寸）供 PM 确认
 
 ### Step 3: Figma 连接与文件创建
 
@@ -66,13 +77,14 @@
 
 对每个页面按以下流程构建：
 
-#### 4a. 读取源码
+#### 4a. 读取源码（LLM 核心环节）
 
-读取该页面涉及的所有 HTML/CSS/JS（或 SwiftUI）源码，理解：
+读取该页面对应的 render 函数源码（从 `pages.json` 获取 `render_fn` 定位），理解：
 - 组件层级结构（哪些是容器、哪些是子元素）
 - 布局方式（flex/grid/stack → Figma auto-layout 方向和间距）
-- 样式细节（颜色、字体、圆角、阴影、渐变）
+- 样式细节 — 优先引用 `tokens.json` 中的预提取值（rgb01 可直接用于 Figma），代码中的内联样式作为补充
 - 文案内容（标题、按钮文字、描述文本）
+- 图片/SVG 使用 — 查 `images.json` 和 `svgs.json` 确认该页面用到的素材
 
 #### 4b. 构建 Figma 节点
 
@@ -118,9 +130,9 @@
 
 - 所有容器使用 `layoutMode`（auto-layout），不使用绝对定位（底部导航栏等固定元素除外）
 - 先创建父节点并设置 `layoutMode`，再 `appendChild` 子节点，最后设置 `layoutSizingHorizontal = "FILL"`（顺序不能反）
-- 颜色使用 Step 2 提取的精确值（RGB 0-1 范围）
+- 颜色使用 `tokens.json` 中的 `rgb01` 数组（已转换为 Figma 0-1 范围），直接展开为 `{r: 0.11, g: 0.11, b: 0.12}`
 - 字体优先使用 `Inter`（Figma 默认可用），加载所需 style：`await figma.loadFontAsync({ family: "Inter", style: "Bold" })`
-- **图片加载（重要：必须委托给独立 Agent）**：从源码提取图片 URL，用 bash 下载为小尺寸（150x110）JPEG，base64 编码后嵌入 `use_figma` 代码。Plugin API 无 `fetch`/`atob`，需自行实现 base64 解码器（见下方模板）。每张图约 5K base64 字符，单次调用可嵌入 2-3 张图。**图片加载必须通过 `Agent` 工具委托给独立子 Agent 执行**——长对话中 base64 字符串会在传递过程中损坏，导致图片显示为色块。子 Agent 拥有独立短上下文，base64 传递完整无损
+- **图片加载（重要：必须委托给独立 Agent）**：如已用 `--with-b64` 运行预处理，直接读取 `images/manifest.json` 获取 `.b64` 文件路径；否则用 `extract-images.sh <demo_dir> <output_dir>` 按需生成。Plugin API 无 `fetch`/`atob`，需自行实现 base64 解码器（见下方模板）。每张图约 5K base64 字符，单次调用可嵌入 2-3 张图。**图片加载必须通过 `Agent` 工具委托给独立子 Agent 执行**——长对话中 base64 字符串会在传递过程中损坏，导致图片显示为色块。子 Agent 拥有独立短上下文，base64 传递完整无损
 - **每个页面创建一个独立的顶层 Frame**，尺寸固定为 430×932（iPhone 15 Pro），`clipsContent = true`
 - Content 子 Frame 使用 `layoutSizingVertical = "FIXED"`，高度按实际内容设置（可超过 932px，表示可滚动）
 - 每次 `use_figma` 调用的代码不超过 200 行，复杂页面分多次调用
@@ -246,8 +258,13 @@ function fillImg(node, hash) {
   node.fills = [{ type: "IMAGE", imageHash: hash, scaleMode: "FILL" }];
 }
 
-// 使用：先用 bash 下载图片并 base64 编码
-// curl -sL "IMAGE_URL?w=150&h=110&fm=jpg&q=70" | base64 | tr -d '\n'
+// 使用：
+// 方式 1（推荐）：预处理管线已生成 .b64 文件
+//   cat /tmp/figma-prepare/images/img_001.b64
+// 方式 2：手动下载
+//   curl -sL "IMAGE_URL?w=150&h=110&fm=jpg&q=70" | base64 | tr -d '\n'
+// 方式 3：使用已有脚本批量生成
+//   ./scripts/figma-load-images.sh <mapping_file>
 // 然后将 base64 字符串嵌入代码
 const B1 = "...base64...";
 const img = loadImg(B1);
@@ -285,8 +302,8 @@ fillImg(targetNode, img.hash);
 | 角色 | 执行者 | 职责 | 关键约束 |
 |------|--------|------|----------|
 | **Coordinator** | 主 Agent | Vision 对比分析、制定修复计划、编排子 Agent、验证结果 | 不直接处理 base64 图片数据 |
-| **Image Loader** | 独立子 Agent | 下载/压缩图片 → base64 编码 → 调用 `use_figma` 加载到指定节点 | 每次 max 2 张图，base64 < 6000 字符，用完即弃（短上下文防损坏） |
-| **SVG Builder** | 独立子 Agent 或主 Agent | 从源码提取 SVG → `createNodeFromSvg()` 替换占位色块 | 一次可处理多个 SVG，需传入精确的 nodeId |
+| **Image Loader** | 独立子 Agent | 读取 `images/manifest.json` 中的 `.b64` 文件 → 调用 `use_figma` 加载到指定节点 | 每次 max 2 张图，base64 < 6000 字符，用完即弃（短上下文防损坏） |
+| **SVG Builder** | 独立子 Agent 或主 Agent | 从 `svgs.json` 获取 SVG content → `createNodeFromSvg()` 替换占位色块 | 一次可处理多个 SVG，需传入精确的 nodeId |
 | **Layout Fixer** | 主 Agent | 调整间距/圆角/颜色/位置/auto-layout 属性 | 直接操作 `use_figma`，不涉及大数据传输 |
 
 ### 工作流
@@ -309,16 +326,17 @@ Coordinator: 重新截图验证 → 未达标则再循环
 
 ## 重要规则
 
-1. **不编造数据** — 颜色、字体、文案全部从代码提取，不凭空编造
-2. **先确认再执行** — Step 1 页面清单必须 PM 确认后再开始构建
-3. **每页独立 Frame** — 每个页面是独立的顶层 Frame，不混在一个 Frame 中
-4. **构建后必须验证** — 每个页面构建完成后，必须执行 Step 5 自验证流程，不能跳过
-5. **不遗漏 section** — 读代码时必须完整遍历渲染函数，列出所有 UI section，逐个构建
-6. **文字不可截断** — text 节点必须设置 `textAutoResize = "HEIGHT"` 和 `layoutSizingHorizontal = "FILL"`（在 auto-layout 父节点中）
-7. **图片用占位色块** — 当前阶段用深灰色占位（`{r:0.12, g:0.12, b:0.14}`），节点名标注图片用途
-8. **逐页完成** — 一个页面验证达标后再开始下一个页面，不铺开多页同时做
-9. **语义分组** — 相关元素必须用父 Frame 包裹（Cover+Tag → CoverArea，Icon+Label → MetaRow），禁止平级堆叠
-10. **图标必须嵌套** — SVG 图标 `appendChild` 到父容器内，尺寸标准化为 4 的倍数（16/20/24），不能作为浮动兄弟节点
+1. **不编造数据** — 颜色、字体、文案全部从预处理 JSON 或代码提取，不凭空编造
+2. **先跑管线再动手** — 必须先执行 `demo-to-figma-prepare.sh` 生成 JSON，再开始构建；颜色直接用 `tokens.json` 的 `rgb01`，不要手动解析 CSS
+3. **先确认再执行** — Step 2 页面清单必须 PM 确认后再开始构建
+4. **每页独立 Frame** — 每个页面是独立的顶层 Frame，不混在一个 Frame 中
+5. **构建后必须验证** — 每个页面构建完成后，必须执行 Step 5 自验证流程，不能跳过
+6. **不遗漏 section** — 读代码时必须完整遍历渲染函数，列出所有 UI section，逐个构建
+7. **文字不可截断** — text 节点必须设置 `textAutoResize = "HEIGHT"` 和 `layoutSizingHorizontal = "FILL"`（在 auto-layout 父节点中）
+8. **图片用占位色块** — 当前阶段用深灰色占位（`{r:0.12, g:0.12, b:0.14}`），节点名标注图片用途
+9. **逐页完成** — 一个页面验证达标后再开始下一个页面，不铺开多页同时做
+10. **语义分组** — 相关元素必须用父 Frame 包裹（Cover+Tag → CoverArea，Icon+Label → MetaRow），禁止平级堆叠
+11. **图标必须嵌套** — SVG 图标 `appendChild` 到父容器内，尺寸标准化为 4 的倍数（16/20/24），不能作为浮动兄弟节点
 
 ## Agent 生成 vs 设计师精修的职责边界
 
