@@ -229,7 +229,9 @@ fillImg(targetNode, img.hash);
 | 代码超长报错 | 单次 use_figma 代码过长 | 拆分为多次调用，每次不超过 200 行 |
 | `fetch is not defined` | Plugin API 无网络能力 | 用 bash 预下载图片，base64 嵌入代码 |
 | `atob is not defined` | Plugin API 无 atob | 使用上方纯 JS base64 解码器模板 |
-| Frame 高度异常（100px） | 新建 Frame 默认高度 | 创建后立即设置 `layoutSizingVertical = "HUG"` |
+| Frame 高度异常（100px） | 新建 Frame 默认高度 | 创建后立即设置 `layoutSizingVertical = "HUG"`。构建完成后全量扫描：遍历所有 Frame，凡 `height===100 && layoutMode!=="NONE"` 的一律设 HUG |
+| SVG 图标以独立图层叠加 | `createNodeFromSvg` 产出的 Frame 是平级兄弟 | **必须嵌套**：先创建父容器 Frame（圆角/背景），再把 SVG 移入 `appendChild`。设计师不接受 A 上面叠 B 的图层结构 |
+| Cover Image 与 Tag 平级 | 分别创建后未分组 | 相关元素必须用父 Frame 包裹（如 Cover 包含 Image+Tag），设计师需要语义化分组才能高效编辑 |
 | 文字截断 | 父容器宽度 FIXED | 父容器设 `layoutSizingHorizontal = "FILL"`，文本设 `textAutoResize = "HEIGHT"` |
 | 底部导航栏不可见 | 页面 Frame 高度不足 | 页面 Frame 固定 932px + `clipsContent = true` |
 | 图片显示为色块/损坏 | base64 字符串在传递中被截断或损坏 | 保持单张图片 base64 < 8K 字符；每次 `use_figma` 调用只嵌入 1-2 张图；调用后立即用 `get_screenshot` 验证 |
