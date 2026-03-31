@@ -79,9 +79,45 @@
 使用 `mcp__figma__use_figma` 执行 Figma Plugin API 代码：
 
 **必须遵守的规则：**
+
+**图层组织规范（设计师协作质量核心）：**
+
+- **命名规范**：所有节点必须设语义化 `node.name`，禁止出现 `Frame 1`、`Rectangle 2` 等默认名称
+  - 页面级：`{PageName} — Mobile`
+  - 区块级：`Header`、`Hero Section`、`Card Grid`、`Tab Bar`
+  - 卡片内部：`Card/Cover`、`Card/Content`、`Card/Footer`
+  - 图标：`Icon/{Name}` 或在容器内用 `Left Icon`、`Trailing Icon`
+- **语义分组**：相关元素必须用父 Frame 包裹，设计师需要语义化分组才能高效编辑
+  - Cover Image + Tag → 包裹在 `CoverArea` Frame 内（Tag 用 `layoutPositioning = "ABSOLUTE"`）
+  - Icon + Label → 包裹在 `MetaRow` Frame 内
+  - 禁止平级堆叠：A 上面叠 B 的结构设计师不接受
+- **嵌套深度**：控制在 3 层以内（Section → Card → Content），避免过深嵌套
+- **Auto Layout 尺寸模式决策**：
+
+  | 模式 | 何时使用 | 典型场景 |
+  |------|---------|---------|
+  | **HUG** | 父容器包裹子内容收缩 | 文本容器、按钮、Card 整体高度 |
+  | **FILL** | 子元素拉伸占满父容器 | 内容区域水平方向、文本宽度 |
+  | **FIXED** | 固定尺寸不可变 | 页面 Frame(430×932)、图标(24×24)、图片高度 |
+
+- **Card 组件标准结构**：
+  ```
+  Card [VERTICAL auto-layout, gap:0, cornerRadius:8, clipsContent:true]
+  ├── CoverArea [FILL horizontal, FIXED height]
+  │   ├── CoverImage [Rectangle, IMAGE fill]
+  │   └── Tag [ABSOLUTE positioned]
+  ├── Content [VERTICAL auto-layout, padding:16, gap:8, FILL horizontal, HUG vertical]
+  │   ├── Title [textAutoResize:"HEIGHT", FILL horizontal]
+  │   └── Subtitle [textAutoResize:"HEIGHT", FILL horizontal]
+  └── Footer [HORIZONTAL auto-layout, padding:12 16, gap:8]
+  ```
+- **SVG 图标处理**：`createNodeFromSvg()` 产出的 Frame 必须 `appendChild` 到父容器内，然后设 FIXED 尺寸（16/20/24，4 的倍数）
+- **间距/圆角一致性**：使用 4 或 8 的倍数（xs=4, sm=8, md=16, lg=24, xl=32），从 CSS 提取后对齐到最近的倍数
+
+**基础构建规则：**
+
 - 所有容器使用 `layoutMode`（auto-layout），不使用绝对定位（底部导航栏等固定元素除外）
 - 先创建父节点并设置 `layoutMode`，再 `appendChild` 子节点，最后设置 `layoutSizingHorizontal = "FILL"`（顺序不能反）
-- 图层命名语义化：使用 "Header"、"Hero Card"、"Tab Bar" 等描述性名称
 - 颜色使用 Step 2 提取的精确值（RGB 0-1 范围）
 - 字体优先使用 `Inter`（Figma 默认可用），加载所需 style：`await figma.loadFontAsync({ family: "Inter", style: "Bold" })`
 - **图片加载（重要：必须委托给独立 Agent）**：从源码提取图片 URL，用 bash 下载为小尺寸（150x110）JPEG，base64 编码后嵌入 `use_figma` 代码。Plugin API 无 `fetch`/`atob`，需自行实现 base64 解码器（见下方模板）。每张图约 5K base64 字符，单次调用可嵌入 2-3 张图。**图片加载必须通过 `Agent` 工具委托给独立子 Agent 执行**——长对话中 base64 字符串会在传递过程中损坏，导致图片显示为色块。子 Agent 拥有独立短上下文，base64 传递完整无损
@@ -229,12 +265,47 @@ fillImg(targetNode, img.hash);
 | 代码超长报错 | 单次 use_figma 代码过长 | 拆分为多次调用，每次不超过 200 行 |
 | `fetch is not defined` | Plugin API 无网络能力 | 用 bash 预下载图片，base64 嵌入代码 |
 | `atob is not defined` | Plugin API 无 atob | 使用上方纯 JS base64 解码器模板 |
-| Frame 高度异常（100px） | 新建 Frame 默认高度 | 创建后立即设置 `layoutSizingVertical = "HUG"` |
+| Frame 高度异常（100px） | 新建 Frame 默认高度 | 创建后立即设置 `layoutSizingVertical = "HUG"`。构建完成后全量扫描：遍历所有 Frame，凡 `height===100 && layoutMode!=="NONE"` 的一律设 HUG |
+| SVG 图标以独立图层叠加 | `createNodeFromSvg` 产出的 Frame 是平级兄弟 | **必须嵌套**：先创建父容器 Frame（圆角/背景），再把 SVG 移入 `appendChild`。设计师不接受 A 上面叠 B 的图层结构 |
+| Cover Image 与 Tag 平级 | 分别创建后未分组 | 相关元素必须用父 Frame 包裹（如 Cover 包含 Image+Tag），设计师需要语义化分组才能高效编辑 |
 | 文字截断 | 父容器宽度 FIXED | 父容器设 `layoutSizingHorizontal = "FILL"`，文本设 `textAutoResize = "HEIGHT"` |
 | 底部导航栏不可见 | 页面 Frame 高度不足 | 页面 Frame 固定 932px + `clipsContent = true` |
-| 图片显示为色块/损坏 | base64 字符串在传递中被截断或损坏 | 保持单张图片 base64 < 8K 字符；每次 `use_figma` 调用只嵌入 1-2 张图；调用后立即用 `get_screenshot` 验证 |
+| 图片显示为色块/损坏 | base64 字符串在传递中被截断或损坏 | 保持单张图片 base64 < 6K 字符（实测 ~140x140 JPEG q65 为安全上限）；每次 `use_figma` 调用只嵌入 1-2 张图；调用后立即用 `get_screenshot` 验证 |
 | 图片节点名不匹配 | `findOne` 按名称搜索但节点名可能是默认值 "Rectangle" | 搜索时同时按 `name` 和 `type === "RECTANGLE"` 匹配 |
 | 所有卡片使用相同图片 | 单次调用只能嵌入有限图片 | 分多次调用，每次加载不同图片的 base64；或接受设计稿中使用代表性图片 |
+| `createImage` hash 跨调用不渲染 | Figma Plugin API session 限制，前次调用创建的 imageHash 后续调用可能不渲染 | 尽量在同一次 `use_figma` 调用中完成 createImage + 赋值 fills；或接受部分卡片复用相同图片 |
+| SVG 图标在 auto-layout 中位置偏移 | `appendChild` 后被 auto-layout 重排 | 对需要固定位置的 SVG 设置 `layoutPositioning = "ABSOLUTE"`，然后手动设置 x/y 坐标 |
+
+## Agent Team 分工（迭代修复阶段）
+
+迭代修复阶段（Step 5）使用 Agent 工具将工作分配给专职子 Agent，提升并行效率并避免长对话导致的 base64 损坏。
+
+### 角色与职责
+
+| 角色 | 执行者 | 职责 | 关键约束 |
+|------|--------|------|----------|
+| **Coordinator** | 主 Agent | Vision 对比分析、制定修复计划、编排子 Agent、验证结果 | 不直接处理 base64 图片数据 |
+| **Image Loader** | 独立子 Agent | 下载/压缩图片 → base64 编码 → 调用 `use_figma` 加载到指定节点 | 每次 max 2 张图，base64 < 6000 字符，用完即弃（短上下文防损坏） |
+| **SVG Builder** | 独立子 Agent 或主 Agent | 从源码提取 SVG → `createNodeFromSvg()` 替换占位色块 | 一次可处理多个 SVG，需传入精确的 nodeId |
+| **Layout Fixer** | 主 Agent | 调整间距/圆角/颜色/位置/auto-layout 属性 | 直接操作 `use_figma`，不涉及大数据传输 |
+
+### 工作流
+
+```
+Coordinator: 截图对比 → 输出差距表
+    ├── Image Loader Agent (background): 批量加载图片
+    ├── SVG Builder Agent (background): 批量替换 SVG 图标
+    └── Layout Fixer (foreground): 修间距/颜色/位置
+Coordinator: 重新截图验证 → 未达标则再循环
+```
+
+### 关键规则
+
+1. **逐页完成** — 一个页面验证达标后再开始下一个，不要同时铺开多页
+2. **Image Loader 必须用独立 Agent** — 长对话中 base64 字符串会损坏
+3. **图片尺寸梯度** — 140×140 q65 ≈ 6K chars（SOTD 验证可用）；大图拆多次调用
+4. **每轮修复后必须截图验证** — 不盲信 use_figma 的返回值，截图才是真相
+5. **差距表驱动** — 每轮修复从差距表中按严重度排序执行，修完标记
 
 ## 重要规则
 
@@ -245,3 +316,14 @@ fillImg(targetNode, img.hash);
 5. **不遗漏 section** — 读代码时必须完整遍历渲染函数，列出所有 UI section，逐个构建
 6. **文字不可截断** — text 节点必须设置 `textAutoResize = "HEIGHT"` 和 `layoutSizingHorizontal = "FILL"`（在 auto-layout 父节点中）
 7. **图片用占位色块** — 当前阶段用深灰色占位（`{r:0.12, g:0.12, b:0.14}`），节点名标注图片用途
+8. **逐页完成** — 一个页面验证达标后再开始下一个页面，不铺开多页同时做
+9. **语义分组** — 相关元素必须用父 Frame 包裹（Cover+Tag → CoverArea，Icon+Label → MetaRow），禁止平级堆叠
+10. **图标必须嵌套** — SVG 图标 `appendChild` 到父容器内，尺寸标准化为 4 的倍数（16/20/24），不能作为浮动兄弟节点
+
+## Agent 生成 vs 设计师精修的职责边界
+
+**Agent 输出（80% 结构工作）**：完整图层层级 + 语义命名 + Auto Layout 配置正确（方向/尺寸/间距/gap）+ 精确颜色和字体 + 正确嵌套（图标在容器内、Tag 在 Cover 内）+ 阴影效果 + 文本自适应
+
+**设计师完成（20% 精修和系统化）**：转为组件和变体 → 创建共享样式和变量 → 替换图片占位符 → 添加原型交互流程 → 光学间距微调 → 响应式变体
+
+> 调研详情见 `content/research/figma-layer-conventions.md`
