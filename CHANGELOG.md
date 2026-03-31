@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.12.0 (2026-03-30) — Demo → Figma 自动转换
+
+### 新增能力
+- **Demo 转 Figma 设计稿** (`/demo-to-figma`) — PM vibe coding 出 demo 后，自动将 HTML/CSS/JS 项目转为可编辑的 Figma 设计稿，供设计师精修 `#IHRKLX`
+  - 自动扫描项目页面、从 CSS 变量提取 design tokens（色彩/字体/间距/圆角）
+  - 用 Figma MCP `use_figma` 逐页程序化构建 Figma 节点（auto-layout + 语义化图层命名）
+  - 内置 Vision 自验证循环：截图对比 → 差距分析（7 类差距 × 3 级严重度）→ 自动修复 → 再验证
+  - 真实图片加载：bash 下载 → base64 编码 → Plugin API `figma.createImage()` 填充
+  - 纯 JS base64 解码器模板（兼容 Plugin API 沙箱，无 fetch/atob）
+  - 8 条故障排查 + 7 条规则（含「图片加载必须委托独立 Agent」「Frame 默认高度 100px 陷阱」等）
+
+### 新增脚本
+- **`capture-demo-screenshots.sh`** — Playwright 自动截取 demo 各页面截图，供 `/demo-to-figma` 自验证对比使用
+
+### 验证结果
+- ShoeLens 4 个主要页面（Home/Category/Collection/Profile）全部成功转换
+- 5 轮验证-修复迭代，修复 15+ 个问题
+- Figma 文件可直接打开编辑：https://www.figma.com/design/Cg2gGDD9aH4Rjs1iUgDWhD
+
+### 关键技术发现
+- `generate_figma_design`（浏览器截屏）图片密集页面超时 → `use_figma`（程序化创建）无此问题
+- Plugin API 沙箱无 `fetch`/`atob` → 外部下载 + 自带 base64 解码器
+- 长对话 base64 传递会损坏 → 图片加载必须委托独立 Agent
+
 ## v0.11.0 (2026-03-26) — 图片去版权化工具
 
 ### 新增能力
