@@ -67,6 +67,17 @@ description: "向 AE Team 提交可复用能力需求"
 
 将填写好的需求展示给用户，确认无误后提交。
 
+### Step 4.5: 上传截图（如有）
+
+如果用户提供了截图来说明需求，先上传获取 URL：
+
+```bash
+ae pm upload-image ~/path/to/screenshot.png
+# 输出: ![screenshot.png](https://gitee.com/...)
+```
+
+将输出的 markdown 图片引用插入到需求正文相应位置。
+
 ### Step 5: 提交到 ae-pm
 
 ```bash
@@ -79,7 +90,7 @@ curl -s -X POST "https://gitee.com/api/v5/repos/turningsyn/issues" \
     "access_token": "'"$GITEE_TOKEN"'",
     "repo": "ae-pm",
     "title": "[FEAT] 需求名称",
-    "body": "需求正文（按上方模板填写）"
+    "body": "需求正文（按上方模板填写，可包含 ![img](url) 截图引用）"
   }'
 ```
 

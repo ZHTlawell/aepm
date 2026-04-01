@@ -44,8 +44,9 @@ description: "提交 bug 报告到 Gitee"
 
 > "这个 UI 问题能截个图吗？最好是 demo 和成品的对比截图，这样 AE Team 能直接看到差异。"
 
-- 截图保存到项目目录下（如 `bugs/screenshot-xxx.png`）
-- issue 正文中用相对路径引用
+**截图处理方式：**
+- 用户提供截图路径后，使用 `ae pm upload-image` 上传，或在 submit-bug 时用 `--screenshot` 参数
+- 上传后的图片 URL 会自动插入 issue 正文
 
 如果用户无法提供截图，在 issue 中标注 `⚠️ 无截图，需人工复现`。
 
@@ -104,6 +105,15 @@ description: "提交 bug 报告到 Gitee"
 
 **必须通过 `ae` CLI 提交，不要直接调用 API 或创建本地文件。**
 
+如果有截图，使用 `--screenshot` 参数（可多次指定）：
+
+```bash
+ae pm submit-bug "bug 标题（含前缀）" "bug 正文" --screenshot ~/path/to/screenshot.png
+ae pm submit-bug "bug 标题" "正文" -s demo.png -s prod.png
+```
+
+无截图时：
+
 ```bash
 ae pm submit-bug "bug 标题（含前缀）" "bug 正文（markdown 格式）"
 ```
@@ -112,6 +122,13 @@ ae pm submit-bug "bug 标题（含前缀）" "bug 正文（markdown 格式）"
 
 ```bash
 ae pm submit-bug --repo ae-dev "bug 标题" "bug 正文"
+```
+
+也可以先单独上传截图获取 URL，手动插入正文：
+
+```bash
+ae pm upload-image ~/Desktop/screenshot.png
+# 输出: ![screenshot.png](https://gitee.com/...)
 ```
 
 ### Step 5: 确认结果

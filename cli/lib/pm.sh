@@ -16,6 +16,7 @@ ae_pm() {
         submit-requirement) _pm_run_skill "ae-submit-requirement" "$@" ;;
         submit-bug)         _pm_submit_bug "$@" ;;
         file-bugs)          _pm_file_bugs "$@" ;;
+        upload-image)       _pm_upload_image "$@" ;;
         validate-speckit)   _pm_validate_speckit "$@" ;;
         image-decopyright)  _pm_image_decopyright "$@" ;;
         help|--help|-h)     _pm_usage ;;
@@ -38,8 +39,9 @@ ${BOLD}COMMANDS${NC}
     demo-to-speckit <demo_dir>     从 demo 源码提取标准 speckit（6 模块）
     verify-app <demo> <prod>       E2E 对比 demo vs 成品，自动归因差异
     submit-requirement             向 AE Team 提交可复用能力需求
-    submit-bug <title> [body]      向 AE Team 提交 bug 报告
+    submit-bug <title> [body]      向 AE Team 提交 bug 报告（支持 --screenshot）
     file-bugs <diff-report.json>   从 verify-app 报告批量提交 bug
+    upload-image <image...>        上传图片到 Gitee，返回 markdown 引用
     validate-speckit <speckit_dir> 校验 speckit 格式是否符合 schema
     image-decopyright <img...>     图片去版权化 — AI 重绘生成可商用替代图片
 
@@ -47,7 +49,8 @@ ${BOLD}EXAMPLES${NC}
     ae pm demo-to-speckit ./ShoeLens
     ae pm verify-app ./ShoeLens-demo ./ShoeLens-prod
     ae pm submit-requirement
-    ae pm submit-bug "底部 Tab 栏出现双层重叠" "复现步骤：打开 app 后..."
+    ae pm submit-bug "底部 Tab 栏出现双层重叠" --screenshot ~/Desktop/bug.png
+    ae pm upload-image ~/Desktop/screenshot.png
     ae pm file-bugs verify/reports/diff-iter1.json
     ae pm image-decopyright ./assets/hero.png
     ae pm image-decopyright ./assets/*.png --output ./assets/safe/
@@ -82,17 +85,19 @@ _pm_gitee_create_issue() {
 
     info "正在提交 issue 到 ${BOLD}${repo}${NC} ..."
 
+    # Python generates JSON payload piped to curl (avoids nested $() quoting issues)
     local response
-    response=$(curl -s --max-time 30 -X POST "https://gitee.com/api/v5/repos/turningsyn/issues" \
-        -H "Content-Type: application/json" \
-        -d "$(GITEE_TOKEN="$GITEE_TOKEN" python3 -c "
+    response=$(GITEE_TOKEN="$GITEE_TOKEN" python3 -c "
 import json, sys, os
 print(json.dumps({
     'access_token': os.environ['GITEE_TOKEN'],
     'repo': sys.argv[1],
     'title': sys.argv[2],
     'body': sys.argv[3]
-}))" "$repo" "$title" "$body")")
+}))" "$repo" "$title" "$body" | curl -s --max-time 30 -X POST \
+        "https://gitee.com/api/v5/repos/turningsyn/issues" \
+        -H "Content-Type: application/json" \
+        -d @-)
 
     # Check for error
     local html_url
@@ -110,21 +115,157 @@ print(json.dumps({
     fi
 }
 
+# _pm_gitee_upload_image <image_path> [repo]
+# Uploads a local image to Gitee repo under _attachments/, prints download URL.
+_pm_gitee_upload_image() {
+    local image_path="$1"
+    local repo="${2:-ae-pm}"
+
+    if [[ ! -f "$image_path" ]]; then
+        err "文件不存在: $image_path"
+        return 1
+    fi
+
+    _pm_load_gitee_token
+
+    local basename
+    basename=$(basename "$image_path")
+    local ts
+    ts=$(date +%s)
+    local date_path
+    date_path=$(date +%Y/%m)
+    local remote_path="_attachments/${date_path}/${ts}-${basename}"
+
+    # Python generates JSON payload with base64 content, piped to curl.
+    # This avoids shell ARG_MAX limits for large images.
+    local response
+    response=$(GITEE_TOKEN="$GITEE_TOKEN" python3 -c "
+import base64, json, os, sys
+with open(sys.argv[1], 'rb') as f:
+    content_b64 = base64.b64encode(f.read()).decode()
+print(json.dumps({
+    'access_token': os.environ['GITEE_TOKEN'],
+    'message': 'chore: upload attachment ' + sys.argv[2],
+    'content': content_b64
+}))" "$image_path" "$basename" | curl -s --max-time 60 -X POST \
+        "https://gitee.com/api/v5/repos/turningsyn/${repo}/contents/${remote_path}" \
+        -H "Content-Type: application/json" \
+        -d @-)
+
+    local download_url
+    download_url=$(echo "$response" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('content',{}).get('download_url',''))" 2>/dev/null || true)
+
+    if [[ -n "$download_url" ]]; then
+        echo "$download_url"
+    else
+        err "图片上传失败，API 返回:"
+        echo "$response" >&2
+        return 1
+    fi
+}
+
+# ── upload-image ─────────────────────────────────────────────────
+
+_pm_upload_image() {
+    local images=() repo="ae-pm"
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --repo)   repo="$2"; shift 2 ;;
+            --clipboard)
+                # macOS: extract image from clipboard
+                local tmp="/tmp/ae-clipboard-$(date +%s).png"
+                if osascript -e '
+                    set png_data to the clipboard as «class PNGf»
+                    set f to open for access POSIX file "'"$tmp"'" with write permission
+                    write png_data to f
+                    close access f
+                ' 2>/dev/null; then
+                    images+=("$tmp")
+                    info "已从剪贴板提取图片: $tmp"
+                else
+                    err "剪贴板中没有图片"
+                    exit 1
+                fi
+                shift
+                ;;
+            --help|-h)
+                cat <<EOF
+${BOLD}ae pm upload-image${NC} — 上传图片到 Gitee，返回 markdown 引用
+
+${BOLD}USAGE${NC}
+    ae pm upload-image <image...> [--repo <repo>]
+    ae pm upload-image --clipboard [--repo <repo>]
+
+${BOLD}OPTIONS${NC}
+    --repo        目标仓库（默认 ae-pm）
+    --clipboard   从剪贴板提取图片（仅 macOS）
+
+${BOLD}OUTPUT${NC}
+    每张图片输出一行: ![filename](url)
+
+${BOLD}EXAMPLES${NC}
+    ae pm upload-image ~/Desktop/screenshot.png
+    ae pm upload-image bug1.png bug2.png --repo ae-dev
+    ae pm upload-image --clipboard
+EOF
+                return 0
+                ;;
+            *) images+=("$1"); shift ;;
+        esac
+    done
+
+    if [[ ${#images[@]} -eq 0 ]]; then
+        err "请指定图片路径或使用 --clipboard"
+        echo "用法: ae pm upload-image <image...>"
+        exit 1
+    fi
+
+    for img in "${images[@]}"; do
+        info "上传: $(basename "$img") ..."
+        local url
+        url=$(_pm_gitee_upload_image "$img" "$repo")
+        if [[ $? -eq 0 && -n "$url" ]]; then
+            local name=$(basename "$img")
+            ok "![${name}](${url})"
+        else
+            err "上传失败: $img"
+        fi
+    done
+}
+
 # ── submit-bug ────────────────────────────────────────────────────
 
 _pm_submit_bug() {
-    local title="" body="" repo="ae-pm"
+    local title="" body="" repo="ae-pm" screenshots=()
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --repo)   repo="$2"; shift 2 ;;
+            --repo)        repo="$2"; shift 2 ;;
+            --screenshot|-s) screenshots+=("$2"); shift 2 ;;
+            --clipboard)
+                local tmp="/tmp/ae-clipboard-$(date +%s).png"
+                if osascript -e '
+                    set png_data to the clipboard as «class PNGf»
+                    set f to open for access POSIX file "'"$tmp"'" with write permission
+                    write png_data to f
+                    close access f
+                ' 2>/dev/null; then
+                    screenshots+=("$tmp")
+                    info "已从剪贴板提取截图"
+                else
+                    err "剪贴板中没有图片"
+                    exit 1
+                fi
+                shift
+                ;;
             --help|-h)
                 cat <<EOF
 ${BOLD}ae pm submit-bug${NC} — 提交 bug 报告到 AE Team
 
 ${BOLD}USAGE${NC}
-    ae pm submit-bug <title> [body]
+    ae pm submit-bug <title> [body] [--screenshot <image>]...
     ae pm submit-bug --repo <repo> <title> [body]
 
 ${BOLD}ARGS${NC}
@@ -132,12 +273,15 @@ ${BOLD}ARGS${NC}
     body     Bug 描述（可选，支持 markdown）
 
 ${BOLD}OPTIONS${NC}
-    --repo   目标仓库（默认 ae-pm，可选 ae-dev）
+    --repo          目标仓库（默认 ae-pm，可选 ae-dev）
+    --screenshot,-s 附带截图（可多次指定）
+    --clipboard     从剪贴板提取截图（仅 macOS）
 
 ${BOLD}EXAMPLES${NC}
     ae pm submit-bug "底部 Tab 栏出现双层重叠"
-    ae pm submit-bug "底部 Tab 栏出现双层重叠" "复现步骤：1. 打开 app..."
-    ae pm submit-bug --repo ae-dev "编译报错 Swift 版本不兼容"
+    ae pm submit-bug "UI 颜色不对" --screenshot ~/Desktop/bug.png
+    ae pm submit-bug "布局错位" -s demo.png -s prod.png
+    ae pm submit-bug --repo ae-dev "编译报错" --clipboard
 EOF
                 return 0
                 ;;
@@ -170,6 +314,24 @@ EOF
     # Add [BUG] prefix if not present — skip if already has a known prefix
     if [[ "$title" != \[BUG\]* && "$title" != \[GEN-BUG\]* && "$title" != \[SPECKIT-GAP\]* && "$title" != \[CONSTRAINT-GAP\]* && "$title" != \[DEMO-BUG\]* ]]; then
         title="[BUG] $title"
+    fi
+
+    # Upload screenshots and append to body
+    if [[ ${#screenshots[@]} -gt 0 ]]; then
+        local img_section=$'\n\n## 截图\n'
+        for img in "${screenshots[@]}"; do
+            info "上传截图: $(basename "$img") ..."
+            local url
+            url=$(_pm_gitee_upload_image "$img" "$repo")
+            if [[ $? -eq 0 && -n "$url" ]]; then
+                local name=$(basename "$img")
+                img_section+=$'\n'"![${name}](${url})"$'\n'
+                ok "截图上传成功"
+            else
+                warn "截图上传失败: $img，跳过"
+            fi
+        done
+        body="${body}${img_section}"
     fi
 
     _pm_gitee_create_issue "$repo" "$title" "$body"
