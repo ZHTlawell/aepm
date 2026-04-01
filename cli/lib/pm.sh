@@ -15,8 +15,8 @@ ae_pm() {
         verify-app)         _pm_run_skill "ae-verify-app" "$@" ;;
         submit-requirement) _pm_run_skill "ae-submit-requirement" "$@" ;;
         submit-bug)         _pm_submit_bug "$@" ;;
+        comment-issue)      _pm_comment_issue "$@" ;;
         file-bugs)          _pm_file_bugs "$@" ;;
-        upload-image)       _pm_upload_image "$@" ;;
         validate-speckit)   _pm_validate_speckit "$@" ;;
         image-decopyright)  _pm_image_decopyright "$@" ;;
         help|--help|-h)     _pm_usage ;;
@@ -40,8 +40,8 @@ ${BOLD}COMMANDS${NC}
     verify-app <demo> <prod>       E2E 对比 demo vs 成品，自动归因差异
     submit-requirement             向 AE Team 提交可复用能力需求
     submit-bug <title> [body]      向 AE Team 提交 bug 报告（支持 --screenshot）
+    comment-issue <id> <body>      给已有 issue 追加评论（支持 --screenshot）
     file-bugs <diff-report.json>   从 verify-app 报告批量提交 bug
-    upload-image <image...>        上传图片到 Gitee，返回 markdown 引用
     validate-speckit <speckit_dir> 校验 speckit 格式是否符合 schema
     image-decopyright <img...>     图片去版权化 — AI 重绘生成可商用替代图片
 
@@ -50,7 +50,7 @@ ${BOLD}EXAMPLES${NC}
     ae pm verify-app ./ShoeLens-demo ./ShoeLens-prod
     ae pm submit-requirement
     ae pm submit-bug "底部 Tab 栏出现双层重叠" --screenshot ~/Desktop/bug.png
-    ae pm upload-image ~/Desktop/screenshot.png
+    ae pm comment-issue IHXXXX "补充截图" --screenshot ~/Desktop/demo.png
     ae pm file-bugs verify/reports/diff-iter1.json
     ae pm image-decopyright ./assets/hero.png
     ae pm image-decopyright ./assets/*.png --output ./assets/safe/
@@ -164,25 +164,98 @@ print(json.dumps({
     fi
 }
 
-# ── upload-image ─────────────────────────────────────────────────
+# _pm_gitee_add_comment <repo> <issue_number> <body>
+# Posts a comment on an existing issue, prints comment URL.
+_pm_gitee_add_comment() {
+    local repo="$1" issue_number="$2" body="$3"
 
-_pm_upload_image() {
-    local images=() repo="ae-pm"
+    _pm_load_gitee_token
+
+    info "正在评论 ${BOLD}${repo}#${issue_number}${NC} ..."
+
+    local response
+    response=$(GITEE_TOKEN="$GITEE_TOKEN" python3 -c "
+import json, sys, os
+print(json.dumps({
+    'access_token': os.environ['GITEE_TOKEN'],
+    'body': sys.argv[1]
+}))" "$body" | curl -s --max-time 30 -X POST \
+        "https://gitee.com/api/v5/repos/turningsyn/${repo}/issues/${issue_number}/comments" \
+        -H "Content-Type: application/json" \
+        -d @-)
+
+    local comment_id
+    comment_id=$(echo "$response" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null || true)
+
+    if [[ -n "$comment_id" ]]; then
+        ok "评论成功！"
+        echo ""
+        echo "  https://e.gitee.com/turningsyn/issues/list?issue=${issue_number}"
+        echo ""
+    else
+        err "评论失败，API 返回:"
+        echo "$response"
+        exit 1
+    fi
+}
+
+# _pm_clipboard_to_file — macOS: extract clipboard image to temp file, print path
+_pm_clipboard_to_file() {
+    local tmp="/tmp/ae-clipboard-$(date +%s).png"
+    if osascript -e '
+        set png_data to the clipboard as «class PNGf»
+        set f to open for access POSIX file "'"$tmp"'" with write permission
+        write png_data to f
+        close access f
+    ' 2>/dev/null; then
+        echo "$tmp"
+    else
+        return 1
+    fi
+}
+
+# _pm_upload_screenshots <repo> <screenshots...>
+# Uploads images, prints markdown image section to stdout.
+# Progress messages go to stderr so they don't pollute the captured output.
+_pm_upload_screenshots() {
+    local repo="$1"; shift
+    local img_section=$'\n\n## 截图\n'
+    local any_ok=0
+
+    for img in "$@"; do
+        info "上传截图: $(basename "$img") ..." >&2
+        local url
+        url=$(_pm_gitee_upload_image "$img" "$repo")
+        if [[ $? -eq 0 && -n "$url" ]]; then
+            local name=$(basename "$img")
+            img_section+=$'\n'"![${name}](${url})"$'\n'
+            ok "截图上传成功" >&2
+            any_ok=1
+        else
+            warn "截图上传失败: $img，跳过" >&2
+        fi
+    done
+
+    if [[ $any_ok -eq 1 ]]; then
+        echo "$img_section"
+    fi
+}
+
+# ── comment-issue ────────────────────────────────────────────────
+
+_pm_comment_issue() {
+    local issue_id="" body="" repo="ae-pm" screenshots=()
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --repo)   repo="$2"; shift 2 ;;
+            --repo)          repo="$2"; shift 2 ;;
+            --screenshot|-s) screenshots+=("$2"); shift 2 ;;
             --clipboard)
-                # macOS: extract image from clipboard
-                local tmp="/tmp/ae-clipboard-$(date +%s).png"
-                if osascript -e '
-                    set png_data to the clipboard as «class PNGf»
-                    set f to open for access POSIX file "'"$tmp"'" with write permission
-                    write png_data to f
-                    close access f
-                ' 2>/dev/null; then
-                    images+=("$tmp")
-                    info "已从剪贴板提取图片: $tmp"
+                local tmp
+                tmp=$(_pm_clipboard_to_file)
+                if [[ $? -eq 0 ]]; then
+                    screenshots+=("$tmp")
+                    info "已从剪贴板提取截图"
                 else
                     err "剪贴板中没有图片"
                     exit 1
@@ -191,47 +264,62 @@ _pm_upload_image() {
                 ;;
             --help|-h)
                 cat <<EOF
-${BOLD}ae pm upload-image${NC} — 上传图片到 Gitee，返回 markdown 引用
+${BOLD}ae pm comment-issue${NC} — 给已有 issue 追加评论
 
 ${BOLD}USAGE${NC}
-    ae pm upload-image <image...> [--repo <repo>]
-    ae pm upload-image --clipboard [--repo <repo>]
+    ae pm comment-issue <issue_id> <body> [--screenshot <image>]...
+    ae pm comment-issue <issue_id> --screenshot <image>
+
+${BOLD}ARGS${NC}
+    issue_id    Issue 编号（如 IHXXXX）
+    body        评论内容（支持 markdown，仅有截图时可省略）
 
 ${BOLD}OPTIONS${NC}
-    --repo        目标仓库（默认 ae-pm）
-    --clipboard   从剪贴板提取图片（仅 macOS）
-
-${BOLD}OUTPUT${NC}
-    每张图片输出一行: ![filename](url)
+    --repo          目标仓库（默认 ae-pm，可选 ae-dev）
+    --screenshot,-s 附带截图（可多次指定）
+    --clipboard     从剪贴板提取截图（仅 macOS）
 
 ${BOLD}EXAMPLES${NC}
-    ae pm upload-image ~/Desktop/screenshot.png
-    ae pm upload-image bug1.png bug2.png --repo ae-dev
-    ae pm upload-image --clipboard
+    ae pm comment-issue IHXXXX "已修复，请验收"
+    ae pm comment-issue IHXXXX "补充截图" --screenshot ~/Desktop/bug.png
+    ae pm comment-issue IHXXXX -s demo.png -s prod.png
+    ae pm comment-issue IHXXXX --clipboard
 EOF
                 return 0
                 ;;
-            *) images+=("$1"); shift ;;
+            *)
+                if [[ -z "$issue_id" ]]; then
+                    issue_id="$1"
+                elif [[ -z "$body" ]]; then
+                    body="$1"
+                else
+                    err "参数过多。用法: ae pm comment-issue <issue_id> <body>"
+                    exit 1
+                fi
+                shift
+                ;;
         esac
     done
 
-    if [[ ${#images[@]} -eq 0 ]]; then
-        err "请指定图片路径或使用 --clipboard"
-        echo "用法: ae pm upload-image <image...>"
+    if [[ -z "$issue_id" ]]; then
+        err "请指定 issue 编号"
+        echo "用法: ae pm comment-issue <issue_id> <body> [--screenshot ...]"
         exit 1
     fi
 
-    for img in "${images[@]}"; do
-        info "上传: $(basename "$img") ..."
-        local url
-        url=$(_pm_gitee_upload_image "$img" "$repo")
-        if [[ $? -eq 0 && -n "$url" ]]; then
-            local name=$(basename "$img")
-            ok "![${name}](${url})"
-        else
-            err "上传失败: $img"
-        fi
-    done
+    if [[ -z "$body" && ${#screenshots[@]} -eq 0 ]]; then
+        err "评论内容和截图不能都为空"
+        exit 1
+    fi
+
+    # Upload screenshots and append to body
+    if [[ ${#screenshots[@]} -gt 0 ]]; then
+        local img_md
+        img_md=$(_pm_upload_screenshots "$repo" "${screenshots[@]}")
+        body="${body}${img_md}"
+    fi
+
+    _pm_gitee_add_comment "$repo" "$issue_id" "$body"
 }
 
 # ── submit-bug ────────────────────────────────────────────────────
@@ -245,13 +333,9 @@ _pm_submit_bug() {
             --repo)        repo="$2"; shift 2 ;;
             --screenshot|-s) screenshots+=("$2"); shift 2 ;;
             --clipboard)
-                local tmp="/tmp/ae-clipboard-$(date +%s).png"
-                if osascript -e '
-                    set png_data to the clipboard as «class PNGf»
-                    set f to open for access POSIX file "'"$tmp"'" with write permission
-                    write png_data to f
-                    close access f
-                ' 2>/dev/null; then
+                local tmp
+                tmp=$(_pm_clipboard_to_file)
+                if [[ $? -eq 0 ]]; then
                     screenshots+=("$tmp")
                     info "已从剪贴板提取截图"
                 else
@@ -318,20 +402,9 @@ EOF
 
     # Upload screenshots and append to body
     if [[ ${#screenshots[@]} -gt 0 ]]; then
-        local img_section=$'\n\n## 截图\n'
-        for img in "${screenshots[@]}"; do
-            info "上传截图: $(basename "$img") ..."
-            local url
-            url=$(_pm_gitee_upload_image "$img" "$repo")
-            if [[ $? -eq 0 && -n "$url" ]]; then
-                local name=$(basename "$img")
-                img_section+=$'\n'"![${name}](${url})"$'\n'
-                ok "截图上传成功"
-            else
-                warn "截图上传失败: $img，跳过"
-            fi
-        done
-        body="${body}${img_section}"
+        local img_md
+        img_md=$(_pm_upload_screenshots "$repo" "${screenshots[@]}")
+        body="${body}${img_md}"
     fi
 
     _pm_gitee_create_issue "$repo" "$title" "$body"

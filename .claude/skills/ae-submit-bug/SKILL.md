@@ -124,11 +124,10 @@ ae pm submit-bug "bug 标题（含前缀）" "bug 正文（markdown 格式）"
 ae pm submit-bug --repo ae-dev "bug 标题" "bug 正文"
 ```
 
-也可以先单独上传截图获取 URL，手动插入正文：
+提交后如需补充截图，使用 `comment-issue`：
 
 ```bash
-ae pm upload-image ~/Desktop/screenshot.png
-# 输出: ![screenshot.png](https://gitee.com/...)
+ae pm comment-issue IHXXXX "补充截图" --screenshot ~/Desktop/screenshot.png
 ```
 
 ### Step 5: 确认结果
