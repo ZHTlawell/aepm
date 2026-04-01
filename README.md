@@ -215,10 +215,10 @@ ae update
 ├── pm/                         ← ae-pm
 │   ├── CLAUDE.md
 │   ├── .claude/skills/
-│   │   ├── ae-demo-to-speckit.md
-│   │   ├── ae-verify-app.md
-│   │   ├── ae-submit-requirement.md
-│   │   └── ae-submit-bug.md
+│   │   ├── ae-demo-to-speckit/SKILL.md
+│   │   ├── ae-verify-app/SKILL.md
+│   │   ├── ae-submit-requirement/SKILL.md
+│   │   └── ae-submit-bug/SKILL.md
 │   ├── README.md
 │   └── CHANGELOG.md
 └── dev/                        ← ae-dev（开发者用）

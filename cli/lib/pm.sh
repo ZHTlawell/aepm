@@ -553,7 +553,7 @@ _pm_run_skill() {
     local skill_name="$1"
     shift
 
-    local skill_file="$AE_HOME/pm/.claude/skills/${skill_name}.md"
+    local skill_file="$AE_HOME/pm/.claude/skills/${skill_name}/SKILL.md"
 
     # Check ae-pm is installed
     if [[ ! -d "$AE_HOME/pm" ]]; then
@@ -565,8 +565,8 @@ _pm_run_skill() {
     if [[ ! -f "$skill_file" ]]; then
         err "Skill 不存在: $skill_name"
         echo "可用的 PM skills:"
-        ls "$AE_HOME/pm/.claude/skills/"*.md 2>/dev/null | while read -r f; do
-            echo "  - $(basename "$f" .md)"
+        for d in "$AE_HOME/pm/.claude/skills/"*/; do
+            [[ -f "$d/SKILL.md" ]] && echo "  - $(basename "$d")"
         done
         exit 1
     fi

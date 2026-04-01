@@ -1,3 +1,7 @@
+---
+description: "图片去版权化 — AI 重绘生成可商用替代"
+---
+
 # Skill: 图片去版权化 (image-decopyrighter)
 
 ## 触发条件

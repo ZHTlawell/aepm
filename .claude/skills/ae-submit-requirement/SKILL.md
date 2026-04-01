@@ -1,3 +1,7 @@
+---
+description: "向 AE Team 提交可复用能力需求"
+---
+
 # Skill: 提交需求 (submit-requirement)
 
 ## 触发条件

@@ -60,18 +60,18 @@ _link_role() {
     mkdir -p "$skills_dir"
 
     local linked=0
-    for skill in "$ae_role_dir/.claude/skills/"*.md; do
-        [[ -f "$skill" ]] || continue
+    for skill_dir in "$ae_role_dir/.claude/skills/"*/; do
+        [[ -f "$skill_dir/SKILL.md" ]] || continue
         local name
-        name=$(basename "$skill")
+        name=$(basename "$skill_dir")
         if [[ -L "$skills_dir/$name" ]]; then
             # Already linked, skip
             continue
-        elif [[ -f "$skills_dir/$name" ]]; then
+        elif [[ -d "$skills_dir/$name" ]]; then
             warn "  $name 已存在（非软链接），跳过"
             continue
         fi
-        ln -sf "$skill" "$skills_dir/$name"
+        ln -sf "$skill_dir" "$skills_dir/$name"
         ((linked++))
     done
     ok "  链接了 $linked 个 skills"

@@ -1,3 +1,7 @@
+---
+description: "将 demo 原型转为 Figma 设计稿"
+---
+
 # Skill: Demo 原型转 Figma 设计稿 (demo-to-figma)
 
 ## 触发条件

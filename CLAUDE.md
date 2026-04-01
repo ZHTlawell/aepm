@@ -36,7 +36,7 @@ PM vibe coding V0 原型（在约束下）→ 能发布则发布 → 不能发�
 
 **Skill 加载：**
 - Skills 通过软链接从 `~/.ae/pm/.claude/skills/` 挂载到项目 `.claude/skills/`，可直接用 `/ae-skill-name` 触发（所有 ae-platform 提供的 skill 均以 `ae-` 前缀命名）
-- 如果未挂载，用户说"使用 ae-pm 的 /ae-demo-to-speckit skill"即可，你需要读取 `~/.ae/pm/.claude/skills/ae-demo-to-speckit.md` 并按其流程执行
+- 如果未挂载，用户说"使用 ae-pm 的 /ae-demo-to-speckit skill"即可，你需要读取 `~/.ae/pm/.claude/skills/ae-demo-to-speckit/SKILL.md` 并按其流程执行
 - 完整 CLAUDE.md 位于 `~/.ae/pm/CLAUDE.md`，如需查阅完整约束可直接读取
 
 ## 环境配置

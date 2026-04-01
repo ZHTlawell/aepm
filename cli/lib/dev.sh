@@ -49,7 +49,7 @@ _dev_run_skill() {
     local skill_name="$1"
     shift
 
-    local skill_file="$AE_HOME/dev/.claude/skills/${skill_name}.md"
+    local skill_file="$AE_HOME/dev/.claude/skills/${skill_name}/SKILL.md"
 
     # Check ae-dev is installed
     if [[ ! -d "$AE_HOME/dev" ]]; then
@@ -61,8 +61,8 @@ _dev_run_skill() {
     if [[ ! -f "$skill_file" ]]; then
         err "Skill 不存在: $skill_name"
         echo "可用的 Dev skills:"
-        ls "$AE_HOME/dev/.claude/skills/"*.md 2>/dev/null | while read -r f; do
-            echo "  - $(basename "$f" .md)"
+        for d in "$AE_HOME/dev/.claude/skills/"*/; do
+            [[ -f "$d/SKILL.md" ]] && echo "  - $(basename "$d")"
         done
         exit 1
     fi

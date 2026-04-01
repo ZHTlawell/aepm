@@ -1,3 +1,7 @@
+---
+description: "提交 bug 报告到 Gitee"
+---
+
 # Skill: 提交 Bug (submit-bug)
 
 ## 触发条件

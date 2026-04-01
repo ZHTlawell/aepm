@@ -1,3 +1,7 @@
+---
+description: "从 verify-app diff report 批量提交 bug"
+---
+
 # Skill: 从验证报告批量提 Bug (file-bugs)
 
 ## 触发条件

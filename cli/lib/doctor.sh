@@ -20,7 +20,7 @@ ae_doctor() {
     if [[ "$role" == "all" || "$role" == "pm" ]]; then
         echo -e "${BOLD}ae-pm${NC}"
         _check "ae-pm 已安装"      "test -f '$AE_HOME/pm/CLAUDE.md' && echo '$AE_HOME/pm/'"
-        _check "PM skills"         "ls '$AE_HOME/pm/.claude/skills/'*.md 2>/dev/null | wc -l | tr -d ' '"
+        _check "PM skills"         "find '$AE_HOME/pm/.claude/skills' -name SKILL.md 2>/dev/null | wc -l | tr -d ' '"
         _check "Gitee credentials" "test -f '$HOME/.config/ae-pm/credentials.env' && echo '已配置'"
         _check_gitee_token
         echo ""
@@ -30,7 +30,7 @@ ae_doctor() {
     if [[ "$role" == "all" || "$role" == "dev" ]]; then
         echo -e "${BOLD}ae-dev${NC}"
         _check "ae-dev 已安装"     "test -f '$AE_HOME/dev/CLAUDE.md' && echo '$AE_HOME/dev/'"
-        _check "Dev skills"        "ls '$AE_HOME/dev/.claude/skills/'*.md 2>/dev/null | wc -l | tr -d ' '"
+        _check "Dev skills"        "find '$AE_HOME/dev/.claude/skills' -name SKILL.md 2>/dev/null | wc -l | tr -d ' '"
         echo ""
 
         echo -e "${BOLD}iOS 开发环境${NC}"

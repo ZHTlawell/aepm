@@ -1,3 +1,7 @@
+---
+description: "E2E 对比 demo vs 成品，自动归因差异"
+---
+
 # Skill: App 差异比对验证 (verify-app)
 
 ## 触发条件
