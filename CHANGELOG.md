@@ -42,7 +42,12 @@
 - `generate_figma_design` 可截取简单页面（含图片），但复杂页面会 crash
 - 最佳实践：**图片用色块占位 + SVG 图标通过 `createNodeFromSvg()` 完美还原**，设计师后续替换图片
 
-## v0.12.0 (2026-03-31) — Figma 图层组织规范
+## v0.12.0 (2026-03-31) — demo-to-figma skill + 图层组织规范
+
+### 新增能力
+- **`/demo-to-figma` skill** — PM demo 原型自动转 Figma 设计稿，供设计师精修 `#IHUYQ4`
+- **demo-to-figma Agent Team 分工** — 页面拆分多 agent 并行处理，提升转换效率
+- **CLI 工具脚本** — `figma-load-images.sh`（批量图片加载）+ `capture-demo-screenshots.sh`（自动截图）
 
 ### 改进
 - **demo-to-figma 图层规范** — 嵌入 Figma 图层组织规范，解决设计师反馈的图层结构不规范问题 `#IHUYQ4`
@@ -52,6 +57,9 @@
   - Card 标准结构模板（Cover/Content/Footer 三段式）
   - SVG 图标必须 appendChild 到父容器，尺寸标准化 4 的倍数
   - Agent(80%) vs 设计师(20%) 职责边界明确
+- **verify-app 完成后引导 /file-bugs** — 验证完成后主动提示用户使用 `/file-bugs` 批量提 bug
+- **issue 必须填写验收标准** — `/submit-bug`、`/submit-requirement`、`/file-bugs` 强制要求验收标准字段，杜绝无法验证的 issue
+- **查收更新验收反馈闭环** — PM 拉取更新后，agent 自动提取关联 issue，引导逐个验证并回写 comment 到 Gitee
 
 ## v0.11.0 (2026-03-26) — 图片去版权化工具
 
