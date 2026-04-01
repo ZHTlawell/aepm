@@ -1,6 +1,6 @@
 #!/bin/bash
 # capture-demo-screenshots.sh
-# 自动截取 Demo 项目各页面截图，供 /demo-to-figma 自验证使用
+# 自动截取 Demo 项目各页面截图，供 /ae-demo-to-figma 自验证使用
 #
 # 用法: ./scripts/capture-demo-screenshots.sh <demo_dir> <output_dir> [pages...]
 #   demo_dir  - Demo 项目的 www 目录（包含 HTML 文件）

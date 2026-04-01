@@ -19,7 +19,7 @@ AE PM Agent 通过两个机制解决这个问题：
 PM vibe coding demo 原型（在约束下）
         │
         ▼
-  /demo-to-speckit    ← 自动提取标准规格书
+  /ae-demo-to-speckit  ← 自动提取标准规格书
         │
         ▼
   Speckit (6 模块)    ← 产品定位/场景/架构/设计/数据/API
@@ -28,7 +28,7 @@ PM vibe coding demo 原型（在约束下）
   Dev Agent 生成成品   ← 调用 ae-dev 生成 iOS + 后端
         │
         ▼
-  /verify-app          ← E2E 对比 demo vs 成品，自动归因差异
+  /ae-verify-app       ← E2E 对比 demo vs 成品，自动归因差异
         │
         ▼
   可上线的产品
@@ -46,7 +46,7 @@ PM vibe coding demo 原型（在约束下）
 
 ```bash
 # 在 Claude Code 中
-/demo-to-speckit
+/ae-demo-to-speckit
 ```
 
 产出 `speckit/` 目录，包含 6 个标准模块文件。
@@ -85,18 +85,18 @@ Dev Agent 会自动执行：验证 speckit → 生成 OpenAPI 契约 → 生成 
 回到 demo 项目，E2E 对比：
 
 ```bash
-/verify-app
+/ae-verify-app
 ```
 
 ## 已有能力
 
 | Skill | 命令 | 说明 |
 |-------|------|------|
-| Demo 转 Speckit | `/demo-to-speckit` | 从 demo 源码自动提取 6 模块标准规格书 |
-| App 差异验证 | `/verify-app` | E2E 对比两个 app 的功能差异，自动归因到提取/生成/约束环节 |
-| 提交需求 | `/submit-requirement` | 向 AE Team 提交新能力需求（必须是可复用机制） |
-| 提交 Bug | `/submit-bug` 或 `ae pm submit-bug` | 提交 bug 报告到 ae-pm repo |
-| 批量提 Bug | `/file-bugs` 或 `ae pm file-bugs` | 从 verify 报告自动生成 issue 并批量提交 |
+| Demo 转 Speckit | `/ae-demo-to-speckit` | 从 demo 源码自动提取 6 模块标准规格书 |
+| App 差异验证 | `/ae-verify-app` | E2E 对比两个 app 的功能差异，自动归因到提取/生成/约束环节 |
+| 提交需求 | `/ae-submit-requirement` | 向 AE Team 提交新能力需求（必须是可复用机制） |
+| 提交 Bug | `/ae-submit-bug` 或 `ae pm submit-bug` | 提交 bug 报告到 ae-pm repo |
+| 批量提 Bug | `/ae-file-bugs` 或 `ae pm file-bugs` | 从 verify 报告自动生成 issue 并批量提交 |
 | 查收更新 | 直接告诉 agent | 查看 CHANGELOG 了解最新版本更新 |
 
 ## 技术选型约束
@@ -215,10 +215,10 @@ ae update
 ├── pm/                         ← ae-pm
 │   ├── CLAUDE.md
 │   ├── .claude/skills/
-│   │   ├── demo-to-speckit.md
-│   │   ├── verify-app.md
-│   │   ├── submit-requirement.md
-│   │   └── submit-bug.md
+│   │   ├── ae-demo-to-speckit.md
+│   │   ├── ae-verify-app.md
+│   │   ├── ae-submit-requirement.md
+│   │   └── ae-submit-bug.md
 │   ├── README.md
 │   └── CHANGELOG.md
 └── dev/                        ← ae-dev（开发者用）
@@ -243,7 +243,7 @@ ae update
 
 **方式一：通过 agent（推荐）**
 
-在 Claude Code 中使用 `/submit-bug` skill，或告诉 agent：
+在 Claude Code 中使用 `/ae-submit-bug` skill，或告诉 agent：
 
 > "帮我提一个 bug：[描述你的问题]"
 
@@ -257,7 +257,7 @@ ae pm submit-bug "问题标题" "问题描述"
 
 ### 想要新能力？
 
-使用 `/submit-requirement` skill。注意：**每个需求必须是可复用机制**，而非一次性任务。
+使用 `/ae-submit-requirement` skill。注意：**每个需求必须是可复用机制**，而非一次性任务。
 
 例如：
 - 合格："希望 PM agent 能自动生成 API 文档" — 所有 PM 都能复用
@@ -276,7 +276,7 @@ git pull origin main
 
 查看 [CHANGELOG.md](CHANGELOG.md) 了解完整更新记录。
 
-当前版本：**v0.13.0**
+当前版本：**v0.14.0**
 
 ## 由谁维护
 

@@ -216,7 +216,7 @@
 
 ## 验证标准
 
-通过 `/verify-app` 对 demo 运行 baseline 测试：
+通过 `/ae-verify-app` 对 demo 运行 baseline 测试：
 - 从自动 speckit 提取的 test cases coverage ≥ 90%（与手工 speckit 对比）
 - 无功能点遗漏（遗漏 = verify 能通过但 speckit 没描述的功能）
 

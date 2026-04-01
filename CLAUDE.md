@@ -10,12 +10,12 @@
 
 **核心流程：**
 ```
-PM vibe coding V0 原型（在约束下）→ 能发布则发布 → 不能发布则 /demo-to-speckit → Speckit → ae-dev 精细化 → 上线
+PM vibe coding V0 原型（在约束下）→ 能发布则发布 → 不能发布则 /ae-demo-to-speckit → Speckit → ae-dev 精细化 → 上线
 ```
 
 **反馈机制：当你在执行任务过程中遇到以下情况，必须主动引导 PM 通过 issue 反馈给 AE Team：**
 - 约束不合理或缺失 — 比如某个技术约束阻碍了正常开发，或发现了约束未覆盖的场景
-- Skill 不好用或有 bug — 比如 `/demo-to-speckit` 遗漏了重要功能，或流程有歧义
+- Skill 不好用或有 bug — 比如 `/ae-demo-to-speckit` 遗漏了重要功能，或流程有歧义
 - 缺少新能力 — 比如 PM 需要某种操作但没有对应 skill
 - 与愿景有偏差的任何情况 — 如果你觉得当前的工具/约束/流程不能有效达成"PM 自主构建 V0 可用原型"的目标
 
@@ -23,7 +23,7 @@ PM vibe coding V0 原型（在约束下）→ 能发布则发布 → 不能发�
 1. **文档即交付** — 这份 CLAUDE.md 和所有 skill 说明都是给你（agent）看的正式交付物。如果文档描述不清楚导致你无法完成预期功能，这本身就是 bug，必须提 issue 要求 AE Team 修复。
 2. **愿景即标尺** — 上面的愿景和核心流程是你判断"什么该能做到但做不到"的标准。执行过程中遇到阻碍，对照愿景识别 gap，把具体困难提成 issue。不要默默绕过问题。
 
-反馈方式：使用 `/submit-requirement` skill（新能力需求）或 `/submit-bug` skill（bug/疑问）。所有 issue 提交必须通过 `ae` CLI 完成，禁止创建本地文件。**AE Team 会研究、增加和修复所有合理的反馈。**
+反馈方式：使用 `/ae-submit-requirement` skill（新能力需求）或 `/ae-submit-bug` skill（bug/疑问）。所有 issue 提交必须通过 `ae` CLI 完成，禁止创建本地文件。**AE Team 会研究、增加和修复所有合理的反馈。**
 
 ## 使用方式
 
@@ -35,8 +35,8 @@ PM vibe coding V0 原型（在约束下）→ 能发布则发布 → 不能发�
 - 当两者冲突时，提醒用户并建议通过 ae-pm issue 反馈
 
 **Skill 加载：**
-- Skills 通过软链接从 `~/.ae/pm/.claude/skills/` 挂载到项目 `.claude/skills/`，可直接用 `/skill-name` 触发
-- 如果未挂载，用户说"使用 ae-pm 的 /demo-to-speckit skill"即可，你需要读取 `~/.ae/pm/.claude/skills/demo-to-speckit.md` 并按其流程执行
+- Skills 通过软链接从 `~/.ae/pm/.claude/skills/` 挂载到项目 `.claude/skills/`，可直接用 `/ae-skill-name` 触发（所有 ae-platform 提供的 skill 均以 `ae-` 前缀命名）
+- 如果未挂载，用户说"使用 ae-pm 的 /ae-demo-to-speckit skill"即可，你需要读取 `~/.ae/pm/.claude/skills/ae-demo-to-speckit.md` 并按其流程执行
 - 完整 CLAUDE.md 位于 `~/.ae/pm/CLAUDE.md`，如需查阅完整约束可直接读取
 
 ## 环境配置
@@ -77,11 +77,11 @@ curl -s -X POST "https://gitee.com/api/v5/repos/turningsyn/ae-pm/issues/IHQ4H7/c
 
 ## 反馈与 Issue 提交
 
-当用户遇到 bug 或使用疑问时，通过 `/submit-bug` skill 或 `ae` CLI 帮助用户提交 issue。
+当用户遇到 bug 或使用疑问时，通过 `/ae-submit-bug` skill 或 `ae` CLI 帮助用户提交 issue。
 
 **重要规则：**
-- Bug 和疑问 → 使用 `/submit-bug` skill
-- 新能力需求 → 使用 `/submit-requirement` skill
+- Bug 和疑问 → 使用 `/ae-submit-bug` skill
+- 新能力需求 → 使用 `/ae-submit-requirement` skill
 - **禁止创建本地 issue 文件** — 所有 issue 必须提交到 Gitee 远端
 - **禁止直接调用 Gitee API** — 统一通过 `ae` CLI 完成
 
@@ -181,12 +181,12 @@ curl -s "https://gitee.com/api/v5/repos/turningsyn/ae-pm/contents/CHANGELOG.md?a
 
 | 能力 | 说明 | 状态 |
 |------|------|------|
-| Demo 原型转 Speckit | `/demo-to-speckit` — 从 demo 自动提取 6 模块标准规格书 | 可用 |
-| App 差异比对验证 | `/verify-app` — E2E 对比 demo vs 成品，自动归因差异 | 可用 |
-| 提需求 | `/submit-requirement` — 提交标准化的可复用能力需求 | 可用 |
-| 提 Bug | `/submit-bug` — 通过 CLI 提交 bug 报告到 Gitee | 可用 |
-| 批量提 Bug | `/file-bugs` — 从 verify-app diff report 自动生成 issue，PM 确认后批量提交 | 可用 |
-| 图片去版权化 | `/image-decopyrighter` — 将有版权图片 AI 重绘为可商用替代（Gemini Imagen 4.0） | 可用 |
+| Demo 原型转 Speckit | `/ae-demo-to-speckit` — 从 demo 自动提取 6 模块标准规格书 | 可用 |
+| App 差异比对验证 | `/ae-verify-app` — E2E 对比 demo vs 成品，自动归因差异 | 可用 |
+| 提需求 | `/ae-submit-requirement` — 提交标准化的可复用能力需求 | 可用 |
+| 提 Bug | `/ae-submit-bug` — 通过 CLI 提交 bug 报告到 Gitee | 可用 |
+| 批量提 Bug | `/ae-file-bugs` — 从 verify-app diff report 自动生成 issue，PM 确认后批量提交 | 可用 |
+| 图片去版权化 | `/ae-image-decopyrighter` — 将有版权图片 AI 重绘为可商用替代（Gemini Imagen 4.0） | 可用 |
 | 查收更新 | 查看 CHANGELOG.md 了解更新内容 | 可用 |
 
 ### 调用 Dev Agent 生成成品

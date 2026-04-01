@@ -142,7 +142,7 @@
 验证完成后，如果存在 non-pass 的 case（coverage < 100%），必须主动提示用户：
 
 > 验证发现 {N} 个差异（{missing} 个缺失 + {different} 个不同）。
-> 可以用 `/file-bugs` 从 diff report 自动生成 issue 并批量提交到 Gitee。
+> 可以用 `/ae-file-bugs` 从 diff report 自动生成 issue 并批量提交到 Gitee。
 > 或者用 CLI：`ae pm file-bugs {diff_report_path}`
 
 如果 coverage = 100%（全部 pass），提示验证通过即可，无需引导 file-bugs。

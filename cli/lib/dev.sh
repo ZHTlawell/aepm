@@ -11,10 +11,10 @@ ae_dev() {
     shift
 
     case "$cmd" in
-        speckit-receive)  _dev_run_skill "speckit-receive" "$@" ;;
-        ios-build)        _dev_run_skill "ios-build-verify" "$@" ;;
-        ios-test)         _dev_run_skill "ios-ui-test" "$@" ;;
-        backend-build)    _dev_run_skill "backend-build-verify" "$@" ;;
+        speckit-receive)  _dev_run_skill "ae-speckit-receive" "$@" ;;
+        ios-build)        _dev_run_skill "ae-ios-build-verify" "$@" ;;
+        ios-test)         _dev_run_skill "ae-ios-ui-test" "$@" ;;
+        backend-build)    _dev_run_skill "ae-backend-build-verify" "$@" ;;
         help|--help|-h)   _dev_usage ;;
         *)
             err "未知 Dev 命令: $cmd"

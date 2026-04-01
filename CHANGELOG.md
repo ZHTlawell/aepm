@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.14.0 (2026-04-01) — Skill 命名规范化：ae- 前缀
+
+### 重要变更
+- **所有 skill 文件统一加 `ae-` 前缀** — 与用户自建 skills 区分，输入 `/ae` 即可筛选出所有 ae-platform 提供的能力 `#IHWMM0`
+  - `/demo-to-speckit` → `/ae-demo-to-speckit`
+  - `/verify-app` → `/ae-verify-app`
+  - `/submit-bug` → `/ae-submit-bug`
+  - `/file-bugs` → `/ae-file-bugs`
+  - `/submit-requirement` → `/ae-submit-requirement`
+  - `/demo-to-figma` → `/ae-demo-to-figma`
+  - `/image-decopyrighter` → `/ae-image-decopyrighter`
+- **CLI 子命令不变** — `ae pm demo-to-speckit` 等 CLI 命令保持不变，内部自动映射到新文件名
+- **CLAUDE.md / README 同步更新** — 所有文档中的 skill 引用已更新
+
 ## v0.13.0 (2026-03-31) — 交付完整性修复 + demo-to-figma 预处理管线
 
 ### 重大修复

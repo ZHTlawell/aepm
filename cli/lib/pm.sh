@@ -11,9 +11,9 @@ ae_pm() {
     shift
 
     case "$cmd" in
-        demo-to-speckit)    _pm_run_skill "demo-to-speckit" "$@" ;;
-        verify-app)         _pm_run_skill "verify-app" "$@" ;;
-        submit-requirement) _pm_run_skill "submit-requirement" "$@" ;;
+        demo-to-speckit)    _pm_run_skill "ae-demo-to-speckit" "$@" ;;
+        verify-app)         _pm_run_skill "ae-verify-app" "$@" ;;
+        submit-requirement) _pm_run_skill "ae-submit-requirement" "$@" ;;
         submit-bug)         _pm_submit_bug "$@" ;;
         file-bugs)          _pm_file_bugs "$@" ;;
         validate-speckit)   _pm_validate_speckit "$@" ;;

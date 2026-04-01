@@ -2,7 +2,7 @@
 
 ## 触发条件
 
-当用户在 `/verify-app` 完成后说"把差异提 bug"、"提 bug"、"file bugs"，或者想基于 diff report 批量提交 issue 时触发。
+当用户在 `/ae-verify-app` 完成后说"把差异提 bug"、"提 bug"、"file bugs"，或者想基于 diff report 批量提交 issue 时触发。
 
 ## 核心原则
 
@@ -18,7 +18,7 @@
 2. 当前项目中最新的 `diff-*.json` 或 `diff-report.json`
 3. `verify/reports/` 目录下最新的 diff report
 
-如果找不到，提示用户先跑 `/verify-app`。
+如果找不到，提示用户先跑 `/ae-verify-app`。
 
 ### Step 2: 解析并筛选
 
@@ -69,7 +69,7 @@
 {如果没有截图，标注"截图待补充 — 可通过 runner.py 重新采集"}
 
 ## 验收标准
-- 重新运行 `/verify-app`，Case {case.id} 状态从 {case.status} 变为 pass
+- 重新运行 `/ae-verify-app`，Case {case.id} 状态从 {case.status} 变为 pass
 {如果是 UI 类差异，补充具体的视觉验收条件，如"卡片圆角与 demo 一致（16px）"}
 
 ## 环境信息
