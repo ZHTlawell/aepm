@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.15.0 (2026-04-02) — App-to-Speckit 逆向分析能力 `#IHWK3R`
+
+### 新增能力
+- **App 逆向提取 Speckit** — `/ae-app-to-speckit`，从已上架 App 逆向生成 speckit（无需源码）
+  - Phase 1: App Store 信息采集（WebSearch/WebFetch）→ feature-checklist
+  - Phase 2: iPhone 真机自动化探索（mobile-mcp + WDA）→ 截图 + 元素树
+  - Phase 3: 逆向生成 speckit Module 01/02/04（带截图引用）
+  - Phase 4: PM Review 清单 + 覆盖率报告
+  - 前置条件：iPhone 真机 + USB + go-ios + WDA + mobile-mcp（SKILL.md 内含完整搭建步骤）
+  - Checklist 驱动覆盖，Phase 2d 强制覆盖率 checkpoint
+  - 中断恢复机制（feature-checklist + exploration-state.json + screenshots/）
+  - 实跑验证：扫描全能王 38 张截图，Core 功能 100% 覆盖
+
+### 重要说明
+- 此 skill 需要额外硬件（iPhone + USB 线）和环境配置（go-ios/WDA/mobile-mcp），详见 skill 内环境搭建章节
+- `mobile_save_screenshot` 在 iOS 真机上有黑屏 bug，skill 内已标注使用 WDA API 替代方案
+
 ## v0.14.1 (2026-04-02) — 飞书集成 + 求助引导机制
 
 ### 新增能力

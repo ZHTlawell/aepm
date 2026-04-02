@@ -190,6 +190,7 @@ curl -s "https://gitee.com/api/v5/repos/turningsyn/ae-pm/contents/CHANGELOG.md?a
 | 批量提 Bug | `/ae-file-bugs` — 从 verify-app diff report 自动生成 issue，PM 确认后批量提交 | 可用 |
 | 图片去版权化 | `/ae-image-decopyrighter` — 将有版权图片 AI 重绘为可商用替代（Gemini Imagen 4.0） | 可用 |
 | 飞书消息与会议 | `/ae-lark-feishu` — 搜索群聊、读取/搜索消息、下载图片、会议妙记/逐字稿、发送消息 | 可用 |
+| App 逆向提取 Speckit | `/ae-app-to-speckit` — 从已上架 App 逆向生成 speckit（iPhone 真机探索 + 截图 + feature-checklist） | 可用（需 iPhone + USB + WDA） |
 | 查收更新 | 查看 CHANGELOG.md 了解更新内容 | 可用 |
 
 ### 调用 Dev Agent 生成成品
