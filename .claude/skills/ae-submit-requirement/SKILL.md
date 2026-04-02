@@ -1,5 +1,6 @@
 ---
-description: "向 AE Team 提交可复用能力需求"
+name: ae-submit-requirement
+description: "向 AE Team 提交能力需求"
 ---
 
 # Skill: 提交需求 (submit-requirement)
@@ -10,99 +11,70 @@ description: "向 AE Team 提交可复用能力需求"
 
 ## 核心原则
 
-**每个需求必须是一个可复用机制（Reusable Mechanism）**，而非一次性任务。
-
-一个合格的需求应满足：
-1. **可被 agent 感知** — 需求实现后，agent 能通过 skill 或指令自动执行
-2. **可被同角色复用** — 其他 PM 遇到同类场景时，也能直接使用这个能力
-3. **可被验证** — 有明确的输入输出和验证标准
-
-### 不合格需求示例
-
-> "帮我把这个 demo 转成正式项目" — 这是一次性任务，不是机制
-
-### 合格需求示例
-
-> "希望 PM agent 具备将 vibe coding demo 原型转化为 speckit 的能力，以便任何 PM 都能将 demo 标准化" — 这是可复用机制
+**收集用户的真实诉求，转化为 AE Team 可理解的需求描述。** 不需要用户懂技术，只需要说清"想让 AI 帮我做什么"。
 
 ## 执行流程
 
 ### Step 1: 理解用户意图
 
-与用户对话，厘清：
-- 用户想解决什么问题？
-- 这个能力的使用场景是什么？
-- 谁会复用这个能力？（同角色的其他人）
+与用户对话，了解：
+- 你想解决什么问题？
+- 现在是怎么做的？（手动流程）
+- 你希望 AI 帮你做到什么程度？
 
-### Step 2: 引导为可复用机制
+### Step 2: 整理需求
 
-如果用户描述的是一次性任务，引导转化：
-
-> "我理解你想完成 X。如果我们把这个做成一个通用能力，以后任何 PM 遇到类似场景都能用。我来帮你梳理成一个标准需求？"
-
-### Step 3: 填写需求模板
+将用户的描述整理为结构化格式：
 
 ```markdown
-## 需求名称
-<!-- 简明描述这个能力，如：Demo 原型转 Speckit -->
+## 需求描述
+<!-- 用户想要什么能力 -->
 
 ## 使用场景
-<!-- 什么情况下会用到这个能力 -->
+<!-- 什么时候会用到 -->
 
-## 输入
-<!-- agent 执行这个能力需要什么输入 -->
+## 当前做法
+<!-- 现在是怎么手动完成的 -->
 
-## 输出
-<!-- agent 执行完后产出什么 -->
+## 期望效果
+<!-- AI 帮忙后应该是什么样的 -->
 
-## 验证标准（必填）
-<!-- 如何判断这个能力执行成功？必须是可执行的具体步骤，不接受"能正常工作"之类的模糊描述 -->
+## 验证标准
+<!-- 如何判断这个能力做好了？至少一条可执行的验证步骤 -->
 1. ...
-
-## 复用说明
-<!-- 谁会复用？在什么场景下复用？ -->
 ```
 
-### Step 4: 用户确认
+### Step 3: 用户确认
 
-将填写好的需求展示给用户，确认无误后提交。
+将整理好的标题和正文展示给用户确认。
 
-### Step 5: 提交到 ae-pm
+标题格式：`[FEAT] 能力简述`
+
+### Step 4: 提交
+
+**查阅当前 CLAUDE.md 中的「Issue 路由」表获取 credentials 路径、目标仓库和 CLI 命令，然后提交：**
 
 ```bash
-source ~/.config/ae-pm/credentials.env
+source <credentials_path>
 unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
 
 curl -s -X POST "https://gitee.com/api/v5/repos/turningsyn/issues" \
   -H "Content-Type: application/json" \
   -d '{
     "access_token": "'"$GITEE_TOKEN"'",
-    "repo": "ae-pm",
-    "title": "[FEAT] 需求名称",
-    "body": "需求正文（按上方模板填写）"
+    "repo": "<目标仓库>",
+    "title": "[FEAT] 需求标题",
+    "body": "需求正文"
   }'
 ```
 
-### Step 5.5: 补充截图（如有）
+### Step 5: 确认结果
 
-如果用户提供了截图来说明需求，提交 issue 后用 `comment-issue` 追加：
-
-```bash
-ae pm comment-issue IHXXXX "补充截图说明" --screenshot ~/path/to/screenshot.png
-```
-
-多张截图可一次带上：
-
-```bash
-ae pm comment-issue IHXXXX "UI 参考" -s mockup1.png -s mockup2.png
-```
-
-### Step 6: 确认提交成功
-
-向用户展示 issue 链接，并说明：
-
-> "需求已提交到 ae-pm，AE 团队会评估并排期。能力开发完成后会通过 CHANGELOG 发布更新，届时你可以通过查收更新来获取新能力。"
+向用户展示 issue 链接：
+> "需求已提交，AE Team 会评估并排期。做好后会通知你更新。"
 
 ## 重要规则
 
-- **验证标准必填且必须具体** — 不接受"能正常使用"之类的模糊描述。必须是可执行的验证步骤，如"运行 /xxx 后能生成 xxx 文件，文件包含 xxx 字段"。如果用户没提供，主动追问："这个能力做好后，你会怎么验证它是可用的？"
+- **提交前必须让用户确认内容**
+- **验证标准必填** — 如果用户没提供，主动追问
+- 多个需求分开提交，每个一个 issue

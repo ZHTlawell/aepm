@@ -164,11 +164,11 @@ git clone https://gitee.com/turningsyn/ae-pm.git ~/.ae/pm
 **Step 2: 配置 Token**
 
 ```bash
-mkdir -p ~/.config/ae-pm
-cat > ~/.config/ae-pm/credentials.env << 'EOF'
+mkdir -p ~/.config/ae
+cat > ~/.config/ae/credentials.env << 'EOF'
 GITEE_TOKEN=你的gitee_access_token
 EOF
-chmod 600 ~/.config/ae-pm/credentials.env
+chmod 600 ~/.config/ae/credentials.env
 ```
 
 Token 生成地址：https://gitee.com/profile/personal_access_tokens（需要 `issues` 和 `projects` 权限）

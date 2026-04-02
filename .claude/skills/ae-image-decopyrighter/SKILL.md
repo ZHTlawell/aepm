@@ -31,7 +31,7 @@ export TOGETHER_API_KEY="..."        # Together AI ($0.003/张)
 export OPENAI_API_KEY="sk-..."       # DALL-E 3 ($0.04/张)
 ```
 
-建议写入 `~/.config/ae-pm/credentials.env` 以便持久化。
+建议写入 `~/.config/ae/credentials.env` 以便持久化。
 
 ## 执行流程
 

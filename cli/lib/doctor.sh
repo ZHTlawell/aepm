@@ -16,12 +16,22 @@ ae_doctor() {
     _check "AE_HOME 目录" "test -d '$AE_HOME' && echo '$AE_HOME'"
     echo ""
 
+    # ── ae-go ──
+    if [[ "$role" == "all" || "$role" == "go" ]]; then
+        echo -e "${BOLD}ae-go${NC}"
+        _check "ae-go 已安装"      "test -f '$AE_HOME/go/CLAUDE.md' && echo '$AE_HOME/go/'"
+        _check "Go skills"         "find '$AE_HOME/go/.claude/skills' -name SKILL.md 2>/dev/null | wc -l | tr -d ' '"
+        _check "Gitee credentials" "(test -f '$HOME/.config/ae/credentials.env' || test -f '$HOME/.config/ae-pm/credentials.env') && echo '已配置'"
+        _check_gitee_token
+        echo ""
+    fi
+
     # ── ae-pm ──
     if [[ "$role" == "all" || "$role" == "pm" ]]; then
         echo -e "${BOLD}ae-pm${NC}"
         _check "ae-pm 已安装"      "test -f '$AE_HOME/pm/CLAUDE.md' && echo '$AE_HOME/pm/'"
         _check "PM skills"         "find '$AE_HOME/pm/.claude/skills' -name SKILL.md 2>/dev/null | wc -l | tr -d ' '"
-        _check "Gitee credentials" "test -f '$HOME/.config/ae-pm/credentials.env' && echo '已配置'"
+        _check "Gitee credentials" "(test -f '$HOME/.config/ae/credentials.env' || test -f '$HOME/.config/ae-pm/credentials.env') && echo '已配置'"
         _check_gitee_token
         echo ""
     fi
@@ -52,7 +62,7 @@ ae_doctor() {
         "codex --version 2>/dev/null" \
         "cursor --version 2>/dev/null"
 
-    # Figma MCP（PM 需要）
+    # Figma MCP（PM 需要，go 不需要）
     if [[ "$role" == "all" || "$role" == "pm" ]]; then
         if command -v claude &>/dev/null; then
             _check "Figma MCP" "claude mcp list 2>/dev/null | grep -qi figma && echo '已连接'"
@@ -108,8 +118,11 @@ _check_any() {
 }
 
 _check_gitee_token() {
-    local cred="$HOME/.config/ae-pm/credentials.env"
-    if [[ ! -f "$cred" ]]; then
+    local cred=""
+    for f in "$HOME/.config/ae/credentials.env" "$HOME/.config/ae-pm/credentials.env"; do
+        if [[ -f "$f" ]]; then cred="$f"; break; fi
+    done
+    if [[ -z "$cred" ]]; then
         printf "  ${RED}✗${NC} %-22s %s\n" "Gitee Token" "未配置"
         all_ok=false
         return

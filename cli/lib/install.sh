@@ -64,36 +64,31 @@ _install_repos() {
 
     mkdir -p "$AE_HOME"
 
+    # ae-go
+    _install_clone_or_pull "ae-go" "https://gitee.com/turningsyn/ae-go.git" "$AE_HOME/go"
+
     # ae-pm
-    if [[ -d "$AE_HOME/pm/.git" ]]; then
-        ok "ae-pm 已安装，更新中..."
-        (cd "$AE_HOME/pm" && git pull origin main 2>/dev/null) || warn "ae-pm 更新失败（可能无网络）"
-    else
-        info "克隆 ae-pm..."
-        git clone https://gitee.com/turningsyn/ae-pm.git "$AE_HOME/pm" 2>/dev/null || {
-            err "ae-pm 克隆失败。请确认网络和 Gitee 权限。"
-        }
-    fi
+    _install_clone_or_pull "ae-pm" "https://gitee.com/turningsyn/ae-pm.git" "$AE_HOME/pm"
 
     # ae-dev
-    if [[ -d "$AE_HOME/dev/.git" ]]; then
-        ok "ae-dev 已安装，更新中..."
-        (cd "$AE_HOME/dev" && git pull origin main 2>/dev/null) || warn "ae-dev 更新失败"
-    else
-        info "克隆 ae-dev..."
-        git clone https://gitee.com/turningsyn/ae-dev.git "$AE_HOME/dev" 2>/dev/null || {
-            err "ae-dev 克隆失败。请确认网络和 Gitee 权限。"
-        }
-    fi
+    _install_clone_or_pull "ae-dev" "https://gitee.com/turningsyn/ae-dev.git" "$AE_HOME/dev"
 
-    # ae-speckit-examples
-    if [[ -d "$AE_HOME/speckit-examples/.git" ]]; then
-        ok "ae-speckit-examples 已安装，更新中..."
-        (cd "$AE_HOME/speckit-examples" && git pull origin main 2>/dev/null) || warn "ae-speckit-examples 更新失败"
+    # ae-speckit-examples (optional)
+    _install_clone_or_pull "ae-speckit-examples" "https://github.com/ligenjian001-ai/ae-speckit-examples.git" "$AE_HOME/speckit-examples" || true
+}
+
+_install_clone_or_pull() {
+    local name="$1"
+    local url="$2"
+    local dir="$3"
+
+    if [[ -d "$dir/.git" ]]; then
+        ok "$name 已安装，更新中..."
+        (cd "$dir" && git pull 2>/dev/null) || warn "$name 更新失败（可能无网络）"
     else
-        info "克隆 ae-speckit-examples..."
-        git clone https://github.com/ligenjian001-ai/ae-speckit-examples.git "$AE_HOME/speckit-examples" 2>/dev/null || {
-            warn "ae-speckit-examples 克隆失败（可选组件，不影响核心功能）"
+        info "克隆 $name..."
+        git clone "$url" "$dir" 2>/dev/null || {
+            warn "$name 克隆失败。请确认网络和权限。"
         }
     fi
 }
@@ -152,10 +147,11 @@ _install_backend_deps() {
 _setup_credentials() {
     echo -e "${BOLD}[5/5] 凭证配置${NC}"
 
-    local cred_dir="$HOME/.config/ae-pm"
+    local cred_dir="$HOME/.config/ae"
     local cred_file="$cred_dir/credentials.env"
 
-    if [[ -f "$cred_file" ]]; then
+    # Check new path or legacy path
+    if [[ -f "$cred_file" ]] || [[ -f "$HOME/.config/ae-pm/credentials.env" ]]; then
         ok "Gitee credentials 已配置"
         return
     fi

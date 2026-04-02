@@ -33,20 +33,20 @@ PM vibe coding V0 原型（在约束下）→ 能发布则发布 → 不能发�
 
 ## 环境配置
 
-PM 使用前需要配置以下 token。所有 token 统一存储在 `~/.config/ae-pm/credentials.env` 中：
+PM 使用前需要配置以下 token。所有 token 统一存储在 `~/.config/ae/credentials.env` 中：
 
 ```bash
-# ~/.config/ae-pm/credentials.env
+# ~/.config/ae/credentials.env
 GITEE_TOKEN=your_gitee_access_token
 GEMINI_API_KEY=your_gemini_api_key    # 图片去版权化等 AI 能力需要
 ```
 
-当用户提供 token 时，你应该直接帮他写入该文件（`mkdir -p ~/.config/ae-pm && echo 'KEY=value' >> ~/.config/ae-pm/credentials.env`）。
+当用户提供 token 时，你应该直接帮他写入该文件（`mkdir -p ~/.config/ae && echo 'KEY=value' >> ~/.config/ae/credentials.env`）。
 
 访问 Gitee API 前必须加载 credentials 并清除代理：
 
 ```bash
-source ~/.config/ae-pm/credentials.env
+source ~/.config/ae/credentials.env 2>/dev/null || source ~/.config/ae-pm/credentials.env 2>/dev/null
 unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
 ```
 
@@ -57,7 +57,7 @@ unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/n
 入驻 issue 编号：**IHQ4H7**
 
 ```bash
-source ~/.config/ae-pm/credentials.env
+source ~/.config/ae/credentials.env 2>/dev/null || source ~/.config/ae-pm/credentials.env 2>/dev/null
 unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
 
 curl -s -X POST "https://gitee.com/api/v5/repos/turningsyn/ae-pm/issues/IHQ4H7/comments" \
@@ -66,6 +66,16 @@ curl -s -X POST "https://gitee.com/api/v5/repos/turningsyn/ae-pm/issues/IHQ4H7/c
 ```
 
 成功标志：在 issue IHQ4H7 下方看到自己的确认回复。
+
+## Issue 路由
+
+当 skill 需要提交 issue 时，使用以下配置：
+
+| 配置项 | 值 |
+|--------|-----|
+| Credentials | `~/.config/ae/credentials.env` |
+| 目标仓库 | `ae-pm` |
+| CLI 命令 | `ae pm submit-bug` / `ae pm submit-requirement` |
 
 ## 反馈与 Issue 提交
 
@@ -103,7 +113,7 @@ cd ~/.ae/pm && git pull origin main
 如需检查远端是否有新版本（用户说"看看有没有更新"等）：
 
 ```bash
-source ~/.config/ae-pm/credentials.env
+source ~/.config/ae/credentials.env 2>/dev/null || source ~/.config/ae-pm/credentials.env 2>/dev/null
 unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
 
 curl -s "https://gitee.com/api/v5/repos/turningsyn/ae-pm/contents/CHANGELOG.md?access_token=$GITEE_TOKEN" \
@@ -142,7 +152,7 @@ curl -s "https://gitee.com/api/v5/repos/turningsyn/ae-pm/contents/CHANGELOG.md?a
 
 - **验证通过** — 在对应 issue 上发 comment 确认：
   ```bash
-  source ~/.config/ae-pm/credentials.env
+  source ~/.config/ae/credentials.env
   unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
 
   curl -s -X POST "https://gitee.com/api/v5/repos/turningsyn/{repo}/issues/{number}/comments" \
@@ -245,7 +255,7 @@ PM 在使用 vibe coding 工具（Antigravity 等）生成 demo 原型时，必�
 
 1. **读取 issue** — 通过 Gitee API 获取 issue 内容和已有 comment：
    ```bash
-   source ~/.config/ae-pm/credentials.env
+   source ~/.config/ae/credentials.env
    unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
 
    # 从链接中提取 owner/repo/issue_number

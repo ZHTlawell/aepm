@@ -1,4 +1,5 @@
 ---
+name: ae-submit-bug
 description: "提交 bug 报告到 Gitee"
 ---
 
@@ -10,71 +11,39 @@ description: "提交 bug 报告到 Gitee"
 
 ## 核心原则
 
-**每个 bug 必须可归因、可验证。** AE Team 拿到 issue 后要能直接定位到该修哪个环节，而不是"成品有问题请自查"。
+**让用户用最少的话把问题说清楚。** 不要一次问完所有问题，根据用户已提供的信息跳过已知项。
 
 ## 执行流程
 
 ### Step 1: 收集 bug 信息
 
-与用户对话，逐项厘清以下信息。**不要一次问完所有问题**，根据用户已经提供的信息跳过已知项，只追问缺失的。
+与用户对话，逐项厘清以下信息：
 
 #### 1a. 问题描述
-
 - 发生了什么？
-- 哪个项目？（如 ShoeLens、AnotherApp）
+- 涉及什么产品/工具/项目？
 
-#### 1b. 归因判断（关键）
+#### 1b. 截图（如有）
 
-引导用户判断 bug 最可能由哪个环节导致：
+如果 bug 涉及 UI 表现，询问用户是否有截图：
+> "能截个图给我看看吗？这样 AE Team 能更快定位问题。"
 
-| 归因阶段 | 标题前缀 | 判断依据 |
-|----------|----------|----------|
-| Demo 本身的问题 | `[DEMO-BUG]` | Demo 原型里就存在这个问题 |
-| Speckit 提取遗漏 | `[SPECKIT-GAP]` | Demo 里有但 speckit 没提取到（对比 speckit 确认） |
-| 成品生成偏差 | `[GEN-BUG]` | Speckit 里写了但成品没实现或实现错误 |
-| 约束缺失 | `[CONSTRAINT-GAP]` | 现有约束没覆盖这个场景，导致 demo 或成品出问题 |
-| 不确定 | `[BUG]` | 用户无法判断时使用，由 AE Team 归因 |
+如果用户无法提供截图，在 issue 中标注 `无截图，需人工复现`。
 
-**引导话术：**
-> "这个问题在你的 demo 原型里是正常的吗？如果 demo 里正常但成品里有问题，那大概率是 speckit 提取或成品生成环节的问题。你能帮我确认一下吗？"
+#### 1c. 具体化
 
-#### 1c. 截图 / 证据（UI 类 bug 必需）
-
-如果 bug 涉及 UI 表现（布局、样式、视觉还原等），**必须要求用户提供截图**：
-
-> "这个 UI 问题能截个图吗？最好是 demo 和成品的对比截图，这样 AE Team 能直接看到差异。"
-
-**截图处理方式：**
-- 用户提供截图路径后，使用 `ae pm upload-image` 上传，或在 submit-bug 时用 `--screenshot` 参数
-- 上传后的图片 URL 会自动插入 issue 正文
-
-如果用户无法提供截图，在 issue 中标注 `⚠️ 无截图，需人工复现`。
-
-#### 1d. 具体化（笼统描述必须拆分）
-
-如果用户的描述很笼统（如"视觉还原度差"、"样式不对"），**必须追问具体表现**：
-
-> "你说视觉差距大，能帮我列几个最明显的具体差异吗？比如：某个按钮颜色不对、某个间距太大、某个字体不一致？这样 AE Team 才能逐项修复。"
-
-**至少拆出 2-3 个可验证的具体条目**，例如：
-- ❌ "UI 视觉还原度差距较大" — 无法验证
-- ✅ "首页卡片圆角 demo 是 16px，成品是 8px" — 可验证
-- ✅ "底部 Tab 栏图标颜色 demo 是 #FF6B35，成品是系统蓝" — 可验证
+如果用户的描述很笼统（如"用不了"、"有问题"），追问具体表现：
+> "能具体说说是哪个环节出了问题吗？比如点了什么按钮、看到了什么错误？"
 
 ### Step 2: 格式化
 
-将收集到的信息整理为 markdown 格式：
+将收集到的信息整理为 markdown：
 
 ```markdown
 ## 描述
 <!-- 一句话说清问题 -->
 
-## 归因
-- **阶段**: [DEMO-BUG / SPECKIT-GAP / GEN-BUG / CONSTRAINT-GAP / 不确定]
-- **理由**: <!-- 为什么判断是这个阶段的问题 -->
-
 ## 具体表现
-<!-- 逐条列出可验证的具体问题，UI 类附截图路径 -->
 1. ...
 2. ...
 
@@ -84,67 +53,39 @@ description: "提交 bug 报告到 Gitee"
 
 ## 期望行为
 <!-- 应该是什么样的 -->
-
-## 验收标准
-<!-- 修复后如何验证？列出具体的检验步骤或判断条件 -->
-1. ...
-
-## 环境信息
-- 项目:
-- ae-pm 版本:
 ```
 
 ### Step 3: 用户确认
 
-将格式化后的 **标题（含前缀）** 和 **正文** 展示给用户确认。
+将格式化后的标题和正文展示给用户确认。
 
-标题格式：`[前缀] 项目名 — 问题简述`
-示例：`[GEN-BUG] ShoeLens — 底部 Tab 栏出现双层重叠`
+标题格式：`[BUG] 产品名 — 问题简述`
 
-### Step 4: 通过 CLI 提交
+### Step 4: 提交
 
-**必须通过 `ae` CLI 提交，不要直接调用 API 或创建本地文件。**
-
-如果有截图，使用 `--screenshot` 参数（可多次指定）：
+**查阅当前 CLAUDE.md 中的「Issue 路由」表获取 credentials 路径、目标仓库和 CLI 命令，然后提交：**
 
 ```bash
-ae pm submit-bug "bug 标题（含前缀）" "bug 正文" --screenshot ~/path/to/screenshot.png
-ae pm submit-bug "bug 标题" "正文" -s demo.png -s prod.png
-```
+source <credentials_path>
+unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
 
-无截图时：
-
-```bash
-ae pm submit-bug "bug 标题（含前缀）" "bug 正文（markdown 格式）"
-```
-
-如果 bug 属于 ae-dev 而非 ae-pm：
-
-```bash
-ae pm submit-bug --repo ae-dev "bug 标题" "bug 正文"
-```
-
-提交后如需补充截图，使用 `comment-issue`：
-
-```bash
-ae pm comment-issue IHXXXX "补充截图" --screenshot ~/Desktop/screenshot.png
+curl -s -X POST "https://gitee.com/api/v5/repos/turningsyn/issues" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "access_token": "'"$GITEE_TOKEN"'",
+    "repo": "<目标仓库>",
+    "title": "[BUG] 标题",
+    "body": "正文"
+  }'
 ```
 
 ### Step 5: 确认结果
 
-CLI 会输出 issue 链接。将链接展示给用户，并说明：
-
-> "Bug 已提交，AE Team 会跟进处理。你可以在上面的链接中查看进展。"
-
-## 批量提交
-
-如果用户一次描述多个 bug，**逐个走完 Step 1-4**，不要合并成一个 issue。每个 bug 独立提交，各自归因。
+向用户展示 issue 链接：
+> "Bug 已提交，AE Team 会跟进处理。你可以在这个链接查看进展。"
 
 ## 重要规则
 
-- **禁止创建本地 issue 文件** — 所有 bug 必须通过 `ae pm submit-bug` CLI 命令提交到 Gitee
-- **禁止直接调用 curl/Gitee API** — 统一走 CLI
 - **提交前必须让用户确认内容**
-- **UI 类 bug 没有截图的，必须在 issue 中标注**
-- **笼统描述必须追问拆分，不接受"差距大"之类的模糊表述**
-- **验收标准必填** — 每个 bug 必须写清"修完后怎么验证"。如果用户没提供，主动追问："这个 bug 修好后，你会怎么确认它修好了？"至少要有一条可执行的验证步骤
+- 笼统描述必须追问具体化
+- 多个 bug 逐个提交，每个一个 issue

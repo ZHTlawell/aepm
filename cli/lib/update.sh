@@ -7,6 +7,7 @@ ae_update() {
 
     local any_updated=false
 
+    _update_repo "ae-go"              "$AE_HOME/go"
     _update_repo "ae-pm"              "$AE_HOME/pm"
     _update_repo "ae-dev"             "$AE_HOME/dev"
     _update_repo "ae-speckit-examples" "$AE_HOME/speckit-examples"

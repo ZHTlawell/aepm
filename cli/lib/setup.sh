@@ -2,14 +2,14 @@
 # ae setup — one-command full environment setup
 
 ae_setup() {
-    local role="${1:-pm}"
+    local role="${1:-go}"
     local skip_ios=false
     local skip_backend=false
 
     # Parse flags
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            pm|dev|both) role="$1"; shift ;;
+            go|pm|dev|all) role="$1"; shift ;;
             --skip-ios)     skip_ios=true; shift ;;
             --skip-backend) skip_backend=true; shift ;;
             --help|-h)
@@ -20,9 +20,10 @@ ${BOLD}USAGE${NC}
     ae setup [role] [options]
 
 ${BOLD}ROLES${NC}
-    pm       只装 PM 环境（默认）
-    dev      只装 Dev 环境
-    both     PM + Dev 都装
+    go       全员通用环境（默认）
+    pm       PM 环境
+    dev      Dev 环境
+    all      Go + PM + Dev 全装
 
 ${BOLD}OPTIONS${NC}
     --skip-ios       跳过 iOS 依赖（Xcode/AXe）
@@ -88,7 +89,7 @@ EOF
     fi
 
     # Figma MCP（仅 PM 角色需要）
-    if [[ "$role" == "pm" || "$role" == "both" ]]; then
+    if [[ "$role" == "pm" || "$role" == "all" ]]; then
         if command -v claude &>/dev/null; then
             if claude mcp list 2>/dev/null | grep -qi "figma"; then
                 ok "  Figma MCP: 已连接"
@@ -112,16 +113,19 @@ EOF
     step=$((step + 1))
     echo -e "${BOLD}[$step/$total_steps] AE 仓库${NC}"
 
-    if [[ "$role" == "pm" || "$role" == "both" ]]; then
+    if [[ "$role" == "go" || "$role" == "all" ]]; then
+        _setup_clone_or_pull "ae-go" "https://gitee.com/turningsyn/ae-go.git" "$AE_HOME/go"
+    fi
+
+    if [[ "$role" == "pm" || "$role" == "all" ]]; then
         _setup_clone_or_pull "ae-pm" "https://gitee.com/turningsyn/ae-pm.git" "$AE_HOME/pm"
     fi
 
-    if [[ "$role" == "dev" || "$role" == "both" ]]; then
+    if [[ "$role" == "dev" || "$role" == "all" ]]; then
         _setup_clone_or_pull "ae-dev" "https://gitee.com/turningsyn/ae-dev.git" "$AE_HOME/dev"
+        # speckit-examples (optional, don't fail on error)
+        _setup_clone_or_pull "ae-speckit-examples" "https://github.com/ligenjian001-ai/ae-speckit-examples.git" "$AE_HOME/speckit-examples" || true
     fi
-
-    # speckit-examples (optional, don't fail on error)
-    _setup_clone_or_pull "ae-speckit-examples" "https://github.com/ligenjian001-ai/ae-speckit-examples.git" "$AE_HOME/speckit-examples" || true
     echo ""
 
     # ── Step 3: Credentials ───────────────────────────────────────
@@ -137,7 +141,7 @@ EOF
     step=$((step + 1))
     echo -e "${BOLD}[$step/$total_steps] 开发依赖${NC}"
 
-    if [[ "$role" == "dev" || "$role" == "both" ]]; then
+    if [[ "$role" == "dev" || "$role" == "all" ]]; then
         if ! $skip_ios; then
             _setup_ios_deps
         else
@@ -149,7 +153,7 @@ EOF
             warn "  跳过后端依赖（--skip-backend）"
         fi
     else
-        ok "  PM 角色无需开发依赖"
+        ok "  $role 角色无需开发依赖"
     fi
     echo ""
 
@@ -223,12 +227,18 @@ _setup_clone_or_pull() {
 }
 
 _setup_credentials() {
-    local cred_dir="$HOME/.config/ae-pm"
+    local cred_dir="$HOME/.config/ae"
     local cred_file="$cred_dir/credentials.env"
 
-    if [[ -f "$cred_file" ]]; then
+    # Check new path first, then fallback to legacy
+    local existing_cred=""
+    for f in "$cred_file" "$HOME/.config/ae-pm/credentials.env"; do
+        [[ -f "$f" ]] && existing_cred="$f" && break
+    done
+
+    if [[ -n "$existing_cred" ]]; then
         # Validate existing token
-        source "$cred_file"
+        source "$existing_cred"
         if [[ -n "${GITEE_TOKEN:-}" ]]; then
             unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
             local resp
@@ -327,10 +337,9 @@ _setup_backend_deps() {
 _setup_onboarding() {
     # Check prerequisites
     if [[ -z "${GITEE_TOKEN:-}" ]]; then
-        local cred_file="$HOME/.config/ae-pm/credentials.env"
-        if [[ -f "$cred_file" ]]; then
-            source "$cred_file"
-        fi
+        for f in "$HOME/.config/ae/credentials.env" "$HOME/.config/ae-pm/credentials.env"; do
+            if [[ -f "$f" ]]; then source "$f"; break; fi
+        done
     fi
 
     if [[ -z "${GITEE_TOKEN:-}" ]]; then

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ae — unified CLI for AE Platform (PM + Dev agent infrastructure)
-# https://gitee.com/turningsyn/ae-pm
+# ae — unified CLI for AE Platform (PM + Dev + Go agent infrastructure)
+# https://gitee.com/turningsyn/ae-platform
 
 AE_VERSION="0.1.0"
 AE_HOME="${AE_HOME:-$HOME/.ae}"
@@ -49,7 +49,11 @@ ${BOLD}COMMANDS${NC}
         ios-test <app_path>            iOS UI 测试
         backend-build <project_dir>   后端编译+启动验证
 
-    ${BOLD}link${NC} <role> [dir]    在项目中启用 ae-pm 或 ae-dev
+    ${BOLD}go${NC} <subcommand>      全员通用
+        submit-bug <title> [body]      向 AE Team 提交 bug 报告
+        submit-requirement <title>     向 AE Team 提交能力需求
+
+    ${BOLD}link${NC} <role> [dir]    在项目中启用 ae-pm / ae-dev / ae-go
     ${BOLD}version${NC}              显示版本
     ${BOLD}help${NC}                 显示帮助
 
@@ -65,7 +69,7 @@ ${BOLD}ENVIRONMENT${NC}
 EOF
 }
 
-# Source sub-module
+# Source sub-module (supports nested paths like "pm/commands")
 source_lib() {
     local lib="$AE_LIB_DIR/$1.sh"
     if [[ ! -f "$lib" ]]; then
@@ -103,12 +107,16 @@ main() {
             ae_update "$@"
             ;;
         pm)
-            source_lib "pm"
+            source_lib "pm/commands"
             ae_pm "$@"
             ;;
         dev)
-            source_lib "dev"
+            source_lib "dev/commands"
             ae_dev "$@"
+            ;;
+        go)
+            source_lib "go/commands"
+            ae_go "$@"
             ;;
         link)
             source_lib "link"

@@ -60,14 +60,22 @@ EOF
 # ── Gitee API helper ──────────────────────────────────────────────
 
 _pm_load_gitee_token() {
-    local cred_file="$HOME/.config/ae-pm/credentials.env"
-    if [[ ! -f "$cred_file" ]]; then
+    local loaded=false
+    local cred_file=""
+    for f in "$HOME/.config/ae/credentials.env" "$HOME/.config/ae-pm/credentials.env"; do
+        if [[ -f "$f" ]]; then
+            cred_file="$f"
+            source "$f"
+            loaded=true
+            break
+        fi
+    done
+    if ! $loaded; then
         err "Gitee token 未配置。请先运行:"
-        echo "  mkdir -p ~/.config/ae-pm"
-        echo "  echo 'GITEE_TOKEN=你的token' > ~/.config/ae-pm/credentials.env"
+        echo "  mkdir -p ~/.config/ae"
+        echo "  echo 'GITEE_TOKEN=你的token' > ~/.config/ae/credentials.env"
         exit 1
     fi
-    source "$cred_file"
     if [[ -z "${GITEE_TOKEN:-}" ]]; then
         err "GITEE_TOKEN 为空，请检查 $cred_file"
         exit 1
@@ -717,14 +725,14 @@ EOF
     fi
 
     # Load credentials if available
-    for cred in "$HOME/.config/ae-pm/credentials.env" "$HOME/.config/agentrunzo/credentials.env"; do
+    for cred in "$HOME/.config/ae/credentials.env" "$HOME/.config/ae-pm/credentials.env" "$HOME/.config/agentrunzo/credentials.env"; do
         [[ -f "$cred" ]] && source "$cred"
     done
 
     # Check API keys
     if [[ "$backend" == "gemini" && -z "${GEMINI_API_KEY:-}" ]]; then
         err "GEMINI_API_KEY 未配置。请设置："
-        echo "  echo 'GEMINI_API_KEY=...' >> ~/.config/ae-pm/credentials.env"
+        echo "  echo 'GEMINI_API_KEY=...' >> ~/.config/ae/credentials.env"
         exit 1
     fi
     if [[ "$backend" == "together" && -z "${TOGETHER_API_KEY:-}" ]]; then
