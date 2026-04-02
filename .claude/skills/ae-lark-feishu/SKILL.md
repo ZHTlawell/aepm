@@ -8,11 +8,72 @@ description: "飞书/Lark 消息读取、搜索、发送、会议妙记/逐字�
 
 当用户提到飞书、Lark、群消息、聊天记录、会议纪要、妙记、逐字稿，或要求读取/搜索/发送飞书消息时触发。
 
-## 前置条件
+## 前置条件检查与自动安装
 
-- **lark-cli 已安装**: `/usr/local/bin/lark-cli`
-- **已认证用户**: 李根剑 (brand: feishu)
-- 如 token 过期，运行 `lark-cli auth login` 重新认证
+执行任何飞书操作前，必须先完成以下检查。如果检查不通过，按顺序引导用户完成安装和配置。
+
+### Step 1: 检查 lark-cli 是否已安装
+
+```bash
+which lark-cli && lark-cli --help | head -1
+```
+
+如果未安装，引导用户安装：
+
+```bash
+# 需要 Node.js 环境
+npm install -g @larksuite/cli
+```
+
+安装后验证：
+```bash
+lark-cli --help | head -1
+# 预期输出: lark-cli — Lark/Feishu CLI tool.
+```
+
+### Step 2: 检查认证状态
+
+```bash
+lark-cli auth status
+```
+
+检查输出中的关键字段：
+- `tokenStatus`: 如果是 `valid` 则直接可用；如果是 `needs_refresh` 会自动刷新；如果是 `expired` 或命令报错则需要重新登录
+- `userName`: 确认是当前用户
+
+### Step 3: 认证登录（如需要）
+
+如果未认证或 token 已过期：
+
+```bash
+# 申请所有域的权限（推荐首次使用）
+lark-cli auth login --domain all
+
+# 或只申请特定域（最小权限）
+lark-cli auth login --domain im,vc,docs,contact,calendar
+```
+
+这是 Device Flow 认证：
+1. 命令会输出一个验证 URL 和 user code
+2. **告诉用户**：在浏览器打开该 URL，输入 user code 完成授权
+3. 命令会自动等待授权完成
+
+授权完成后再次验证：
+```bash
+lark-cli auth status
+# 确认 tokenStatus 为 valid，userName 正确
+```
+
+### Step 4: 确认可正常访问（快速测试）
+
+```bash
+# 搜索一个群聊来验证连通性
+lark-cli im +chat-search --query "test" --format pretty
+```
+
+如果报错 `401` 或 `token expired`，重新执行 Step 3。
+
+**以上检查全部通过后，方可执行后续操作。**
 
 ## 核心能力
 
