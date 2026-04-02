@@ -30,82 +30,13 @@ description: "从已上架 App 逆向提取 speckit（无源码，通过 App Sto
 
 | 条件 | 说明 |
 |------|------|
-| iPhone 真机 + USB | 通过 go-ios 连接 |
-| WDA 已安装并运行 | localhost:8100 可用 |
-| mobile-mcp 已配置 | Claude Code MCP server |
+| iPhone 真机自动化环境 | **必须先完成 `/ae-mobile-setup`**（go-ios + WDA + mobile-mcp 全套） |
 | 目标 App 已安装 | 从 App Store 下载到真机 |
 | **免打扰模式** | **建议 PM 开启 iPhone 免打扰（专注模式），避免通知遮挡界面干扰操作和截图** |
 
-### 环境搭建（首次使用）
-
-如果以下工具链未安装，按顺序执行：
-
-**1. 安装 go-ios**
-```bash
-npm install -g go-ios
-```
-
-**2. 启动 USB 隧道（iOS 17+ 必须）**
-```bash
-ios tunnel start --userspace
-```
-保持此进程运行。新开终端继续。
-
-**3. 编译并安装 WDA（WebDriverAgent）到 iPhone**
-```bash
-# Clone WDA
-cd ~/Documents/git && git clone https://github.com/appium/WebDriverAgent.git
-cd WebDriverAgent
-
-# 编译（替换为你的 Team ID）
-xcodebuild build-for-testing \
-  -project WebDriverAgent.xcodeproj \
-  -scheme WebDriverAgentRunner \
-  -destination "id=$(ios list 2>/dev/null | python3 -c 'import json,sys;print(json.load(sys.stdin)["deviceList"][0])')" \
-  DEVELOPMENT_TEAM=YOUR_TEAM_ID \
-  CODE_SIGN_IDENTITY="Apple Development" \
-  PRODUCT_BUNDLE_IDENTIFIER=com.your.WebDriverAgentRunner.xctrunner \
-  -allowProvisioningUpdates
-
-# 安装到 iPhone
-ios install --path="$(find ~/Library/Developer/Xcode/DerivedData/WebDriverAgent-*/Build/Products/Debug-iphoneos -name '*.app' -maxdepth 1)"
-```
-
-> 首次安装后，需在 iPhone 上信任开发者证书：设置 → 通用 → VPN 与设备管理 → 信任
-
-**4. 启动 WDA + 端口转发**
-```bash
-# 启动 WDA（保持运行）
-cd ~/Documents/git/WebDriverAgent && xcodebuild test-without-building \
-  -project WebDriverAgent.xcodeproj \
-  -scheme WebDriverAgentRunner \
-  -destination "id=YOUR_UDID" \
-  DEVELOPMENT_TEAM=YOUR_TEAM_ID \
-  PRODUCT_BUNDLE_IDENTIFIER=com.your.WebDriverAgentRunner.xctrunner &
-
-# 等待 WDA 启动（约 15 秒），然后转发端口
-sleep 15 && ios forward 8100 8100
-
-# 验证
-curl -s http://localhost:8100/status | python3 -c "import json,sys;print(json.load(sys.stdin)['value']['ready'])"
-# 应输出 True
-```
-
-**5. 配置 mobile-mcp 为 Claude Code MCP Server**
-```bash
-claude mcp add mobile-mcp -- npx @mobilenext/mobile-mcp
-```
-
-**6. 允许 mobile-mcp 工具**
-
-在 `~/.claude/settings.json` 的 `permissions.allow` 中添加：
-```json
-"mcp__mobile-mcp__*"
-```
-
 ### 环境检查（每次会话开始）
 
-执行前先验证：
+执行前先验证环境就绪：
 
 ```
 1. mobile_list_available_devices → 确认设备在线
@@ -113,7 +44,7 @@ claude mcp add mobile-mcp -- npx @mobilenext/mobile-mcp
 3. mobile_list_apps → 确认目标 App 已安装
 ```
 
-如果 WDA 不可用，重新执行上面的 Step 4（启动 WDA + 端口转发）。
+如果环境不可用，引导用户运行 `/ae-mobile-setup`。如果之前搭建过只是 WDA 断开，`/ae-mobile-setup` 会自动检测并只执行快速重连。
 
 ## 输入
 
@@ -244,9 +175,9 @@ claude mcp add mobile-mcp -- npx @mobilenext/mobile-mcp
 
 ### Phase 2: 真机 App 探索
 
-**工具**：mobile-mcp MCP tools
+**基础能力**：本 Phase 使用 `/ae-mobile-agent` 的 observe → think → act → verify 循环进行手机操控。以下规则是在 mobile-agent 基础上的**领域特化**（针对 App 系统化探索场景）。
 
-**关键规则**：
+**关键规则**（继承自 mobile-agent + 探索特化）：
 - **每次操作后必须 `mobile_take_screenshot` 看到画面内容**，确认操作成功。不能盲目连续操作
 - `mobile_save_screenshot` 在 iOS 真机上可能返回黑屏，**不要使用**。改用 WDA API 直接存：`curl -s http://localhost:8100/screenshot` → base64 decode → 写文件
 - 需要实际拍摄文档的步骤（扫描、OCR 等），让 PM 手动操作，Agent 负责截图和记录
@@ -453,6 +384,8 @@ with open('screenshots/{name}.png', 'wb') as f:
 
 ## 关联
 
+- 前置：`/ae-mobile-setup`（环境搭建，首次使用前必须完成）
+- 基础能力：`/ae-mobile-agent`（手机操控的 observe-think-act-verify 循环）
 - 上游：PM 选定目标 App
 - 下游：demo-to-speckit（如果先 vibe coding 再提取）、demo-to-figma、verify-app
-- 父任务：IHWK3R、IHVABC
+- 父任务：IHWK3R、IHXR0I、IHVABC

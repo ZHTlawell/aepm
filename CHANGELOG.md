@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.15.1 (2026-04-03) — ae-app-to-speckit 环境搭建解耦 `#IHXR0I`
+
+### 改进
+- **ae-app-to-speckit 环境搭建解耦** — 移除 skill 内嵌的 70 行环境搭建章节，改为前置条件指向 ae-go 的 `/ae-mobile-setup` (ae-platform#IHXR0I)
+  - 搭建能力从 PM 专用提升为全员通用（ae-go），任何角色都能操控 iPhone
+  - Phase 2 探索标注基于 `/ae-mobile-agent` 的 observe-think-act-verify 循环
+  - 关联新增 #IHXR0I
+
 ## v0.15.0 (2026-04-02) — App-to-Speckit 逆向分析能力 `#IHWK3R`
 
 ### 新增能力

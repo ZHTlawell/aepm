@@ -276,7 +276,7 @@ git pull origin main
 
 查看 [CHANGELOG.md](CHANGELOG.md) 了解完整更新记录。
 
-当前版本：**v0.15.0**
+当前版本：**v0.15.1**
 
 ## 由谁维护
 
