@@ -1,6 +1,22 @@
 ---
 name: ae-app-to-speckit
 description: "从已上架 App 逆向提取 speckit（无源码，通过 App Store + 真机 UI 探索）"
+permissions:
+  allow:
+    - "mcp__mobile-mcp__*"
+    - "WebSearch"
+    - "WebFetch"
+    - "Write({workdir}/speckit/**)"
+    - "Edit({workdir}/speckit/**)"
+    - "Bash(curl -s http://localhost:8100:*)"
+    - "Bash(python3 -c:*)"
+    - "Bash(cd {workdir}:*)"
+    - "Bash(mkdir -p:*)"
+    - "Bash(ls:*)"
+    - "Bash(sleep:*)"
+    - "Bash(ios forward:*)"
+    - "Bash(ios list:*)"
+    - "Bash(xcodebuild test-without-building:*)"
 ---
 
 # Skill: App 逆向提取 Speckit (app-to-speckit)

@@ -1,5 +1,16 @@
 ---
 description: "E2E 对比 demo vs 成品，自动归因差异"
+permissions:
+  allow:
+    - "mcp__mobile-mcp__*"
+    - "Bash(curl -s http://localhost:8100:*)"
+    - "Bash(python3 -c:*)"
+    - "Bash(sleep:*)"
+    - "Bash(mkdir -p:*)"
+    - "Bash(ios forward:*)"
+    - "Bash(ios list:*)"
+    - "Write({workdir}/verify-report/**)"
+    - "Edit({workdir}/verify-report/**)"
 ---
 
 # Skill: App 差异比对验证 (verify-app)

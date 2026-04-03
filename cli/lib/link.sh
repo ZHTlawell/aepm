@@ -50,6 +50,91 @@ EOF
     ok "完成！启动你的 AI 编码工具即可使用 AE 能力。"
 }
 
+# Extract permissions.allow from all SKILL.md frontmatter and merge into
+# the project's .claude/settings.local.json so users don't have to manually
+# configure allow rules for each skill.
+#
+# SKILL.md frontmatter format:
+#   ---
+#   name: ae-app-to-speckit
+#   permissions:
+#     allow:
+#       - "Bash(curl:*)"
+#       - "mcp__mobile-mcp__*"
+#   ---
+#
+# Template variable {workdir} is replaced with the actual project directory.
+_merge_skill_permissions() {
+    local project_dir="$1"
+    local ae_role_dir="$2"
+    local settings_file="$project_dir/.claude/settings.local.json"
+
+    # Extract permissions from all SKILL.md frontmatter, merge into settings.local.json
+    mkdir -p "$project_dir/.claude"
+    local added
+    added=$(python3 - "$ae_role_dir" "$project_dir" "$settings_file" <<'PYEOF'
+import sys, os, yaml, json
+
+ae_role_dir, project_dir, settings_file = sys.argv[1], sys.argv[2], sys.argv[3]
+skills_dir = os.path.join(ae_role_dir, ".claude", "skills")
+
+# 1. Collect permissions from all skills
+new_perms = []
+if os.path.isdir(skills_dir):
+    for name in sorted(os.listdir(skills_dir)):
+        skill_md = os.path.join(skills_dir, name, "SKILL.md")
+        if not os.path.isfile(skill_md):
+            continue
+        with open(skill_md) as f:
+            content = f.read()
+        parts = content.split("---", 2)
+        if len(parts) < 3:
+            continue
+        try:
+            fm = yaml.safe_load(parts[1])
+        except:
+            continue
+        if not isinstance(fm, dict):
+            continue
+        for p in (fm.get("permissions") or {}).get("allow") or []:
+            p = p.replace("{workdir}", project_dir)
+            if p not in new_perms:
+                new_perms.append(p)
+
+if not new_perms:
+    print("0")
+    sys.exit(0)
+
+# 2. Merge into settings.local.json
+settings = {}
+if os.path.isfile(settings_file):
+    try:
+        with open(settings_file) as f:
+            settings = json.load(f)
+    except:
+        pass
+
+existing = settings.setdefault("permissions", {}).setdefault("allow", [])
+added = 0
+for p in new_perms:
+    if p not in existing:
+        existing.append(p)
+        added += 1
+
+if added > 0:
+    with open(settings_file, "w") as f:
+        json.dump(settings, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+
+print(added)
+PYEOF
+    ) || return 0
+
+    if [[ "$added" != "0" ]]; then
+        ok "  合并了 ${added} 条 skill 权限到 settings.local.json"
+    fi
+}
+
 _link_role() {
     local role="$1"
     local project_dir="$2"
@@ -81,7 +166,10 @@ _link_role() {
     done
     ok "  链接了 $linked 个 skills$(( skipped > 0 )) && echo -n "，跳过 $skipped 个已存在的" || true"
 
-    # 2. Add reference to CLAUDE.md if not already present
+    # 2. Merge skill permissions into project settings.local.json
+    _merge_skill_permissions "$project_dir" "$ae_role_dir"
+
+    # 3. Add reference to CLAUDE.md if not already present
     local claude_md="$project_dir/CLAUDE.md"
     local marker="~/.ae/$role/CLAUDE.md"
 
