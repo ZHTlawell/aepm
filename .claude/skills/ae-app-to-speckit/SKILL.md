@@ -22,6 +22,7 @@ permissions:
     - "Bash(python3 *screenshot-save.py:*)"
     - "Bash(python3 *coverage-stats.py:*)"
     - "Bash(bash *wda-start.sh:*)"
+    - "Bash(python3 *wda-cli.py:*)"
 ---
 
 # Skill: App 逆向提取 Speckit (app-to-speckit)
@@ -46,6 +47,7 @@ permissions:
 3. **视觉优先** — 第三方 App 的 Accessibility Tree 不可控，纯视觉（截图 + VLM 分析）是主要识别手段
 4. **每步必看** — 每次操作后必须 `mobile_take_screenshot` 确认画面内容，不能盲操作。截图是证据，也是下游 vibe coding 的参照物
 5. **广度 100% + 核心深度** — 先确保每个功能至少有一张入口截图（广度覆盖 100%），再对核心流程做端到端深度走通。不需要每个功能都端到端，但每个功能必须有"长什么样"的截图
+6. **发现问题当场提 issue** — 探索过程中发现脚本 bug、流程缺陷、工具不好用时，**当场使用 `/ae-submit-bug` 提交 issue 再继续当前任务**。不要等到最后汇总。如果已有完整 bug 信息，可以用 `ae pm submit-bug "标题" "描述"` 跳过交互追问直接提交
 
 ## 前置条件
 
@@ -65,16 +67,37 @@ Step 0.1-0.5: 一键启动 WDA 环境
     → 自动完成：设备检测 → tunnel → xcodebuild → 端口转发 → 验证
     如果失败 → 引导运行 /ae-mobile-setup
 
-Step 0.6: 确认屏幕 + App
-    mobile_take_screenshot → 确认屏幕未锁定
-    mobile_list_apps → 确认目标 App 已安装
+Step 0.6: 检查 MCP tools 可用性
+    尝试调用 mobile_take_screenshot
+    如果 MCP tools 不可用（MCP server 未连接）→ 全程使用 wda-cli.py 替代：
+        python3 ~/.ae/pm/scripts/wda-cli.py screenshot --save /tmp/test.png
+        python3 ~/.ae/pm/scripts/wda-cli.py tap X Y
+        python3 ~/.ae/pm/scripts/wda-cli.py launch BUNDLE_ID
+        python3 ~/.ae/pm/scripts/wda-cli.py source --format xml
+        python3 ~/.ae/pm/scripts/wda-cli.py swipe X1 Y1 X2 Y2
+    在 exploration-state.json 中标记 "mcp_available": true/false
 
-Step 0.7: 收集 PII 关键词（隐私脱敏用）
+Step 0.7: 确认屏幕 + 发现 Bundle ID
+    截图确认屏幕未锁定
+    用 App 名称模糊搜索真实 Bundle ID（App Store 推断的可能不一致）：
+        python3 ~/.ae/pm/scripts/wda-cli.py apps | grep -i "<app_name>"
+    如果搜到多个结果，列出让 PM 确认
+    将确认后的 bundle_id 写入 exploration-state.json
+
+Step 0.8: 收集 PII 关键词（隐私脱敏用）
     向 PM 确认以下信息，保存到 exploration-state.json 的 pii_patterns 字段：
     - 用户姓名及变体（如 "李根剑", "根剑", "lgj"）
     - 设备名称（如 "根剑的 AirPods Pro", "lgj iphone"）
     - 用户 ID / 手机号 / 邮箱（如出现在 App 中）
     如果 PM 不确定，先跳过，Phase 2 过程中发现再补充
+
+Step 0.9: 付费策略评估（Phase 1 完成后、Phase 2 开始前回来补充）
+    分析 app-profile.json 中的 iap_list，计算最低测试成本（通常是周订阅）
+    向 PM 报告：
+    - 免费层可覆盖的功能范围
+    - 付费层额外可覆盖的功能范围
+    - 最低测试成本（如 "¥6/周 可解锁全部功能"）
+    PM 决定是否付费 → 记入 exploration-state.json 的 payment_strategy
 ```
 
 **如果之前搭建过只是 WDA 断开**，`/ae-mobile-setup` 会自动检测并只执行快速重连（跳过 go-ios 安装等已完成步骤）。
@@ -167,15 +190,20 @@ speckit 文档中通过 `![描述](screenshots/xx.png)` 引用截图，确保下
 
 **步骤**：
 ```
-1. mobile_launch_app → 启动目标 App
-2. 完成 onboarding（如有）→ 到达 Home
-3. 主动寻找以下入口（按优先级）：
+1. 启动目标 App
+2. 处理 Onboarding（如有）：
+   - 评分请求弹窗 → 点"以后再说" / "Not Now"
+   - 付费墙弹窗 → 找关闭按钮（通常右上角 X）
+   - 权限请求 → 默认点"允许"（相机/相册/通知等）
+   - 引导页 → 逐页截图，找 "跳过" / "Skip" / 最后的 "开始使用"
+3. 到达 Home 后，主动寻找功能目录入口（按优先级）：
    - "帮助" / "Help" / "?" 入口
    - "全部功能" / "更多工具" / "All Features" 入口
    - 设置页中的功能列表
    - 侧边栏/汉堡菜单中的完整功能目录
+   如果以上都找不到（部分 App 无功能目录）→ 全面滚动各 Tab 页面发现功能
 4. 截图完整功能列表（可能需要多次滚动）
-5. 用 App 内功能目录更新 feature-checklist：
+5. 用发现的功能更新 feature-checklist：
    - 新增 Phase 1 未发现的功能，source 标记为 "in_app"
    - 已有功能如果 App 内有更详细分类，更新描述
 6. 更新 exploration-state.json，标记 Phase 1.5 完成
@@ -252,6 +280,26 @@ speckit 文档中通过 `![描述](screenshots/xx.png)` 引用截图，确保下
 - `mobile_save_screenshot` 在 iOS 真机上可能返回黑屏，**不要使用**。改用 WDA API 直接存：`curl -s http://localhost:8100/screenshot` → base64 decode → 写文件
 - 需要实际拍摄文档的步骤（扫描、OCR 等），让 PM 手动操作，Agent 负责截图和记录
 - 手机锁屏后截图会变黑屏，每次操作前先确认屏幕状态
+- **需要上传照片测试时**，先推送测试图片到设备相册：`ios push-photo test.jpg --udid=<udid>`（需 go-ios 支持），或告知 PM 手动将测试图片存到相册
+
+**Agent-PM 交互协议**（遇到需要人工操作的步骤时）：
+
+```
+1. Agent 暂停 → 告知 PM："请在手机上完成 XX 操作（如登录/拍照/付款），完成后告诉我"
+2. PM 操作完成 → 回复 "好了" / "done"
+3. Agent 截图确认 → 确认操作结果符合预期
+4. 继续后续步骤
+```
+
+适用场景：登录/注册、付款确认、拍照/扫描、权限授权等需要物理操作的步骤。
+
+**底部弹出面板（Bottom Sheet）关闭策略**：
+
+iOS bottom sheet 的关闭按钮通常是 `XCUIElementTypeOther`，无 name/label。按以下优先级尝试关闭：
+1. 元素树中找带 "close"/"dismiss"/"cancel" label 的按钮
+2. 向下 swipe（从面板中部向屏幕底部）
+3. 点击面板外的灰色遮罩区域（通常是屏幕最上方 100px）
+4. 如果都不行，告知 PM 手动关闭
 
 **标准 tap 操作模板**（避免反复猜坐标，每次点击都用此流程）：
 
@@ -286,7 +334,10 @@ Step 5: 逐 Tab 截图：
         mobile_click → mobile_take_screenshot（确认到达）→ 保存截图
         mobile_list_elements_on_screen → 记录元素
         如有滚动内容 → swipe + 再次截图
+        滚动回顶部：优先点击状态栏（屏幕最顶部 y=0 区域），如不生效则多次上滑
 ```
+
+**截图精简规则**：如果一个页面是重复样式的长列表（如 50+ 风格/模板/滤镜），不需要逐屏截图。只截首尾两屏 + 在 feature-checklist 备注中记录总数量（如 "52 种风格"）。
 
 **Level 2 — 子入口遍历**：
 

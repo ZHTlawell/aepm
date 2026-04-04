@@ -62,7 +62,8 @@ if [[ -z "$UDID" ]]; then
     UDID=$(echo "$DEVICE_JSON" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
-print(data['deviceList'][0]['serialNumber'])
+item = data['deviceList'][0]
+print(item['serialNumber'] if isinstance(item, dict) else item)
 " 2>/dev/null || true)
 fi
 

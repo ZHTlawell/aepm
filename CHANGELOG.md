@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.19.0 (2026-04-05) — Interior AI 实战反馈 6 issue 修复 `#IHZ79E` `#IHZ79I` `#IHZ79N` `#IHZ7A2` `#IHZ7AU` `#IHZ7B0`
+
+### Bug 修复
+- **wda-start.sh UDID 解析 bug** — `ios list` 返回字符串数组时按对象解析导致 KeyError，现在兼容两种格式 (#IHZ79E)
+
+### 新增能力
+- **wda-cli.py** — WDA HTTP API 统一 CLI，当 mobile-mcp tools 不可用时的完整 fallback：screenshot/tap/swipe/launch/source/apps (#IHZ79I)
+
+### 改进
+- **Bundle ID 自动发现** — Phase 0.7 增加 App 名称模糊搜索真实 bundle ID，解决 App Store 推断 ID 与实际安装不一致的问题 (#IHZ79N)
+- **付费策略评估** — Phase 0.9 分析 IAP 列表，向 PM 报告免费/付费层覆盖范围和最低测试成本 (#IHZ7A2)
+- **Agent-PM 交互协议** — 标准化暂停-通知-恢复流程，适用于登录/拍照/付款等需要人工操作的步骤 (#IHZ7A2)
+- **底部弹窗关闭策略** — 4 级降级方案（label→swipe→遮罩→PM 手动） (#IHZ7A2)
+- **测试图片推送** — 支持通过 go-ios 推送测试照片到设备相册 (#IHZ7A2)
+- **Onboarding 具体策略** — 评分弹窗跳过、付费墙找关闭、权限默认允许 (#IHZ7AU)
+- **Phase 1.5 功能目录降级** — 找不到帮助入口时改为全面滚动各 Tab 发现功能 (#IHZ7AU)
+- **截图精简规则** — 重复样式长列表只截首尾两屏 + 记录总数 (#IHZ7AU)
+- **滚动到顶部** — 优先点击状态栏，不生效则多次上滑 (#IHZ7AU)
+- **发现问题当场提 issue** — SKILL.md 核心原则 + CLAUDE.md 行为准则均内嵌规则 (#IHZ7B0)
+- **MCP 可用性检查** — Phase 0.6 检测 mobile MCP 是否可用，不可用时自动切换 wda-cli.py (#IHZ79I)
+
 ## v0.18.1 (2026-04-05) — Feature Discovery by Reasoning `#IHZ400`
 
 ### 改进
