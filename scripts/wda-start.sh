@@ -133,17 +133,24 @@ sleep 1
 MOBILE_CONFIG="${HOME}/.config/ae/mobile-setup.json"
 if [[ -f "$MOBILE_CONFIG" ]]; then
     WDA_PROJECT=$(python3 -c "
-import json
+import json, os
 with open('$MOBILE_CONFIG') as f:
     data = json.load(f)
-p = data.get('wda_project_path', '')
-print(p if p else '')
+p = data.get('wda_project', '')
+if p:
+    p = os.path.expanduser(p)
+    # Append .xcodeproj if not already
+    xcproj = os.path.join(p, 'WebDriverAgent.xcodeproj')
+    if os.path.exists(xcproj):
+        print(xcproj)
+    elif os.path.exists(p) and p.endswith('.xcodeproj'):
+        print(p)
 " 2>/dev/null || true)
 fi
 
-# 2. Search common locations
+# 2. Search system locations (no user-specific paths)
 if [[ -z "$WDA_PROJECT" ]]; then
-    WDA_PROJECT=$(find ~/Documents/git ~/git /usr/local/lib /opt/homebrew ~/Library /Applications \
+    WDA_PROJECT=$(find /usr/local/lib /opt/homebrew ~/Library /Applications \
         -name "WebDriverAgent.xcodeproj" -maxdepth 6 2>/dev/null | head -1 || true)
 fi
 
