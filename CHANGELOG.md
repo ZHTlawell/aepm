@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.17.0 (2026-04-05) — 截图隐私脱敏 + 元素树快照 `#IHZ400`
+
+### 新增能力
+- **privacy-mask.py** — 截图自动隐私脱敏脚本，基于 Apple Vision OCR 扫描 PII 关键词并自动马赛克 (#IHZ400)
+  - 支持从 exploration-state.json 读取 PII 配置，也支持命令行传入关键词
+  - 支持固定区域马赛克（如每页右上角头像）
+  - dry-run 模式预览、JSON 输出报告
+  - 预期效果：脱敏耗时从 ~30min 降至 <1min
+
+### 改进
+- **Phase 0.7: PII 关键词收集** — 环境就绪阶段即向 PM 收集姓名/设备名/ID 等隐私关键词，存入 exploration-state.json (#IHZ400)
+- **Phase 2e: 隐私脱敏步骤** — Phase 2d 覆盖率检查通过后、Phase 3 生成前，强制执行 privacy-mask.py 脱敏 (#IHZ400)
+- **截图保存同时 dump 元素树 XML** — 每张截图配对保存 WDA source XML，解决三套坐标系换算问题 (#IHZ400)
+
 ## v0.16.0 (2026-04-05) — ae-app-to-speckit 实战优化 `#IHZ400`
 
 ### 改进

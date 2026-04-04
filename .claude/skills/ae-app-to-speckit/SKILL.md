@@ -17,6 +17,8 @@ permissions:
     - "Bash(ios forward:*)"
     - "Bash(ios list:*)"
     - "Bash(xcodebuild test-without-building:*)"
+    - "Bash(python3 *privacy-mask.py:*)"
+    - "Bash(python3 *ocr-screenshot.py:*)"
 ---
 
 # Skill: App 逆向提取 Speckit (app-to-speckit)
@@ -82,6 +84,13 @@ Step 0.5: 验证 WDA 可用
 Step 0.6: 确认屏幕 + App
     mobile_take_screenshot → 确认屏幕未锁定
     mobile_list_apps → 确认目标 App 已安装
+
+Step 0.7: 收集 PII 关键词（隐私脱敏用）
+    向 PM 确认以下信息，保存到 exploration-state.json 的 pii_patterns 字段：
+    - 用户姓名及变体（如 "李根剑", "根剑", "lgj"）
+    - 设备名称（如 "根剑的 AirPods Pro", "lgj iphone"）
+    - 用户 ID / 手机号 / 邮箱（如出现在 App 中）
+    如果 PM 不确定，先跳过，Phase 2 过程中发现再补充
 ```
 
 **如果之前搭建过只是 WDA 断开**，`/ae-mobile-setup` 会自动检测并只执行快速重连（跳过 go-ios 安装等已完成步骤）。
@@ -353,8 +362,33 @@ for each core_flow:
    - 需要实物（证件/发票）的 → 标记 [需PM协助]
 ```
 
+#### Phase 2e: 隐私脱敏（Phase 2d 通过后、Phase 3 之前）
+
+截图中可能包含用户真实姓名、头像、设备名、用户 ID 等个人信息。**截图会被提交到 git 仓库，必须在进入 Phase 3 之前完成脱敏。**
+
+```
+1. 确认 exploration-state.json 中有 pii_patterns（Phase 0.7 收���的）
+   如果没有 → 此时向 PM 补充收集
+2. 运行脱敏脚本：
+   python3 ~/.ae/pm/scripts/privacy-mask.py speckit/screenshots/ \
+     --pii-config speckit/exploration-state.json \
+     --dry-run
+3. 审核报告 → 确认检测结果合理
+4. 去掉 --dry-run 执行实际脱敏：
+   python3 ~/.ae/pm/scripts/privacy-mask.py speckit/screenshots/ \
+     --pii-config speckit/exploration-state.json
+5. 如有固定位置的头像（如每个页面右上角），追加 --avatar-region：
+   python3 ~/.ae/pm/scripts/privacy-mask.py speckit/screenshots/ \
+     --pii-config speckit/exploration-state.json \
+     --avatar-region 330,44,60,60
+6. 快速浏览脱敏后的截图确认无遗漏
+```
+
+**常见泄露点**：设置/个人资料页（姓名+头像+ID）、蓝牙设备名（含姓名）、页面角落头像、笔记/内容区域。
+
 **探索终止条件**：
 - Phase 2d checkpoint 通过
+- Phase 2e 隐私脱敏完成
 - 至少 3 条核心流程端到端走通（每步有截图）
 - 遇到付费墙 → 标记 `[PAYWALL]`，截图后跳过
 - `exploration-state.json` 的 `phase` 更新为 `"3"`
@@ -362,6 +396,7 @@ for each core_flow:
 **截图保存方法**（WDA 直接 API，绕过 mobile_save_screenshot 黑屏 bug）：
 
 ```bash
+# 1. 保存截图（绕过 mobile_save_screenshot 黑屏 bug）
 curl -s http://localhost:8100/screenshot | python3 -c "
 import json, sys, base64
 data = json.load(sys.stdin)
@@ -369,9 +404,14 @@ img = base64.b64decode(data['value'])
 with open('screenshots/{name}.png', 'wb') as f:
     f.write(img)
 "
+
+# 2. 同时保存元素树快照（用于事后坐标定位，如隐私脱敏）
+curl -s http://localhost:8100/source?format=xml -o screenshots/{name}.xml
 ```
 
-**产出**：`screenshots/` 目录（每页面+每步骤截图）+ 更新后的 `feature-checklist.md`
+元素树快照解决了**三套坐标系换算**问题：XML 中的元素坐标是 WDA point，乘以 3 即为截图像素坐标。事后定位不再需要重连 WDA。
+
+**产出**：`screenshots/` 目录（每页面 `.png` + `.xml` 配对）+ 更新后的 `feature-checklist.md`
 
 ### Phase 3: 逆向 Speckit 生成
 
