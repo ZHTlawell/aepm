@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.19.2 (2026-04-05) — wda-start/wda-cli hotfix `#IHZ83R` `#IHZ8CQ`
+
+### Bug 修复
+- **wda-start.sh WDA 路径查找** — 优先读 `~/.config/ae/mobile-setup.json` 的 `wda_project` 字段，不再硬编码用户私人路径 (#IHZ83R)
+- **wda-start.sh 重复 WDA App** — 传递 `DEVELOPMENT_TEAM` + `PRODUCT_BUNDLE_IDENTIFIER` 给 xcodebuild，确保与 `/ae-mobile-setup` 安装时签名一致，不在手机上产生第二个 WDA
+- **wda-cli.py tap/swipe 404** — 从旧版私有 API (`/wda/tap/0`) 改为 W3C Actions API (`POST /session/{sid}/actions`)，兼容 WDA 11.x (#IHZ8CQ)
+
 ## v0.19.1 (2026-04-05) — 中断恢复支持付费后补测 `#IHZ7DQ`
 
 ### 改进
