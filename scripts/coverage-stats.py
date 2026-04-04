@@ -119,6 +119,10 @@ def compute_stats(features):
     in_app_total = len(in_app_features)
     in_app_covered = sum(1 for f in in_app_features if f["status"] in ("captured", "e2e"))
 
+    discovered_features = [f for f in features if f["source"] == "discovered"]
+    discovered_total = len(discovered_features)
+    discovered_covered = sum(1 for f in discovered_features if f["status"] in ("captured", "e2e"))
+
     def pct(n, d):
         return round(n / d * 100, 1) if d > 0 else 0
 
@@ -130,6 +134,11 @@ def compute_stats(features):
             "e2e": by_status.get("e2e", 0),
             "paywall": by_status.get("paywall", 0),
             "login_required": by_status.get("login_required", 0),
+        },
+        "by_source": {
+            "app_store": app_store_total,
+            "in_app": in_app_total,
+            "discovered": discovered_total,
         },
         "overall": {
             "covered": covered,
@@ -150,6 +159,11 @@ def compute_stats(features):
             "covered": in_app_covered,
             "total": in_app_total,
             "pct": pct(in_app_covered, in_app_total),
+        },
+        "discovered": {
+            "covered": discovered_covered,
+            "total": discovered_total,
+            "pct": pct(discovered_covered, discovered_total),
         },
         "uncovered": [
             {"id": f["id"], "name": f["name"], "status": f["status"], "notes": f["notes"]}
@@ -185,6 +199,9 @@ def main():
         print(f"  ⛔ Paywall:        {bs['paywall']}")
         print(f"  🔒 Login required: {bs['login_required']}")
         print()
+        src = stats["by_source"]
+        print(f"  Sources: App Store={src['app_store']}, In-app={src['in_app']}, Discovered={src['discovered']}")
+        print()
         o = stats["overall"]
         print(f"Overall coverage:    {o['covered']}/{o['total']} ({o['pct']}%)")
         c = stats["core"]
@@ -193,6 +210,9 @@ def main():
         print(f"App Store coverage:  {a['covered']}/{a['total']} ({a['pct']}%)")
         i = stats["in_app"]
         print(f"In-app coverage:     {i['covered']}/{i['total']} ({i['pct']}%)")
+        d = stats["discovered"]
+        if d["total"] > 0:
+            print(f"Discovered coverage: {d['covered']}/{d['total']} ({d['pct']}%)")
 
         if stats["uncovered"]:
             print(f"\nUncovered features ({len(stats['uncovered'])}):")

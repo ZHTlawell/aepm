@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.18.1 (2026-04-05) — Feature Discovery by Reasoning `#IHZ400`
+
+### 改进
+- **Feature Discovery by Reasoning** — Phase 2 探索过程中，agent 主动推理发现 checklist 未列出的功能（按钮/设置开关/导航结构暗示的能力），新增 source="discovered" 标签区分来源 (#IHZ400)
+- **coverage-stats.py** — 新增 discovered 来源统计和 by_source 分布 (#IHZ400)
+
 ## v0.18.0 (2026-04-05) — 探索流程全面脚本化 `#IHZ400`
 
 ### 新增能力

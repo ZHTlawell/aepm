@@ -300,6 +300,30 @@ Step 6: 对每个 Tab 内的子功能卡片/入口：
 
 **注意**：App 内功能目录已在 Phase 1.5 提前完成，此处不再重复。如遇到引导弹窗/功能推广，截图并更新 feature-checklist。
 
+**Feature Discovery by Reasoning（探索过程中持续扩展 checklist）**：
+
+feature-checklist 不是静态文档。Phase 2 探索过程中，每次看到截图或元素树时，都要主动判断：**我看到的内容是否暗示了 checklist 上没有的功能？**
+
+触发条件（任意一条命中就新增功能）：
+- 看到 checklist 未记录的按钮/入口/图标（如「导出为 Word」但 checklist 只有「导出为 PDF」）
+- 设置页中的开关/选项暗示了独立功能（如「iCloud 同步」「深色模式」「手势密码」）
+- 元素树中出现 checklist 未覆盖的 accessibility label
+- OCR 识别出功能名称关键词不在 checklist 中
+- 导航结构暗示存在未列出的子模块（如 Tab 内有多层嵌套）
+
+发现新功能时的操作：
+```
+1. 截图当前页面作为证据
+2. 在 feature-checklist.md 中新增一行：
+   ID: 按序号递增（如 F33）
+   source: "discovered"（区别于 app_store / in_app）
+   priority: 根据位置判断（主 Tab 入口 = core，深层子页面 = secondary）
+   覆盖状态: ✅（因为发现时就已经截图了）
+3. 在 exploration-state.json 的 notes 中记录发现理由
+```
+
+**source="discovered" 表示该功能不是来自 App Store 或帮助页的枚举，而是 agent 在探索中通过推理发现的。** 这类功能容易被遗漏，但往往是 App 的差异化卖点。
+
 **Level 2 结束后**：对照 feature-checklist，确认每个功能至少有一张入口截图。未覆盖的功能立即补截图。
 
 #### Phase 2b: 核心流程深度走通（每步截图）
