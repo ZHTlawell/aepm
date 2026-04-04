@@ -101,19 +101,44 @@ def cmd_screenshot(args):
 
 def cmd_tap(args):
     sid = get_session_id(args.url)
-    wda_request(f"/session/{sid}/wda/tap/0", method="POST",
-                body={"x": args.x, "y": args.y}, url_base=args.url)
+    # W3C Actions API (WDA 11.x+)
+    actions = {
+        "actions": [{
+            "type": "pointer",
+            "id": "finger1",
+            "parameters": {"pointerType": "touch"},
+            "actions": [
+                {"type": "pointerMove", "duration": 0, "x": int(args.x), "y": int(args.y)},
+                {"type": "pointerDown", "button": 0},
+                {"type": "pause", "duration": 50},
+                {"type": "pointerUp", "button": 0},
+            ]
+        }]
+    }
+    wda_request(f"/session/{sid}/actions", method="POST",
+                body=actions, url_base=args.url)
     print(f"Tapped ({args.x}, {args.y})")
 
 
 def cmd_swipe(args):
     sid = get_session_id(args.url)
-    wda_request(f"/session/{sid}/wda/dragfromtoforduration", method="POST",
-                body={
-                    "fromX": args.x1, "fromY": args.y1,
-                    "toX": args.x2, "toY": args.y2,
-                    "duration": args.duration,
-                }, url_base=args.url)
+    # W3C Actions API (WDA 11.x+)
+    dur_ms = int(args.duration * 1000)
+    actions = {
+        "actions": [{
+            "type": "pointer",
+            "id": "finger1",
+            "parameters": {"pointerType": "touch"},
+            "actions": [
+                {"type": "pointerMove", "duration": 0, "x": int(args.x1), "y": int(args.y1)},
+                {"type": "pointerDown", "button": 0},
+                {"type": "pointerMove", "duration": dur_ms, "x": int(args.x2), "y": int(args.y2)},
+                {"type": "pointerUp", "button": 0},
+            ]
+        }]
+    }
+    wda_request(f"/session/{sid}/actions", method="POST",
+                body=actions, url_base=args.url)
     print(f"Swiped ({args.x1},{args.y1}) → ({args.x2},{args.y2})")
 
 
