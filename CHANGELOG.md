@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.16.0 (2026-04-05) — ae-app-to-speckit 实战优化 `#IHZ400`
+
+### 改进
+- **Phase 0: WDA 环境启动** — 新增显式 Phase 0 六步环境就绪检查（tunnel→xcodebuild→forward→verify→screenshot→list_apps），替代原来的 3 步简单检查，解决每次新会话 ~20% 时间浪费在调试环境的问题 (#IHZ400)
+- **Phase 1.5: App 内功能目录前置** — 在 Phase 2 系统遍历前先搜帮助页/全部功能入口，提前补全 feature-checklist，避免遍历中段才发现大量未知功能 (#IHZ400)
+- **截图命名语义化** — 从 `{序号}-{名称}.png` 改为 `{phase}-{功能ID}-{描述}.png`，文件名即内容 (#IHZ400)
+- **标准 tap 操作模板** — 新增元素树→rect→中心点→点击→verify 标准流程 + OCR 降级方案，杜绝凭视觉猜坐标（此前每次操作平均 2-3 次才成功） (#IHZ400)
+- **Module 02 截图硬性规则** — 每个流程步骤必须引用真实截图，≥90% 覆盖率检查，不允许占位符 (#IHZ400)
+- **中断恢复去掉 session ID** — 移除 exploration-state.json 中的 wda_session_id，恢复时通过 Phase 0 重建连接 (#IHZ400)
+
+### 已修复（前版本）
+- **Skill permissions 自动生效** — `ae link` 已自动合并 skill permissions 到 settings.local.json（ae-platform#e451a23, #IHY3Q7）
+
 ## v0.15.1 (2026-04-03) — ae-app-to-speckit 环境搭建解耦 `#IHXR0I`
 
 ### 改进
