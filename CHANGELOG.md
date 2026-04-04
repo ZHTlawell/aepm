@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.19.1 (2026-04-05) — 中断恢复支持付费后补测 `#IHZ7DQ`
+
+### 改进
+- **增量补测模式** — 中断恢复支持「付费后回来补测」场景：检测 pending_paid_flows → PM 确认已付费 → 只走待测功能端到端 → 增量更新 speckit (#IHZ7DQ)
+- **覆盖状态正式定义** — 明确 ⬜/✅/🔄/⛔/🔒 五种状态的语义区分，⛔ 表示「有入口截图但核心流程未验证」 (#IHZ7DQ)
+- **exploration-state.json schema 扩展** — 新增 pending_paid_flows / speckit_generated / payment_strategy / mcp_available / bundle_id 字段 (#IHZ7DQ)
+- **Phase 3 增量更新** — speckit 已生成时，补测回来只追加新流程到 Module 02，不覆盖已有内容 (#IHZ7DQ)
+
 ## v0.19.0 (2026-04-05) — Interior AI 实战反馈 6 issue 修复 `#IHZ79E` `#IHZ79I` `#IHZ79N` `#IHZ7A2` `#IHZ7AU` `#IHZ7B0`
 
 ### Bug 修复

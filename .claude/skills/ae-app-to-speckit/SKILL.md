@@ -180,7 +180,15 @@ speckit 文档中通过 `![描述](screenshots/xx.png)` 引用截图，确保下
 | ... | | | | | | |
 ```
 
-覆盖状态标记：⬜ 未覆盖 / ✅ 已截图 / 🔄 已端到端走通 / ⛔ PAYWALL / 🔒 需登录
+覆盖状态定义（状态间有明确语义区分）：
+
+| 状态 | 含义 | 下一步 |
+|------|------|--------|
+| ⬜ | 未覆盖（未发现或未操作） | 需要截图 |
+| ✅ | 有入口截图（功能已发现） | 核心功能需要端到端 |
+| 🔄 | 端到端走通（流程已验证） | 完成 |
+| ⛔ | 付费墙阻断（有入口截图但核心流程未验证） | PM 付费后可回来补测 |
+| 🔒 | 需登录/注册（未测试） | PM 登录后可回来补测 |
 
 **Phase 1 的 feature-checklist 是后续所有 Phase 的驱动核心。**
 
@@ -245,6 +253,14 @@ speckit 文档中通过 `![描述](screenshots/xx.png)` 引用截图，确保下
     "2a-F01-scan-entry.png": "F01",
     "2b-flow01-step03-confirm.png": "F01"
   },
+  "speckit_generated": false,
+  "pending_paid_flows": [
+    {"id": "F04", "name": "风格迁移", "reason": "paywall", "entry_screenshot": "2a-F04-style-entry.png"},
+    {"id": "F05", "name": "替换物体", "reason": "paywall", "entry_screenshot": "2a-F05-replace-entry.png"}
+  ],
+  "payment_strategy": "free_only | paid_weekly | paid_confirmed",
+  "mcp_available": true,
+  "bundle_id": "com.example.app",
   "notes": "工具箱-扫描类已完成，格式转换类进行中"
 }
 ```
@@ -258,9 +274,25 @@ speckit 文档中通过 `![描述](screenshots/xx.png)` 引用截图，确保下
    b. 读取 exploration-state.json → 确定上次停在哪个阶段
    c. 读取 feature-checklist.md → 确定哪些功能还没覆盖
    d. 扫描 screenshots/ → 确认已有截图
-   e. 启动目标 App → 导航到上次中断的位置
-   f. 从中断点继续，不重复已完成的工作
+   e. 检查 pending_paid_flows 是否非空：
+      - 非空 → 向 PM 确认："上次因付费墙跳过了 N 个功能，是否已购买会员？"
+      - PM 已付费 → 进入【增量补测模式】（见下方）
+      - PM 未付费 → 跳过付费功能，从中断点继续
+   f. 启动目标 App → 导航到中断位置或补测目标
+   g. 从中断点继续，不重复已完成的工作
 3. 如果不存在 → 从 Phase 0 开始
+```
+
+**增量补测模式**（付费后回来继续）：
+
+```
+1. 从 pending_paid_flows 逐个取出待测功能
+2. 导航到该功能入口 → 端到端走通 → 每步截图
+3. 更新 feature-checklist：⛔ → 🔄
+4. 更新 exploration-state.json：从 pending_paid_flows 中移除已完成项
+5. 全部补测完成后：
+   - 如果 speckit_generated=true → 进入 Phase 3 增量更新模式
+   - 如果 speckit_generated=false → 正常进入 Phase 3
 ```
 
 **注意**：不保存也不依赖 WDA session ID。每次恢复都通过 Phase 0 重新创建 session。
@@ -462,6 +494,14 @@ python3 ~/.ae/pm/scripts/screenshot-save.py screenshots/{name}
 **产出**：`screenshots/` 目录（每页面 `.png` + `.xml` 配对）+ 更新后的 `feature-checklist.md`
 
 ### Phase 3: 逆向 Speckit 生成
+
+**增量更新模式判断**：如果 `exploration-state.json` 中 `speckit_generated=true`（说明之前已生成过 speckit，这次是付费后补测回来的），则 Phase 3 改为增量模式：
+- Module 01：检查功能边界是否需要更新（新验证的付费功能），追加而非重写
+- Module 02：只追加新验证的流程到 `02-user-scenarios.md` 末尾，不覆盖已有内容
+- Module 04：检查新截图是否有新的设计元素（付费功能可能有不同的 UI），追加差异
+- 完成后标记 `speckit_generated=true`（保持不变）
+
+如果 `speckit_generated=false` 或字段不存在 → 正常全量生成：
 
 从 Phase 1 + Phase 2 产出，填充 speckit 模块：
 
