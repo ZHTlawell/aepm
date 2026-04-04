@@ -19,6 +19,9 @@ permissions:
     - "Bash(xcodebuild test-without-building:*)"
     - "Bash(python3 *privacy-mask.py:*)"
     - "Bash(python3 *ocr-screenshot.py:*)"
+    - "Bash(python3 *screenshot-save.py:*)"
+    - "Bash(python3 *coverage-stats.py:*)"
+    - "Bash(bash *wda-start.sh:*)"
 ---
 
 # Skill: App 逆向提取 Speckit (app-to-speckit)
@@ -57,29 +60,10 @@ permissions:
 WDA 在新会话中几乎必然已断开。**Phase 0 是显式步骤，不可跳过。**
 
 ```
-Step 0.1: 检查设备连接
-    ios list → 确认设备在线
-    如果设备不在线 → 提示 PM 检查 USB 连接，或引导运行 /ae-mobile-setup
-
-Step 0.2: 启动 userspace tunnel（iOS 17+ 必须）
-    ios tunnel start --userspace &
-    等待 2 秒确认 tunnel 进程存活
-
-Step 0.3: 启动 WDA
-    xcodebuild test-without-building \
-      -project /path/to/WebDriverAgent.xcodeproj \
-      -scheme WebDriverAgentRunner \
-      -destination 'id=<device_udid>' &
-    等待 5 秒
-
-Step 0.4: 端口转发
-    ios forward 8100 8100 &
-
-Step 0.5: 验证 WDA 可用
-    curl -s http://localhost:8100/status
-    → 应返回 JSON 且 sessionId 非空
-    如果失败 → 重试 Step 0.3-0.5（最多 2 次）
-    如果仍失败 → 引导运行 /ae-mobile-setup
+Step 0.1-0.5: 一键启动 WDA 环境
+    bash ~/.ae/pm/scripts/wda-start.sh
+    → 自动完成：设备检测 → tunnel → xcodebuild → 端口转发 → 验证
+    如果失败 → 引导运行 /ae-mobile-setup
 
 Step 0.6: 确认屏幕 + App
     mobile_take_screenshot → 确认屏幕未锁定
@@ -346,20 +330,18 @@ for each core_flow:
 
 **Phase 2 结束前必须执行此 checkpoint，不可跳过。**
 
-```
-1. 读取 feature-checklist.md
-2. 统计覆盖率：
-   - 总功能数
-   - ✅ 已截图数 / 🔄 已端到端数 / ⬜ 未覆盖数 / ⛔ PAYWALL 数
-3. 输出覆盖率对照表
-4. 判断：
-   - App Store 核心功能覆盖率 < 80% → 继续补充，不进入 Phase 3
-   - App 内功能目录覆盖率 < 60% → 继续补充
-   - 达标 → 进入 Phase 3
-5. 对未覆盖的功能逐个判断：
-   - 能进入的 → 立即补截图
-   - 需要登录/付费的 → 标记原因
-   - 需要实物（证件/发票）的 → 标记 [需PM协助]
+```bash
+# 1. 运行覆盖率统计脚本
+python3 ~/.ae/pm/scripts/coverage-stats.py speckit/feature-checklist.md
+
+# 2. 自动检查阈值（core ≥ 80%, in-app ≥ 60%，不达标 exit 1）
+python3 ~/.ae/pm/scripts/coverage-stats.py speckit/feature-checklist.md \
+  --check --core-min 80 --in-app-min 60
+
+# 3. 如果不达标，对未覆盖的功能逐个判断：
+#    能进入的 → 立即补截图
+#    需要登录/付费的 → 标记原因
+#    需要实物（证件/发票）的 → 标记 [需PM协助]
 ```
 
 #### Phase 2e: 隐私脱敏（Phase 2d 通过后、Phase 3 之前）
@@ -396,20 +378,11 @@ for each core_flow:
 **截图保存方法**（WDA 直接 API，绕过 mobile_save_screenshot 黑屏 bug）：
 
 ```bash
-# 1. 保存截图（绕过 mobile_save_screenshot 黑屏 bug）
-curl -s http://localhost:8100/screenshot | python3 -c "
-import json, sys, base64
-data = json.load(sys.stdin)
-img = base64.b64decode(data['value'])
-with open('screenshots/{name}.png', 'wb') as f:
-    f.write(img)
-"
-
-# 2. 同时保存元素树快照（用于事后坐标定位，如隐私脱敏）
-curl -s http://localhost:8100/source?format=xml -o screenshots/{name}.xml
+python3 ~/.ae/pm/scripts/screenshot-save.py screenshots/{name}
+# → 自动保存 screenshots/{name}.png + screenshots/{name}.xml
+# → 内置黑屏检测和重试
+# → 元素树 XML 用于事后坐标定位（WDA point × 3 = 像素坐标）
 ```
-
-元素树快照解决了**三套坐标系换算**问题：XML 中的元素坐标是 WDA point，乘以 3 即为截图像素坐标。事后定位不再需要重连 WDA。
 
 **产出**：`screenshots/` 目录（每页面 `.png` + `.xml` 配对）+ 更新后的 `feature-checklist.md`
 

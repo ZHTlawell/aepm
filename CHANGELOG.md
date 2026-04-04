@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.18.0 (2026-04-05) — 探索流程全面脚本化 `#IHZ400`
+
+### 新增能力
+- **wda-start.sh** — WDA 环境一键启动，自动完成设备检测→tunnel→xcodebuild→端口转发→验证，替代 Phase 0 的 6 步手动操作 (#IHZ400)
+- **screenshot-save.py** — 截图+元素树一键保存，内置黑屏检测重试，自动配对 `.png` + `.xml` (#IHZ400)
+- **coverage-stats.py** — feature-checklist.md 覆盖率自动统计，支持阈值检查（core ≥ 80%, in-app ≥ 60%） (#IHZ400)
+
+### 改进
+- **SKILL.md 全面引用脚本** — Phase 0/2/2d/2e 的内联命令替换为脚本调用，agent 不再需要拼 curl/python3 一行流 (#IHZ400)
+- **build.sh** — go role 新增 wda-start.sh + screenshot-save.py，mobile-agent 也能用 (#IHZ400)
+
 ## v0.17.0 (2026-04-05) — 截图隐私脱敏 + 元素树快照 `#IHZ400`
 
 ### 新增能力
