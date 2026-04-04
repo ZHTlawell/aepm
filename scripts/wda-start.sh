@@ -129,11 +129,26 @@ pkill -f "xcodebuild.*WebDriverAgentRunner" 2>/dev/null || true
 sleep 1
 
 # Find WebDriverAgent project
-WDA_PROJECT=$(find /usr/local/lib /opt/homebrew ~/Library /Applications \
-    -name "WebDriverAgent.xcodeproj" -maxdepth 6 2>/dev/null | head -1 || true)
+# 1. Check mobile-setup saved config first
+MOBILE_CONFIG="${HOME}/.config/ae/mobile-setup.json"
+if [[ -f "$MOBILE_CONFIG" ]]; then
+    WDA_PROJECT=$(python3 -c "
+import json
+with open('$MOBILE_CONFIG') as f:
+    data = json.load(f)
+p = data.get('wda_project_path', '')
+print(p if p else '')
+" 2>/dev/null || true)
+fi
 
+# 2. Search common locations
 if [[ -z "$WDA_PROJECT" ]]; then
-    # Try go-ios bundled WDA
+    WDA_PROJECT=$(find ~/Documents/git ~/git /usr/local/lib /opt/homebrew ~/Library /Applications \
+        -name "WebDriverAgent.xcodeproj" -maxdepth 6 2>/dev/null | head -1 || true)
+fi
+
+# 3. Try go-ios bundled WDA
+if [[ -z "$WDA_PROJECT" ]]; then
     WDA_PROJECT=$(find "$(dirname "$(which ios)")/../" -name "WebDriverAgent.xcodeproj" -maxdepth 5 2>/dev/null | head -1 || true)
 fi
 
