@@ -165,11 +165,32 @@ if [[ -z "$WDA_PROJECT" ]]; then
 fi
 log "WDA 项目: $WDA_PROJECT"
 
-xcodebuild test-without-building \
-    -project "$WDA_PROJECT" \
-    -scheme WebDriverAgentRunner \
-    -destination "id=$UDID" \
-    &>/tmp/wda-xcodebuild.log &
+# Read signing config from mobile-setup.json (avoid creating duplicate WDA with different bundle ID)
+WDA_TEAM_ID=""
+WDA_BUNDLE_ID=""
+if [[ -f "$MOBILE_CONFIG" ]]; then
+    eval "$(python3 -c "
+import json
+with open('$MOBILE_CONFIG') as f:
+    data = json.load(f)
+tid = data.get('team_id', '')
+bid = data.get('bundle_id', '')
+if tid: print(f'WDA_TEAM_ID={tid}')
+if bid: print(f'WDA_BUNDLE_ID={bid}')
+" 2>/dev/null || true)"
+fi
+
+# Build xcodebuild command with signing params if available
+XC_ARGS=(-project "$WDA_PROJECT" -scheme WebDriverAgentRunner -destination "id=$UDID")
+if [[ -n "$WDA_TEAM_ID" ]]; then
+    XC_ARGS+=(DEVELOPMENT_TEAM="$WDA_TEAM_ID")
+    log "Team ID: $WDA_TEAM_ID"
+fi
+if [[ -n "$WDA_BUNDLE_ID" ]]; then
+    XC_ARGS+=(PRODUCT_BUNDLE_IDENTIFIER="$WDA_BUNDLE_ID")
+fi
+
+xcodebuild test-without-building "${XC_ARGS[@]}" &>/tmp/wda-xcodebuild.log &
 WDA_PID=$!
 log "xcodebuild 启动中 (PID: $WDA_PID)..."
 
