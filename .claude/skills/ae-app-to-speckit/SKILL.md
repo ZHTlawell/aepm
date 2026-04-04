@@ -134,7 +134,12 @@ Step 0.9: 付费策略评估（Phase 1 完成后、Phase 2 开始前回来补充
 | 2b | `2b-flow01-step03-confirm.png` | 端到端流程步骤 |
 | 2c | `2c-empty-state.png` | 边界状态 |
 
-speckit 文档中通过 `![描述](screenshots/xx.png)` 引用截图，确保下游 vibe coding 有精确的视觉参照。在 `exploration-state.json` 中维护截图到功能的映射关系。
+speckit 文档中引用截图时**必须使用 HTML img 标签限制显示宽度**，避免在 Gitee/GitHub 上撑满全屏：
+- 表格内截图：`<img src="screenshots/xx.png" width="280">`
+- 独立段落截图（组件展示）：`<img src="screenshots/xx.png" width="375">`
+- **禁止使用** `![](screenshots/xx.png)` 格式（原始分辨率渲染，阅读体验差）
+
+在 `exploration-state.json` 中维护截图到功能的映射关系。
 
 **MVP 不输出**：03（技术架构）、05（数据模型）、06（API 规范）— 从 UI 反推这三个模块误导风险 > 价值。PM 需要时在 review 阶段手动补充。
 
