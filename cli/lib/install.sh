@@ -78,6 +78,9 @@ _install_repos() {
 
     # ae-speckit-examples (optional)
     _install_clone_or_pull "ae-speckit-examples" "https://github.com/ligenjian001-ai/ae-speckit-examples.git" "$AE_HOME/speckit-examples" || true
+
+    # Register auto-update hook
+    _register_update_hook
 }
 
 _install_clone_or_pull() {
@@ -176,6 +179,83 @@ PYEOF
 
     if [[ "$result" != "0" ]]; then
         ok "  合并了 ${result} 条 skill 权限到全局 settings.json"
+    fi
+}
+
+# Copy ae-update-check.sh to stable location and register SessionStart hook
+# in Claude Code global settings, so updates are checked automatically.
+_register_update_hook() {
+    # Find the update-check script from any installed role
+    local script_src=""
+    for role in pm go dev; do
+        local candidate="$AE_HOME/$role/scripts/ae-update-check.sh"
+        if [[ -f "$candidate" ]]; then
+            script_src="$candidate"
+            break
+        fi
+    done
+
+    if [[ -z "$script_src" ]]; then
+        return 0
+    fi
+
+    # Copy script to stable location
+    local target="$HOME/.config/ae/update-check.sh"
+    mkdir -p "$HOME/.config/ae"
+    cp "$script_src" "$target"
+    chmod +x "$target"
+
+    # Register hook in ~/.claude/settings.json
+    local settings_file="$HOME/.claude/settings.json"
+    mkdir -p "$HOME/.claude"
+
+    local result
+    result=$(python3 - "$target" "$settings_file" <<'PYEOF'
+import sys, os, json
+
+script_path, settings_file = sys.argv[1], sys.argv[2]
+
+settings = {}
+if os.path.isfile(settings_file):
+    try:
+        with open(settings_file) as f:
+            settings = json.load(f)
+    except:
+        pass
+
+hooks = settings.setdefault("hooks", {})
+session_hooks = hooks.setdefault("SessionStart", [])
+
+# Check if already registered
+command = f"bash {script_path}"
+already = False
+for entry in session_hooks:
+    for h in entry.get("hooks", []):
+        if h.get("command") == command:
+            already = True
+            break
+    if already:
+        break
+
+if not already:
+    session_hooks.append({
+        "hooks": [{
+            "type": "command",
+            "command": command,
+            "timeout": 15
+        }]
+    })
+    with open(settings_file, "w") as f:
+        json.dump(settings, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    print("registered")
+else:
+    print("exists")
+PYEOF
+    ) || return 0
+
+    if [[ "$result" == "registered" ]]; then
+        ok "  已注册自动更新检查 hook (SessionStart)"
     fi
 }
 

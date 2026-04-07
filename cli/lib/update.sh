@@ -17,6 +17,13 @@ ae_update() {
         _update_repo "ae-cli" "$AE_HOME/cli" ""
     fi
 
+    # Re-register update hook (picks up latest script version)
+    source_lib "install"
+    _register_update_hook
+
+    # Clear update cache since we just updated
+    rm -f "$HOME/.config/ae/.update-available"
+
     echo ""
     if $any_updated; then
         ok "更新完成。所有通过软链接挂载的项目自动生效。"

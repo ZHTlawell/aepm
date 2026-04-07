@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.20.1 (2026-04-07) — SessionStart hook 自动更新检查 `#II6W5Y`
+
+### 改进
+- **更新检查改为 Claude Code Hook** — 从 agent 指令内联 git fetch 改为 SessionStart hook 脚本（`~/.config/ae/update-check.sh`），不依赖 agent 自觉执行，100% 自动触发 (#II6W5Y)
+- **ae install / ae update 自动注册 hook** — 安装或更新时自动将检查脚本复制到 `~/.config/ae/` 并注册 SessionStart hook 到 `~/.claude/settings.json`
+- **ae update 自动清除更新缓存** — 更新完成后删除 `.update-available` 缓存文件，避免更新后仍显示旧通知
+
 ## v0.20.0 (2026-04-07) — 自动更新检查 `#II6W5Y`
 
 ### 新增

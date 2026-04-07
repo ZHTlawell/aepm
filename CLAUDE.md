@@ -19,33 +19,21 @@ PM vibe coding V0 原型（在约束下）→ 能发布则发布 → 不能发�
 
 ## 版本更新检查
 
-在每次对话的**首次回复之前**，静默执行以下更新检查（不要提前告知用户"我在检查更新"）：
+更新检查通过 Claude Code **SessionStart hook** 自动完成（脚本 `~/.config/ae/update-check.sh` 每 24 小时静默 git fetch 一次），结果缓存到文件。
+
+在每次对话的**首次回复之前**，读取缓存文件：
 
 ```bash
-# 每 24 小时最多检查一次，避免每次对话都 fetch
-LAST_CHECK_FILE="$HOME/.config/ae/.last-update-check-pm"
-mkdir -p "$HOME/.config/ae"
-LAST_CHECK=$(cat "$LAST_CHECK_FILE" 2>/dev/null || echo "0")
-NOW=$(date +%s)
-if (( NOW - LAST_CHECK > 86400 )); then
-    git -C ~/.ae/pm fetch origin main --quiet 2>/dev/null
-    echo "$NOW" > "$LAST_CHECK_FILE"
-fi
-BEHIND=$(git -C ~/.ae/pm rev-list HEAD..origin/main --count 2>/dev/null || echo "0")
-if [ "$BEHIND" -gt 0 ]; then
-    # 获取新版本号
-    NEW_VER=$(git -C ~/.ae/pm show origin/main:CHANGELOG.md 2>/dev/null | head -3 | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-    echo "UPDATE_AVAILABLE:${BEHIND}:${NEW_VER}"
-fi
+cat ~/.config/ae/.update-available 2>/dev/null
 ```
 
 **处理规则：**
-- 如果输出包含 `UPDATE_AVAILABLE`，在回答用户问题之后（不是之前），附加一条简短提示：
+- 如果文件存在且有内容（格式：`ae-pm vX.X.X (N 个更新)`），在回答用户问题之后（不是之前），附加一条简短提示：
 
   > ae-pm 有新版本 {版本号} 可用（{N} 个更新）。要更新的话告诉我一声。
 
-- 用户同意更新时执行：`cd ~/.ae/pm && git pull origin main`，然后按下方「更新后反馈」流程执行
-- 如果输出为空或检查失败，**不显示任何内容**，不要提"检查了没有更新"
+- 用户同意更新时执行：`cd ~/.ae/pm && git pull origin main`，然后按下方「更新后反馈」流程执行。更新完成后删除缓存：`rm -f ~/.config/ae/.update-available`
+- 如果文件不存在或为空，**不显示任何内容**
 
 ## 使用方式
 

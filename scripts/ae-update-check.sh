@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# ae-update-check.sh — Claude Code SessionStart hook
+# Silently checks ae-pm/ae-go repos for updates, writes result to cache file.
+# Runs at most once every 24 hours. Most invocations exit in <10ms.
+
+set -e
+
+AE_HOME="${AE_HOME:-$HOME/.ae}"
+CONFIG_DIR="$HOME/.config/ae"
+CACHE_FILE="$CONFIG_DIR/.update-available"
+CHECK_FILE="$CONFIG_DIR/.last-update-check-hook"
+
+mkdir -p "$CONFIG_DIR"
+
+# Read hook input from stdin (required by Claude Code hook protocol)
+cat >/dev/null 2>&1 || true
+
+# Rate limit: check at most once per 24 hours
+LAST_CHECK=$(cat "$CHECK_FILE" 2>/dev/null || echo "0")
+NOW=$(date +%s)
+if (( NOW - LAST_CHECK < 86400 )); then
+    exit 0
+fi
+
+# Update timestamp
+echo "$NOW" > "$CHECK_FILE"
+
+# Check each installed role
+UPDATES=""
+for ROLE in pm go; do
+    REPO="$AE_HOME/$ROLE"
+    [ -d "$REPO/.git" ] || continue
+
+    git -C "$REPO" fetch origin main --quiet 2>/dev/null || continue
+
+    BEHIND=$(git -C "$REPO" rev-list HEAD..origin/main --count 2>/dev/null || echo "0")
+    if [ "$BEHIND" -gt 0 ]; then
+        NEW_VER=$(git -C "$REPO" show origin/main:CHANGELOG.md 2>/dev/null | head -3 | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+        if [ -n "$UPDATES" ]; then
+            UPDATES="${UPDATES}
+"
+        fi
+        UPDATES="${UPDATES}ae-${ROLE} ${NEW_VER:-?} (${BEHIND} 个更新)"
+    fi
+done
+
+# Write cache
+if [ -n "$UPDATES" ]; then
+    echo "$UPDATES" > "$CACHE_FILE"
+else
+    rm -f "$CACHE_FILE"
+fi
+
+exit 0
