@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.22.0 (2026-04-07) — Paywall 页面生成 + Superwall 集成 `#IHXLWR` `#IHXLWK`
+
+### 新增能力
+- **`/ae-paywall-design` skill** — 自动生成产品 Paywall 付费墙页面（HTML/CSS/JS 或 Native StoreKit 2），支持订阅方案选择、价格对比、免费试用 (#IHXLWR)
+  - 深色渐变风格与 onboarding 统一，功能列表 + 方案卡片 + CTA
+  - 方案选择交互（radio），默认高亮年付 + 显示折算月价 + Save %
+  - 三个 JS 回调：`paywallPurchase(productId)` / `paywallDismiss()` / `paywallRestore()`
+  - 附带 Superwall 和 iOS WKWebView + StoreKit 2 两种集成指引 + Swift 代码片段
+- **`/ae-superwall-setup` skill** — Superwall 账号配置、App 创建、SDK 初始化、Placement 注册的完整引导流程 (#IHXLWK)
+  - Step-by-step 引导 PM 在 Dashboard 创建 App、获取 API Key、注册 Placement
+  - 自动修改项目代码完成 `Superwall.configure(apiKey:)` + placement 触发
+  - 验证集成：日志检查 + Dashboard 事件确认
+  - 与 `/ae-onboarding-design` + `/ae-paywall-design` 三件套配合：生成页面 → 配置 Superwall → 上传绑定
+
 ## v0.21.1 (2026-04-07) — 每次对话自动检查更新 `#II6W5Y`
 
 ### 改进

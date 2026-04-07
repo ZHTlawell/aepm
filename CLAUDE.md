@@ -199,6 +199,8 @@ cd ~/.ae/pm && git pull origin main
 | 飞书消息与会议 | `/ae-lark-feishu` — 搜索群聊、读取/搜索消息、下载图片、会议妙记/逐字稿、发送消息 | 可用 |
 | App 逆向提取 Speckit | `/ae-app-to-speckit` — 从已上架 App 逆向生成 speckit（iPhone 真机探索 + 截图 + feature-checklist） | 可用（需 iPhone + USB + WDA） |
 | Onboarding 页面生成 | `/ae-onboarding-design` — 生成产品 Onboarding 幻灯片（HTML/CSS/JS，Superwall Flow 或 WebView） | 可用 |
+| Paywall 页面生成 | `/ae-paywall-design` — 生成 Paywall 付费墙页面（HTML 或 Native StoreKit 2） | 可用 |
+| Superwall 集成 | `/ae-superwall-setup` — Superwall 账号配置、SDK 集成、Placement 注册引导 | 可用 |
 | 查收更新 | 自动检查新版本（每 24h）+ 查看 CHANGELOG.md 了解更新内容 | 可用 |
 
 ### 调用 Dev Agent 生成成品
