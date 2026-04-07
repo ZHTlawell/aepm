@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.20.3 (2026-04-07) — update.sh 分支检测 `#II6W5Y`
+
+### Bug 修复
+- **ae update 分支硬编码** — `_update_repo` 的 `git pull origin main` 改为动态检测默认分支，修复 ae-go（master 分支）更新时静默失败报「无网络」的问题 (#II6W5Y)
+
 ## v0.20.2 (2026-04-07) — 自动更新检查 bugfix `#II6W5Y`
 
 ### Bug 修复

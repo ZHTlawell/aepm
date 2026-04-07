@@ -42,11 +42,23 @@ _update_repo() {
         return
     fi
 
-    local before after
+    local before after branch
     before=$(cd "$dir" && git rev-parse HEAD 2>/dev/null)
 
+    # Detect default branch (main or master)
+    branch=$(cd "$dir" && git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||')
+    if [[ -z "$branch" ]]; then
+        for b in main master; do
+            if (cd "$dir" && git show-ref --verify --quiet "refs/remotes/origin/$b" 2>/dev/null); then
+                branch="$b"
+                break
+            fi
+        done
+    fi
+    branch="${branch:-main}"
+
     info "更新 $name..."
-    if (cd "$dir" && git pull origin main 2>/dev/null); then
+    if (cd "$dir" && git pull origin "$branch" 2>/dev/null); then
         after=$(cd "$dir" && git rev-parse HEAD 2>/dev/null)
         if [[ "$before" != "$after" ]]; then
             ok "$name 已更新 (${before:0:7} → ${after:0:7})"
