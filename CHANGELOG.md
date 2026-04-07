@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.20.4 (2026-04-07) — hook matcher 修复 `#II6W5Y`
+
+### Bug 修复
+- **SessionStart hook 缺少 matcher** — `_register_update_hook` 写入 settings.json 时补上 `"matcher": "startup"`，修复 hook 注册了但从未被 Claude Code 触发的问题；同时自动修复已有的缺失 matcher 旧条目 (#II6W5Y)
+
 ## v0.20.3 (2026-04-07) — update.sh 分支检测 `#II6W5Y`
 
 ### Bug 修复

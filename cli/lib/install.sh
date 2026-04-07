@@ -232,25 +232,35 @@ if os.path.isfile(settings_file):
 hooks = settings.setdefault("hooks", {})
 session_hooks = hooks.setdefault("SessionStart", [])
 
-# Check if already registered
+# Check if already registered (and fix missing matcher on old entries)
 command = f"bash {script_path}"
-already = False
-for entry in session_hooks:
+found_idx = None
+for i, entry in enumerate(session_hooks):
     for h in entry.get("hooks", []):
         if h.get("command") == command:
-            already = True
+            found_idx = i
             break
-    if already:
+    if found_idx is not None:
         break
 
-if not already:
+changed = False
+if found_idx is not None:
+    # Fix old entry missing matcher
+    if "matcher" not in session_hooks[found_idx]:
+        session_hooks[found_idx]["matcher"] = "startup"
+        changed = True
+else:
     session_hooks.append({
+        "matcher": "startup",
         "hooks": [{
             "type": "command",
             "command": command,
             "timeout": 15
         }]
     })
+    changed = True
+
+if changed:
     with open(settings_file, "w") as f:
         json.dump(settings, f, indent=2, ensure_ascii=False)
         f.write("\n")
