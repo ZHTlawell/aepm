@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.20.5 (2026-04-07) — 自动更新 + changelog 展示 `#II6W5Y`
+
+### 改进
+- **Hook 自动 pull** — SessionStart hook 检测到更新后自动执行 `git pull`，用户无需手动操作 (#II6W5Y)
+- **更新后展示 changelog** — 自动 pull 后提取新版本的 CHANGELOG diff 写入缓存，Agent 在首次回复末尾展示本次更新了哪些功能 (#II6W5Y)
+
 ## v0.20.4 (2026-04-07) — hook matcher 修复 `#II6W5Y`
 
 ### Bug 修复
