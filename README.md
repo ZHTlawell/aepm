@@ -97,6 +97,7 @@ Dev Agent 会自动执行：验证 speckit → 生成 OpenAPI 契约 → 生成 
 | 提交需求 | `/ae-submit-requirement` | 向 AE Team 提交新能力需求（必须是可复用机制） |
 | 提交 Bug | `/ae-submit-bug` 或 `ae pm submit-bug` | 提交 bug 报告到 ae-pm repo |
 | 批量提 Bug | `/ae-file-bugs` 或 `ae pm file-bugs` | 从 verify 报告自动生成 issue 并批量提交 |
+| Onboarding 页面生成 | `/ae-onboarding-design` | 生成产品 Onboarding 幻灯片（HTML/CSS/JS，Superwall/WebView） |
 | 查收更新 | 直接告诉 agent | 查看 CHANGELOG 了解最新版本更新 |
 
 ## 技术选型约束
@@ -276,7 +277,7 @@ git pull origin main
 
 查看 [CHANGELOG.md](CHANGELOG.md) 了解完整更新记录。
 
-当前版本：**v0.20.5**
+当前版本：**v0.21.0**
 
 ## 由谁维护
 

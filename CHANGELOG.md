@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.21.0 (2026-04-07) — Onboarding 页面生成 `#IHXLWQ`
+
+### 新增能力
+- **`/ae-onboarding-design` skill** — 自动生成产品 Onboarding 幻灯片页面（HTML/CSS/JS），可嵌入 Superwall Flow 或 iOS WebView (#IHXLWQ)
+  - MVP 采用 Bevel Carousel 模式：渐变背景 + 圆角 widget 卡片 + 分页圆点 + CTA 按钮
+  - 输入：产品名称 + 核心 feature 列表（1-3 个）+ 可选配色/截图/风格参考
+  - 输出：`onboarding/` 目录（index.html + styles.css + script.js），无外部依赖
+  - 触摸滑动 + snap + 分页圆点 + `window.onboardingComplete()` 回调
+  - 响应式适配 iPhone SE ~ iPhone 16 Pro Max，安全区处理
+  - 附带 Superwall Flow 和 iOS WKWebView 两种集成指引 + Swift 代码片段
+  - Phase 2 规划：Personalization Quiz 模式、视频/Lottie、A/B 测试
+
 ## v0.20.5 (2026-04-07) — 自动更新 + changelog 展示 `#II6W5Y`
 
 ### 改进
