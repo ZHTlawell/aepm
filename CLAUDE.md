@@ -19,7 +19,7 @@ PM vibe coding V0 原型（在约束下）→ 能发布则发布 → 不能发�
 
 ## 版本更新检查
 
-更新检查通过 Claude Code **SessionStart hook** 自动完成（脚本 `~/.config/ae/update-check.sh` 每 24 小时静默 git fetch 一次），结果缓存到文件。
+更新检查通过 Claude Code **SessionStart hook** 自动完成（脚本 `~/.config/ae/update-check.sh` 每次新对话自动 git fetch + pull），结果缓存到文件。
 
 在每次对话的**首次回复之前**，读取缓存文件：
 
@@ -127,7 +127,7 @@ cd ~/.ae/pm && git pull origin main
 
 然后读取 CHANGELOG.md 的最新版本条目，向用户汇报更新了什么内容。
 
-> **注意：** 日常更新已由上方「版本更新检查」的 SessionStart hook 自动完成（每 24 小时静默检查 + 自动 pull）。用户无需主动关注版本变化。
+> **注意：** 日常更新已由上方「版本更新检查」的 SessionStart hook 自动完成（每次新对话自动检查 + pull）。用户无需主动关注版本变化。
 
 ### 更新后反馈（关键）
 

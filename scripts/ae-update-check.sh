@@ -1,30 +1,18 @@
 #!/usr/bin/env bash
 # ae-update-check.sh — Claude Code SessionStart hook
-# Silently checks ae-pm/ae-go repos for updates, auto-pulls if available,
-# and writes changelog diff to cache file for agent to display.
-# Runs at most once every 24 hours. Most invocations exit in <10ms.
+# Checks ae-pm/ae-go repos for updates on every new session,
+# auto-pulls if available, and writes changelog diff to cache file.
 
 set -e
 
 AE_HOME="${AE_HOME:-$HOME/.ae}"
 CONFIG_DIR="$HOME/.config/ae"
 CACHE_FILE="$CONFIG_DIR/.update-available"
-CHECK_FILE="$CONFIG_DIR/.last-update-check-hook"
 
 mkdir -p "$CONFIG_DIR"
 
 # Read hook input from stdin (required by Claude Code hook protocol)
 cat >/dev/null 2>&1 || true
-
-# Rate limit: check at most once per 24 hours
-LAST_CHECK=$(cat "$CHECK_FILE" 2>/dev/null || echo "0")
-NOW=$(date +%s)
-if (( NOW - LAST_CHECK < 86400 )); then
-    exit 0
-fi
-
-# Update timestamp
-echo "$NOW" > "$CHECK_FILE"
 
 # Check and auto-update each installed role
 UPDATES=""
@@ -48,7 +36,6 @@ for ROLE in pm go; do
 
     BEHIND=$(git -C "$REPO" rev-list "HEAD..origin/$BRANCH" --count 2>/dev/null || echo "0")
     if [ "$BEHIND" -gt 0 ]; then
-        BEFORE=$(git -C "$REPO" rev-parse HEAD 2>/dev/null)
         OLD_VER=$(head -3 "$REPO/CHANGELOG.md" 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 
         # Auto pull
@@ -59,7 +46,6 @@ for ROLE in pm go; do
         # Extract changelog diff (new entries between old and new version)
         CHANGELOG_DIFF=""
         if [ -n "$OLD_VER" ] && [ -n "$NEW_VER" ] && [ "$OLD_VER" != "$NEW_VER" ]; then
-            # Get lines from top until we hit the old version header
             CHANGELOG_DIFF=$(awk "/^## $OLD_VER/{exit} /^##/{found=1} found{print}" "$REPO/CHANGELOG.md" 2>/dev/null | head -30)
         fi
 
