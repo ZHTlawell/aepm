@@ -180,6 +180,12 @@ PYEOF
     if [[ "$result" != "0" ]]; then
         ok "  合并了 ${result} 条 skill 权限到全局 settings.json"
     fi
+
+    # Also register update hook (once per session, guarded by flag)
+    if [[ -z "${_AE_UPDATE_HOOK_REGISTERED:-}" ]]; then
+        _register_update_hook
+        _AE_UPDATE_HOOK_REGISTERED=1
+    fi
 }
 
 # Copy ae-update-check.sh to stable location and register SessionStart hook

@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.20.2 (2026-04-07) — 自动更新检查 bugfix `#II6W5Y`
+
+### Bug 修复
+- **Hook 注册失败** — 将 `_register_update_hook` 调用嵌入 `_register_global_skills` 内部，解决 `ae update` 时旧版 update.sh 已在内存导致新注册逻辑不执行的 bootstrapping 问题 (#II6W5Y)
+- **ae-go 分支名硬编码** — `ae-update-check.sh` 从硬编码 `main` 改为动态检测默认分支（`symbolic-ref` + fallback `main`/`master`），修复 ae-go（master 分支）永远检测不到更新的问题 (#II6W5Y)
+
 ## v0.20.1 (2026-04-07) — SessionStart hook 自动更新检查 `#II6W5Y`
 
 ### 改进

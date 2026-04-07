@@ -31,11 +31,23 @@ for ROLE in pm go; do
     REPO="$AE_HOME/$ROLE"
     [ -d "$REPO/.git" ] || continue
 
-    git -C "$REPO" fetch origin main --quiet 2>/dev/null || continue
+    # Detect default branch (main or master)
+    BRANCH=$(git -C "$REPO" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||')
+    if [ -z "$BRANCH" ]; then
+        for b in main master; do
+            if git -C "$REPO" show-ref --verify --quiet "refs/remotes/origin/$b" 2>/dev/null; then
+                BRANCH="$b"
+                break
+            fi
+        done
+    fi
+    [ -z "$BRANCH" ] && continue
 
-    BEHIND=$(git -C "$REPO" rev-list HEAD..origin/main --count 2>/dev/null || echo "0")
+    git -C "$REPO" fetch origin "$BRANCH" --quiet 2>/dev/null || continue
+
+    BEHIND=$(git -C "$REPO" rev-list "HEAD..origin/$BRANCH" --count 2>/dev/null || echo "0")
     if [ "$BEHIND" -gt 0 ]; then
-        NEW_VER=$(git -C "$REPO" show origin/main:CHANGELOG.md 2>/dev/null | head -3 | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+        NEW_VER=$(git -C "$REPO" show "origin/$BRANCH:CHANGELOG.md" 2>/dev/null | head -3 | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
         if [ -n "$UPDATES" ]; then
             UPDATES="${UPDATES}
 "
