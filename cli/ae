@@ -6,7 +6,15 @@ set -euo pipefail
 
 AE_VERSION="0.1.0"
 AE_HOME="${AE_HOME:-$HOME/.ae}"
-AE_CLI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Resolve symlinks to find the real script location (fixes ~/.ae/bin/ae symlink)
+_AE_SCRIPT="${BASH_SOURCE[0]}"
+while [[ -L "$_AE_SCRIPT" ]]; do
+    _AE_DIR="$(cd "$(dirname "$_AE_SCRIPT")" && pwd)"
+    _AE_SCRIPT="$(readlink "$_AE_SCRIPT")"
+    [[ "$_AE_SCRIPT" != /* ]] && _AE_SCRIPT="$_AE_DIR/$_AE_SCRIPT"
+done
+AE_CLI_DIR="$(cd "$(dirname "$_AE_SCRIPT")" && pwd)"
 AE_LIB_DIR="$AE_CLI_DIR/lib"
 
 # Colors

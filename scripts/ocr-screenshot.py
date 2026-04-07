@@ -14,6 +14,12 @@ Usage:
     # Save WDA screenshot to file before OCR
     python3 ocr-screenshot.py --wda --save /tmp/screenshot.png
 
+    # Output logical point coordinates (auto-detect scale from WDA)
+    python3 ocr-screenshot.py --wda --logical
+
+    # Specify scale factor manually (default: auto-detect, fallback @3x)
+    python3 ocr-screenshot.py /path/to/screenshot.png --logical --scale 3
+
 Requires: pyobjc-framework-Vision, pyobjc-framework-Quartz
     pip3 install pyobjc-framework-Vision pyobjc-framework-Quartz
 """
@@ -69,7 +75,28 @@ def fetch_wda_screenshot(save_path=None, max_retries=3):
     return tmp.name
 
 
-def ocr_image(image_path, output_json=False):
+def get_wda_scale_factor():
+    """Detect scale factor from WDA window size vs screenshot resolution."""
+    try:
+        with urllib.request.urlopen("http://localhost:8100/screenshot", timeout=5) as resp:
+            data = json.loads(resp.read())
+        img_bytes = base64.b64decode(data["value"])
+        # Get pixel dimensions from PNG header (width at bytes 16-19)
+        pixel_w = int.from_bytes(img_bytes[16:20], 'big')
+
+        # Get logical window size from WDA
+        with urllib.request.urlopen("http://localhost:8100/window/size", timeout=5) as resp:
+            win = json.loads(resp.read())
+        logical_w = win.get("value", {}).get("width", 0)
+
+        if logical_w > 0:
+            return round(pixel_w / logical_w)
+    except Exception:
+        pass
+    return 3  # default @3x for modern iPhones
+
+
+def ocr_image(image_path, output_json=False, logical=False, scale=None):
     """Run Apple Vision OCR on an image file."""
     try:
         import Vision
@@ -103,6 +130,14 @@ def ocr_image(image_path, output_json=False):
         print(f"Error: OCR failed — {error}", file=sys.stderr)
         sys.exit(1)
 
+    # Determine coordinate divisor for logical mode
+    divisor = 1
+    if logical:
+        divisor = scale if scale else 3
+        coord_label = f"logical @{divisor}x"
+    else:
+        coord_label = "pixel"
+
     results = []
     for obs in request.results():
         candidate = obs.topCandidates_(1)[0]
@@ -112,10 +147,10 @@ def ocr_image(image_path, output_json=False):
         # Convert normalized bounding box to pixel coordinates
         # Vision uses bottom-left origin, convert to top-left
         box = obs.boundingBox()
-        x = int(box.origin.x * img_width)
-        y = int((1 - box.origin.y - box.size.height) * img_height)
-        w = int(box.size.width * img_width)
-        h = int(box.size.height * img_height)
+        x = int(box.origin.x * img_width) // divisor
+        y = int((1 - box.origin.y - box.size.height) * img_height) // divisor
+        w = int(box.size.width * img_width) // divisor
+        h = int(box.size.height * img_height) // divisor
 
         results.append({
             "text": text,
@@ -124,14 +159,25 @@ def ocr_image(image_path, output_json=False):
             "center": {"x": x + w // 2, "y": y + h // 2},
         })
 
+    out_w = img_width // divisor
+    out_h = img_height // divisor
+
     if output_json:
-        print(json.dumps({
+        output = {
             "image_size": {"width": img_width, "height": img_height},
             "text_count": len(results),
             "texts": results,
-        }, ensure_ascii=False, indent=2))
+        }
+        if logical:
+            output["coordinate_mode"] = "logical"
+            output["scale_factor"] = divisor
+            output["logical_size"] = {"width": out_w, "height": out_h}
+        print(json.dumps(output, ensure_ascii=False, indent=2))
     else:
-        print(f"Image: {img_width}x{img_height}, {len(results)} text regions\n")
+        size_info = f"{img_width}x{img_height}"
+        if logical:
+            size_info += f" → {out_w}x{out_h} ({coord_label})"
+        print(f"Image: {size_info}, {len(results)} text regions\n")
         for r in results:
             conf = r["confidence"]
             marker = "✓" if conf >= 0.8 else "?" if conf >= 0.5 else "✗"
@@ -145,11 +191,20 @@ def main():
     parser.add_argument("--wda", action="store_true", help="Grab screenshot from WDA (localhost:8100)")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
     parser.add_argument("--save", metavar="PATH", help="Save WDA screenshot to file")
+    parser.add_argument("--logical", action="store_true",
+                        help="Output logical point coordinates (auto-detect scale from WDA, fallback @3x)")
+    parser.add_argument("--scale", type=int, metavar="N",
+                        help="Scale factor for --logical (default: auto-detect)")
     args = parser.parse_args()
 
     if not args.image and not args.wda:
         parser.print_help()
         sys.exit(1)
+
+    # Auto-detect scale factor from WDA if --logical without explicit --scale
+    scale = args.scale
+    if args.logical and not scale and args.wda:
+        scale = get_wda_scale_factor()
 
     if args.wda:
         image_path = fetch_wda_screenshot(save_path=args.save)
@@ -159,7 +214,7 @@ def main():
         cleanup = False
 
     try:
-        ocr_image(image_path, output_json=args.json)
+        ocr_image(image_path, output_json=args.json, logical=args.logical, scale=scale)
     finally:
         if cleanup and os.path.exists(image_path):
             os.unlink(image_path)

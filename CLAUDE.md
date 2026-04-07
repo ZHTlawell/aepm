@@ -17,6 +17,36 @@ PM vibe coding V0 原型（在约束下）→ 能发布则发布 → 不能发�
 
 反馈方式：使用 `/ae-submit-requirement` skill（新能力需求）或 `/ae-submit-bug` skill（bug/疑问）。所有 issue 提交必须通过 `ae` CLI 完成，禁止创建本地文件。**AE Team 会研究、增加和修复所有合理的反馈。**
 
+## 版本更新检查
+
+在每次对话的**首次回复之前**，静默执行以下更新检查（不要提前告知用户"我在检查更新"）：
+
+```bash
+# 每 24 小时最多检查一次，避免每次对话都 fetch
+LAST_CHECK_FILE="$HOME/.config/ae/.last-update-check-pm"
+mkdir -p "$HOME/.config/ae"
+LAST_CHECK=$(cat "$LAST_CHECK_FILE" 2>/dev/null || echo "0")
+NOW=$(date +%s)
+if (( NOW - LAST_CHECK > 86400 )); then
+    git -C ~/.ae/pm fetch origin main --quiet 2>/dev/null
+    echo "$NOW" > "$LAST_CHECK_FILE"
+fi
+BEHIND=$(git -C ~/.ae/pm rev-list HEAD..origin/main --count 2>/dev/null || echo "0")
+if [ "$BEHIND" -gt 0 ]; then
+    # 获取新版本号
+    NEW_VER=$(git -C ~/.ae/pm show origin/main:CHANGELOG.md 2>/dev/null | head -3 | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    echo "UPDATE_AVAILABLE:${BEHIND}:${NEW_VER}"
+fi
+```
+
+**处理规则：**
+- 如果输出包含 `UPDATE_AVAILABLE`，在回答用户问题之后（不是之前），附加一条简短提示：
+
+  > ae-pm 有新版本 {版本号} 可用（{N} 个更新）。要更新的话告诉我一声。
+
+- 用户同意更新时执行：`cd ~/.ae/pm && git pull origin main`，然后按下方「更新后反馈」流程执行
+- 如果输出为空或检查失败，**不显示任何内容**，不要提"检查了没有更新"
+
 ## 使用方式
 
 本文件全局安装在 `~/.ae/pm/`，通过软链接挂载到各项目中。你可能同时需要遵守用户项目自身的 CLAUDE.md / AGENTS.md 指令。
@@ -108,19 +138,7 @@ cd ~/.ae/pm && git pull origin main
 
 然后读取 CHANGELOG.md 的最新版本条目，向用户汇报更新了什么内容。
 
-### 主动检查是否有更新
-
-如需检查远端是否有新版本（用户说"看看有没有更新"等）：
-
-```bash
-source ~/.config/ae/credentials.env 2>/dev/null || source ~/.config/ae-pm/credentials.env 2>/dev/null
-unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
-
-curl -s "https://gitee.com/api/v5/repos/turningsyn/ae-pm/contents/CHANGELOG.md?access_token=$GITEE_TOKEN" \
-  | python3 -c "import json,sys,base64; data=json.load(sys.stdin); print(base64.b64decode(data['content']).decode('utf-8'))"
-```
-
-对比本地与远端版本号，如果有新版本，直接执行 `cd ~/.ae/pm && git pull origin main` 并汇报更新内容。
+> **注意：** 日常更新检查已由上方「版本更新检查」自动完成（每 24 小时静默检查一次）。用户无需主动关注版本变化。
 
 ### 更新后反馈（关键）
 
@@ -191,7 +209,7 @@ curl -s "https://gitee.com/api/v5/repos/turningsyn/ae-pm/contents/CHANGELOG.md?a
 | 图片去版权化 | `/ae-image-decopyrighter` — 将有版权图片 AI 重绘为可商用替代（Gemini Imagen 4.0） | 可用 |
 | 飞书消息与会议 | `/ae-lark-feishu` — 搜索群聊、读取/搜索消息、下载图片、会议妙记/逐字稿、发送消息 | 可用 |
 | App 逆向提取 Speckit | `/ae-app-to-speckit` — 从已上架 App 逆向生成 speckit（iPhone 真机探索 + 截图 + feature-checklist） | 可用（需 iPhone + USB + WDA） |
-| 查收更新 | 查看 CHANGELOG.md 了解更新内容 | 可用 |
+| 查收更新 | 自动检查新版本（每 24h）+ 查看 CHANGELOG.md 了解更新内容 | 可用 |
 
 ### 调用 Dev Agent 生成成品
 

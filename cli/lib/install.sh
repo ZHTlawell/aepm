@@ -66,12 +66,15 @@ _install_repos() {
 
     # ae-go
     _install_clone_or_pull "ae-go" "https://gitee.com/turningsyn/ae-go.git" "$AE_HOME/go"
+    _register_global_skills "go"
 
     # ae-pm
     _install_clone_or_pull "ae-pm" "https://gitee.com/turningsyn/ae-pm.git" "$AE_HOME/pm"
+    _register_global_skills "pm"
 
     # ae-dev
     _install_clone_or_pull "ae-dev" "https://gitee.com/turningsyn/ae-dev.git" "$AE_HOME/dev"
+    _register_global_skills "dev"
 
     # ae-speckit-examples (optional)
     _install_clone_or_pull "ae-speckit-examples" "https://github.com/ligenjian001-ai/ae-speckit-examples.git" "$AE_HOME/speckit-examples" || true
@@ -90,6 +93,89 @@ _install_clone_or_pull() {
         git clone "$url" "$dir" 2>/dev/null || {
             warn "$name 克隆失败。请确认网络和权限。"
         }
+    fi
+}
+
+# Register ~/.ae/<role>/.claude/skills in Claude Code global settings so
+# skills are available in every workspace without per-project ae link.
+# Also merges all skill permissions into global allow list so users never
+# see permission approval popups for ae skills.
+_register_global_skills() {
+    local role="$1"
+    local skills_dir="$AE_HOME/$role/.claude/skills"
+
+    # Only register if the skills directory exists
+    [[ -d "$skills_dir" ]] || return 0
+
+    local settings_file="$HOME/.claude/settings.json"
+    mkdir -p "$HOME/.claude"
+
+    local result
+    result=$(python3 - "$skills_dir" "$settings_file" <<'PYEOF'
+import sys, os, json, re
+
+skills_dir, settings_file = sys.argv[1], sys.argv[2]
+
+settings = {}
+if os.path.isfile(settings_file):
+    try:
+        with open(settings_file) as f:
+            settings = json.load(f)
+    except:
+        pass
+
+perms = settings.setdefault("permissions", {})
+changed = False
+
+# 1. Register additionalDirectories
+dirs = perms.setdefault("additionalDirectories", [])
+if skills_dir not in dirs:
+    dirs.append(skills_dir)
+    changed = True
+
+# 2. Extract permissions from all SKILL.md frontmatter and merge into allow list
+allow = perms.setdefault("allow", [])
+added_perms = 0
+if os.path.isdir(skills_dir):
+    for name in sorted(os.listdir(skills_dir)):
+        skill_md = os.path.join(skills_dir, name, "SKILL.md")
+        if not os.path.isfile(skill_md):
+            continue
+        with open(skill_md) as f:
+            content = f.read()
+        m = re.match(r'^---\s*\n(.*?)\n---', content, re.DOTALL)
+        if not m:
+            continue
+        fm = m.group(1)
+        in_allow = False
+        for line in fm.splitlines():
+            if re.match(r'\s+allow:\s*$', line):
+                in_allow = True
+                continue
+            if in_allow:
+                pm = re.match(r'\s+-\s+"(.+)"', line)
+                if pm:
+                    perm = pm.group(1)
+                    if perm not in allow:
+                        allow.append(perm)
+                        added_perms += 1
+                elif line.strip() and not line.strip().startswith('-') and not line.strip().startswith('#'):
+                    in_allow = False
+
+if added_perms > 0:
+    changed = True
+
+if changed:
+    with open(settings_file, "w") as f:
+        json.dump(settings, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+
+print(f"{added_perms}")
+PYEOF
+    ) || return 0
+
+    if [[ "$result" != "0" ]]; then
+        ok "  合并了 ${result} 条 skill 权限到全局 settings.json"
     fi
 }
 

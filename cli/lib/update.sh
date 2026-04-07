@@ -7,14 +7,14 @@ ae_update() {
 
     local any_updated=false
 
-    _update_repo "ae-go"              "$AE_HOME/go"
-    _update_repo "ae-pm"              "$AE_HOME/pm"
-    _update_repo "ae-dev"             "$AE_HOME/dev"
-    _update_repo "ae-speckit-examples" "$AE_HOME/speckit-examples"
+    _update_repo "ae-go"              "$AE_HOME/go"              "go"
+    _update_repo "ae-pm"              "$AE_HOME/pm"              "pm"
+    _update_repo "ae-dev"             "$AE_HOME/dev"             "dev"
+    _update_repo "ae-speckit-examples" "$AE_HOME/speckit-examples" ""
 
     # Update ae-cli itself if installed from ae-platform
     if [[ -d "$AE_HOME/cli/.git" ]]; then
-        _update_repo "ae-cli" "$AE_HOME/cli"
+        _update_repo "ae-cli" "$AE_HOME/cli" ""
     fi
 
     echo ""
@@ -28,6 +28,7 @@ ae_update() {
 _update_repo() {
     local name="$1"
     local dir="$2"
+    local role="${3:-}"
 
     if [[ ! -d "$dir/.git" ]]; then
         warn "$name 未安装 ($dir)，跳过"
@@ -43,6 +44,12 @@ _update_repo() {
         if [[ "$before" != "$after" ]]; then
             ok "$name 已更新 (${before:0:7} → ${after:0:7})"
             any_updated=true
+
+            # Re-register skills + permissions for new/updated skills
+            if [[ -n "$role" ]]; then
+                source_lib "install"
+                _register_global_skills "$role"
+            fi
 
             # Show changelog diff if available
             if [[ -f "$dir/CHANGELOG.md" ]]; then

@@ -135,6 +135,48 @@ PYEOF
     fi
 }
 
+# Register ~/.ae/<role>/.claude/skills in Claude Code global settings so
+# skills are available in every workspace without per-project symlinks.
+_register_link_global_skills() {
+    local role="$1"
+    local skills_dir="$AE_HOME/$role/.claude/skills"
+
+    [[ -d "$skills_dir" ]] || return 0
+
+    local settings_file="$HOME/.claude/settings.json"
+    mkdir -p "$HOME/.claude"
+
+    local result
+    result=$(python3 - "$skills_dir" "$settings_file" <<'PYEOF'
+import sys, os, json
+
+skills_dir, settings_file = sys.argv[1], sys.argv[2]
+
+settings = {}
+if os.path.isfile(settings_file):
+    try:
+        with open(settings_file) as f:
+            settings = json.load(f)
+    except:
+        pass
+
+dirs = settings.setdefault("permissions", {}).setdefault("additionalDirectories", [])
+if skills_dir not in dirs:
+    dirs.append(skills_dir)
+    with open(settings_file, "w") as f:
+        json.dump(settings, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    print("added")
+else:
+    print("exists")
+PYEOF
+    ) || return 0
+
+    if [[ "$result" == "added" ]]; then
+        ok "  已注册 ae-$role skills 到 Claude Code 全局设置"
+    fi
+}
+
 _link_role() {
     local role="$1"
     local project_dir="$2"
@@ -168,6 +210,9 @@ _link_role() {
 
     # 2. Merge skill permissions into project settings.local.json
     _merge_skill_permissions "$project_dir" "$ae_role_dir"
+
+    # 2.5 Register role skills in Claude Code global additionalDirectories
+    _register_link_global_skills "$role"
 
     # 3. Add reference to CLAUDE.md if not already present
     local claude_md="$project_dir/CLAUDE.md"
