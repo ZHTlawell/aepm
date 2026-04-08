@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.22.1 (2026-04-08) — WDA iOS 26 兼容性修复 `#II7RKZ`
+
+### Bug 修复
+- **wda-start.sh iOS 版本检测** — 启动前自动检测 iOS 版本，iOS 26+ 提前警告兼容性风险 (#II7RKZ)
+- **DDI 自动挂载** — iOS 17+ 设备自动执行 `ios image auto` 挂载 Developer Disk Image，修复 iOS 26 DDI 不匹配导致的启动失败 (#II7RKZ)
+- **xcodebuild 自动 fallback** — `test-without-building` 失败时自动回退到 `test`（含完整 build），解决 exit code 74 崩溃 (#II7RKZ)
+- **失败诊断增强** — WDA 启动失败时输出最后 20 行日志 + iOS 26 专项诊断建议（含 pymobiledevice3 备选方案）(#II7RKZ)
+
 ## v0.22.0 (2026-04-07) — Paywall 页面生成 + Superwall 集成 `#IHXLWR` `#IHXLWK`
 
 ### 新增能力

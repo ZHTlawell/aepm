@@ -73,6 +73,29 @@ if [[ -z "$UDID" ]]; then
 fi
 log "设备: ${BOLD}$UDID${NC}"
 
+# Step 1.5: Detect iOS version
+IOS_VERSION=$(echo "$DEVICE_JSON" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+for d in data.get('deviceList', []):
+    if isinstance(d, dict) and d.get('serialNumber', '') == '$UDID':
+        print(d.get('productVersion', ''))
+        break
+" 2>/dev/null || true)
+
+IOS_MAJOR=""
+if [[ -n "$IOS_VERSION" ]]; then
+    IOS_MAJOR=$(echo "$IOS_VERSION" | cut -d. -f1)
+    log "iOS 版本: ${BOLD}$IOS_VERSION${NC}"
+    if [[ "$IOS_MAJOR" -ge 26 ]]; then
+        warn "⚠️  检测到 iOS $IOS_VERSION（beta）— WDA 兼容性可能不完整"
+        warn "   已知问题: go-ios DDI 下载可能不匹配 (go-ios#704)"
+        warn "   建议: 确保 Xcode 版本与 iOS beta 匹配，必要时手动挂载 DDI"
+    fi
+else
+    warn "无法获取 iOS 版本号（go-ios 版本可能较旧），继续..."
+fi
+
 # Step 2: Check if WDA is already running
 log "Step 2: 检查 WDA 状态..."
 if curl -s --connect-timeout 2 "http://localhost:${WDA_PORT}/status" | python3 -c "
@@ -120,6 +143,19 @@ if ! kill -0 "$TUNNEL_PID" 2>/dev/null; then
     warn "tunnel 进程已退出（可能 iOS < 17 不需要 tunnel）"
 else
     log "tunnel 已启动 (PID: $TUNNEL_PID)"
+fi
+
+# Step 3.5: Auto-mount Developer Disk Image (iOS 17+)
+if [[ -n "$IOS_MAJOR" && "$IOS_MAJOR" -ge 17 ]]; then
+    log "Step 3.5: 挂载 Developer Disk Image..."
+    if ios image auto --udid="$UDID" &>/dev/null; then
+        log "DDI 挂载成功 ✓"
+    else
+        warn "DDI 挂载失败（可能已挂载或需手动处理）"
+        if [[ -n "$IOS_MAJOR" && "$IOS_MAJOR" -ge 26 ]]; then
+            warn "   iOS 26+ 提示: 如 DDI 不匹配，尝试 Xcode > Window > Devices 手动配对"
+        fi
+    fi
 fi
 
 # Step 4: Start WDA
@@ -190,12 +226,52 @@ if [[ -n "$WDA_BUNDLE_ID" ]]; then
     XC_ARGS+=(PRODUCT_BUNDLE_IDENTIFIER="$WDA_BUNDLE_ID")
 fi
 
+# Try test-without-building first, fallback to test (full build) on failure
+log "尝试 test-without-building..."
 xcodebuild test-without-building "${XC_ARGS[@]}" &>/tmp/wda-xcodebuild.log &
 WDA_PID=$!
-log "xcodebuild 启动中 (PID: $WDA_PID)..."
-
-# Wait for WDA to be ready
 sleep 5
+
+# Check if xcodebuild is still alive
+if ! kill -0 "$WDA_PID" 2>/dev/null; then
+    XC_EXIT=$(wait "$WDA_PID" 2>/dev/null; echo $?)
+    warn "test-without-building 失败 (exit code: $XC_EXIT)"
+
+    # Parse log for common errors
+    if grep -q "exit code 74" /tmp/wda-xcodebuild.log 2>/dev/null || [[ "$XC_EXIT" == "74" ]]; then
+        warn "exit code 74 = test runner 启动即崩溃"
+        if [[ -n "$IOS_MAJOR" && "$IOS_MAJOR" -ge 26 ]]; then
+            warn "iOS 26 已知问题 — 尝试完整 build + test..."
+        fi
+    fi
+
+    log "回退到 xcodebuild test（含完整 build）..."
+    xcodebuild test "${XC_ARGS[@]}" &>/tmp/wda-xcodebuild.log &
+    WDA_PID=$!
+    log "xcodebuild test 启动中 (PID: $WDA_PID)..."
+    sleep 8
+
+    # Check again
+    if ! kill -0 "$WDA_PID" 2>/dev/null; then
+        XC_EXIT2=$(wait "$WDA_PID" 2>/dev/null; echo $?)
+        err "xcodebuild test 也失败了 (exit code: $XC_EXIT2)"
+        # Diagnostic output
+        err "--- 错误日志 (最后 20 行) ---"
+        tail -20 /tmp/wda-xcodebuild.log >&2 2>/dev/null || true
+        err "--- 完整日志: cat /tmp/wda-xcodebuild.log ---"
+        if [[ -n "$IOS_MAJOR" && "$IOS_MAJOR" -ge 26 ]]; then
+            err ""
+            err "=== iOS $IOS_VERSION 诊断建议 ==="
+            err "1. 确认 Xcode 版本支持 iOS $IOS_VERSION（Xcode beta 可能需要更新）"
+            err "2. 手动运行: ios image auto --udid=$UDID"
+            err "3. 在 Xcode GUI 中打开 WebDriverAgent.xcodeproj → Product → Test 查看详细错误"
+            err "4. 备选方案: pymobiledevice3 (pip install pymobiledevice3) 支持 iOS 26 XCTest 启动"
+            err "5. 跟踪上游: https://github.com/appium/WebDriverAgent/issues"
+        fi
+        exit 1
+    fi
+fi
+log "xcodebuild 运行中 (PID: $WDA_PID)"
 
 # Step 5: Port forward
 log "Step 5: 端口转发..."
@@ -233,5 +309,11 @@ sys.exit(1)
     fi
 done
 
-err "WDA 启动失败。查看日志: cat /tmp/wda-xcodebuild.log"
+err "WDA 启动失败（$MAX_RETRIES 次验证均超时）"
+err "查看日志: cat /tmp/wda-xcodebuild.log"
+if [[ -n "$IOS_MAJOR" && "$IOS_MAJOR" -ge 26 ]]; then
+    err ""
+    err "iOS $IOS_VERSION 提示: WDA 可能与当前 iOS beta 不兼容"
+    err "备选方案: pymobiledevice3 (pip install pymobiledevice3)"
+fi
 exit 1
