@@ -79,8 +79,9 @@ _install_repos() {
     # ae-speckit-examples (optional)
     _install_clone_or_pull "ae-speckit-examples" "https://github.com/ligenjian001-ai/ae-speckit-examples.git" "$AE_HOME/speckit-examples" || true
 
-    # Register auto-update hook
+    # Register hooks
     _register_update_hook
+    _register_feedback_hook
 }
 
 _install_clone_or_pull() {
@@ -181,10 +182,11 @@ PYEOF
         ok "  合并了 ${result} 条 skill 权限到全局 settings.json"
     fi
 
-    # Also register update hook (once per session, guarded by flag)
-    if [[ -z "${_AE_UPDATE_HOOK_REGISTERED:-}" ]]; then
+    # Also register hooks (once per session, guarded by flag)
+    if [[ -z "${_AE_HOOKS_REGISTERED:-}" ]]; then
         _register_update_hook
-        _AE_UPDATE_HOOK_REGISTERED=1
+        _register_feedback_hook
+        _AE_HOOKS_REGISTERED=1
     fi
 }
 
@@ -272,6 +274,87 @@ PYEOF
 
     if [[ "$result" == "registered" ]]; then
         ok "  已注册自动更新检查 hook (SessionStart)"
+    fi
+}
+
+# Copy ae-feedback-collect.py to stable location and register PostToolUse hook
+# in Claude Code global settings, so usage feedback is captured automatically.
+_register_feedback_hook() {
+    # Find the feedback-collect script from any installed role
+    local script_src=""
+    for role in pm go dev; do
+        local candidate="$AE_HOME/$role/scripts/ae-feedback-collect.py"
+        if [[ -f "$candidate" ]]; then
+            script_src="$candidate"
+            break
+        fi
+    done
+
+    if [[ -z "$script_src" ]]; then
+        return 0
+    fi
+
+    # Copy script to stable location
+    local target="$HOME/.config/ae/feedback-collect.py"
+    mkdir -p "$HOME/.config/ae"
+    cp "$script_src" "$target"
+
+    # Register hook in ~/.claude/settings.json
+    local settings_file="$HOME/.claude/settings.json"
+    mkdir -p "$HOME/.claude"
+
+    local result
+    result=$(python3 - "$target" "$settings_file" <<'PYEOF'
+import sys, os, json
+
+script_path, settings_file = sys.argv[1], sys.argv[2]
+
+settings = {}
+if os.path.isfile(settings_file):
+    try:
+        with open(settings_file) as f:
+            settings = json.load(f)
+    except:
+        pass
+
+hooks = settings.setdefault("hooks", {})
+post_tool_hooks = hooks.setdefault("PostToolUse", [])
+
+# Check if already registered
+command = f"python3 {script_path}"
+found = False
+for entry in post_tool_hooks:
+    for h in entry.get("hooks", []):
+        if h.get("command") == command:
+            found = True
+            break
+    if found:
+        break
+
+changed = False
+if not found:
+    post_tool_hooks.append({
+        "matcher": "",
+        "hooks": [{
+            "type": "command",
+            "command": command,
+            "timeout": 5
+        }]
+    })
+    changed = True
+
+if changed:
+    with open(settings_file, "w") as f:
+        json.dump(settings, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    print("registered")
+else:
+    print("exists")
+PYEOF
+    ) || return 0
+
+    if [[ "$result" == "registered" ]]; then
+        ok "  已注册使用反馈收集 hook (PostToolUse)"
     fi
 }
 

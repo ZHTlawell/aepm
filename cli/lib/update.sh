@@ -17,12 +17,17 @@ ae_update() {
         _update_repo "ae-cli" "$AE_HOME/cli" ""
     fi
 
-    # Re-register update hook (picks up latest script version)
+    # Re-register hooks (picks up latest script versions)
     source_lib "install"
     _register_update_hook
+    _register_feedback_hook
 
     # Clear update cache since we just updated
     rm -f "$HOME/.config/ae/.update-available"
+
+    # Check for pending feedback and offer to upload
+    source_lib "feedback"
+    _check_and_upload_feedback
 
     echo ""
     if $any_updated; then

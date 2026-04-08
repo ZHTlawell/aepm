@@ -62,6 +62,7 @@ ${BOLD}COMMANDS${NC}
         submit-requirement <title>     向 AE Team 提交能力需求
 
     ${BOLD}link${NC} <role> [dir]    在项目中启用 ae-pm / ae-dev / ae-go
+    ${BOLD}feedback${NC}             管理使用反馈（查看/上传/清除）
     ${BOLD}version${NC}              显示版本
     ${BOLD}help${NC}                 显示帮助
 
@@ -129,6 +130,10 @@ main() {
         link)
             source_lib "link"
             ae_link "$@"
+            ;;
+        feedback)
+            source_lib "feedback"
+            ae_feedback "$@"
             ;;
         version|--version|-v)
             echo "ae v${AE_VERSION}"

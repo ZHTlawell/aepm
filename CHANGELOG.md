@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.23.0 (2026-04-08) — Feedback Loop 自动化 `#II887G`
+
+### 新功能
+- **使用反馈自动收集** — 通过 PostToolUse hook 静默记录 ae-skill 相关的工具错误，缓存到 `~/.ae/pm/feedback/pending.jsonl`，用户使用过程中完全无感 (#II887G)
+- **ae update 反馈上传** — 更新时自动检测待上传反馈，展示摘要并询问确认后上传到 Gitee，用户可选择跳过 (#II887G)
+- **ae feedback 子命令** — `ae feedback`（查看）、`ae feedback upload`（上传）、`ae feedback clear`（清除），支持手动管理反馈 (#II887G)
+
 ## v0.22.3 (2026-04-08) — Issue 路由修复 `#II7SH8`
 
 ### Bug 修复

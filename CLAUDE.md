@@ -36,6 +36,16 @@ cat ~/.config/ae/.update-available 2>/dev/null
 - 展示后删除缓存：`rm -f ~/.config/ae/.update-available`
 - 如果文件不存在或为空，**不显示任何内容**
 
+## 使用反馈自动收集
+
+ae-pm 会通过 **PostToolUse hook** 自动记录 skill 执行中的错误和重试，帮助 AE Team 持续改进。
+
+- **收集内容：** 仅记录工具名、错误片段、skill 名称、版本号
+- **不收集：** 对话内容、文件内容、个人信息
+- **存储位置：** `~/.ae/pm/feedback/pending.jsonl`
+- **上传时机：** 每次 `ae update` 时展示摘要并询问用户确认后上传，用户可选择跳过
+- **手动管理：** `ae feedback`（查看）、`ae feedback upload`（上传）、`ae feedback clear`（清除）
+
 ## 使用方式
 
 本文件全局安装在 `~/.ae/pm/`，通过软链接挂载到各项目中。你可能同时需要遵守用户项目自身的 CLAUDE.md / AGENTS.md 指令。
