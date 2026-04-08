@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.22.3 (2026-04-08) — Issue 路由修复 `#II7SH8`
+
+### Bug 修复
+- **submit-bug/requirement 路由歧义** — Skill 中"查阅当前 CLAUDE.md"改为明确指向 `~/.ae/<role>/.claude/CLAUDE.md`，修复非 ae-pm workspace 下 issue 提交到错误仓库的问题 (#II7SH8)
+
 ## v0.22.2 (2026-04-08) — WDA fallback 逻辑修复 `#II7RKZ`
 
 ### Bug 修复
