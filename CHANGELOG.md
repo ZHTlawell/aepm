@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.22.2 (2026-04-08) — WDA fallback 逻辑修复 `#II7RKZ`
+
+### Bug 修复
+- **fallback 未触发** — 修复 `test-without-building` hang 后验证超时直接退出、未进入 `test` fallback 的问题；重构为"尝试→验证→失败则 fallback"两轮流程 (#II7RKZ)
+- **诊断信息增强** — 失败时输出 30 行日志 + 提示用户反馈 `xcodebuild -version` / `ios version` / 完整日志 (#II7RKZ)
+
 ## v0.22.1 (2026-04-08) — WDA iOS 26 兼容性修复 `#II7RKZ`
 
 ### Bug 修复

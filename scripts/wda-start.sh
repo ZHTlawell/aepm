@@ -226,66 +226,23 @@ if [[ -n "$WDA_BUNDLE_ID" ]]; then
     XC_ARGS+=(PRODUCT_BUNDLE_IDENTIFIER="$WDA_BUNDLE_ID")
 fi
 
-# Try test-without-building first, fallback to test (full build) on failure
-log "尝试 test-without-building..."
-xcodebuild test-without-building "${XC_ARGS[@]}" &>/tmp/wda-xcodebuild.log &
-WDA_PID=$!
-sleep 5
+# --- Helper: start port forward ---
+start_forward() {
+    pkill -f "ios forward.*${WDA_PORT}" 2>/dev/null || true
+    sleep 1
+    ios forward ${WDA_PORT} ${WDA_PORT} --udid="$UDID" &>/dev/null &
+    FORWARD_PID=$!
+    sleep 1
+}
 
-# Check if xcodebuild is still alive
-if ! kill -0 "$WDA_PID" 2>/dev/null; then
-    XC_EXIT=$(wait "$WDA_PID" 2>/dev/null; echo $?)
-    warn "test-without-building 失败 (exit code: $XC_EXIT)"
-
-    # Parse log for common errors
-    if grep -q "exit code 74" /tmp/wda-xcodebuild.log 2>/dev/null || [[ "$XC_EXIT" == "74" ]]; then
-        warn "exit code 74 = test runner 启动即崩溃"
-        if [[ -n "$IOS_MAJOR" && "$IOS_MAJOR" -ge 26 ]]; then
-            warn "iOS 26 已知问题 — 尝试完整 build + test..."
-        fi
-    fi
-
-    log "回退到 xcodebuild test（含完整 build）..."
-    xcodebuild test "${XC_ARGS[@]}" &>/tmp/wda-xcodebuild.log &
-    WDA_PID=$!
-    log "xcodebuild test 启动中 (PID: $WDA_PID)..."
-    sleep 8
-
-    # Check again
-    if ! kill -0 "$WDA_PID" 2>/dev/null; then
-        XC_EXIT2=$(wait "$WDA_PID" 2>/dev/null; echo $?)
-        err "xcodebuild test 也失败了 (exit code: $XC_EXIT2)"
-        # Diagnostic output
-        err "--- 错误日志 (最后 20 行) ---"
-        tail -20 /tmp/wda-xcodebuild.log >&2 2>/dev/null || true
-        err "--- 完整日志: cat /tmp/wda-xcodebuild.log ---"
-        if [[ -n "$IOS_MAJOR" && "$IOS_MAJOR" -ge 26 ]]; then
-            err ""
-            err "=== iOS $IOS_VERSION 诊断建议 ==="
-            err "1. 确认 Xcode 版本支持 iOS $IOS_VERSION（Xcode beta 可能需要更新）"
-            err "2. 手动运行: ios image auto --udid=$UDID"
-            err "3. 在 Xcode GUI 中打开 WebDriverAgent.xcodeproj → Product → Test 查看详细错误"
-            err "4. 备选方案: pymobiledevice3 (pip install pymobiledevice3) 支持 iOS 26 XCTest 启动"
-            err "5. 跟踪上游: https://github.com/appium/WebDriverAgent/issues"
-        fi
-        exit 1
-    fi
-fi
-log "xcodebuild 运行中 (PID: $WDA_PID)"
-
-# Step 5: Port forward
-log "Step 5: 端口转发..."
-pkill -f "ios forward.*${WDA_PORT}" 2>/dev/null || true
-sleep 1
-ios forward ${WDA_PORT} ${WDA_PORT} --udid="$UDID" &>/dev/null &
-FORWARD_PID=$!
-sleep 1
-log "端口转发已启动 (PID: $FORWARD_PID)"
-
-# Step 6: Verify
-log "Step 6: 验证 WDA..."
-for attempt in $(seq 1 $MAX_RETRIES); do
-    if curl -s --connect-timeout 3 "http://localhost:${WDA_PORT}/status" | python3 -c "
+# --- Helper: verify WDA responds ---
+# Returns 0 on success, 1 on failure
+verify_wda() {
+    local retries=${1:-$MAX_RETRIES}
+    local wait_first=${2:-5}
+    sleep "$wait_first"
+    for attempt in $(seq 1 "$retries"); do
+        if curl -s --connect-timeout 3 "http://localhost:${WDA_PORT}/status" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
 sid = data.get('sessionId') or data.get('value', {}).get('sessionId', '')
@@ -294,6 +251,53 @@ if sid:
     sys.exit(0)
 sys.exit(1)
 " 2>/dev/null; then
+            return 0
+        fi
+        if [[ $attempt -lt $retries ]]; then
+            warn "第 $attempt 次验证失败，等待重试..."
+            sleep 3
+        fi
+    done
+    return 1
+}
+
+# --- Helper: dump diagnostics ---
+dump_diagnostics() {
+    err "--- 错误日志 (最后 30 行) ---"
+    tail -30 /tmp/wda-xcodebuild.log >&2 2>/dev/null || true
+    err "--- 完整日志: cat /tmp/wda-xcodebuild.log ---"
+    if [[ -n "$IOS_MAJOR" && "$IOS_MAJOR" -ge 26 ]]; then
+        err ""
+        err "=== iOS $IOS_VERSION 诊断建议 ==="
+        err "1. 确认 Xcode 版本支持 iOS $IOS_VERSION（Xcode beta 可能需要更新）"
+        err "2. 在 Xcode GUI 中: 打开 WebDriverAgent.xcodeproj → Product → Test 查看详细错误"
+        err "3. 检查 WDA 版本: 尝试从 appium/WebDriverAgent main 分支重新 clone 最新代码"
+        err "4. 备选方案: pymobiledevice3 (pip install pymobiledevice3) 支持 iOS 26 XCTest 启动"
+        err "5. 跟踪上游: https://github.com/appium/WebDriverAgent/issues"
+        err ""
+        err "请将以下信息反馈给 AE Team:"
+        err "  cat /tmp/wda-xcodebuild.log | tail -50"
+        err "  xcodebuild -version"
+        err "  ios version"
+    fi
+}
+
+# ===== Attempt 1: test-without-building =====
+log "尝试 test-without-building..."
+xcodebuild test-without-building "${XC_ARGS[@]}" &>/tmp/wda-xcodebuild.log &
+WDA_PID=$!
+
+# Quick check: if process died immediately
+sleep 3
+if ! kill -0 "$WDA_PID" 2>/dev/null; then
+    XC_EXIT=$(wait "$WDA_PID" 2>/dev/null; echo $?)
+    warn "test-without-building 立即失败 (exit code: $XC_EXIT)"
+else
+    # Process alive — start forward and verify
+    log "Step 5: 端口转发..."
+    start_forward
+    log "Step 6: 验证 WDA..."
+    if verify_wda 3 3; then
         log "${GREEN}WDA 环境就绪 ✓${NC}"
         echo ""
         echo -e "${BOLD}进程信息:${NC}"
@@ -303,17 +307,48 @@ sys.exit(1)
         echo ""
         exit 0
     fi
-    if [[ $attempt -lt $MAX_RETRIES ]]; then
-        warn "第 $attempt 次验证失败，等待重试..."
-        sleep 3
-    fi
-done
-
-err "WDA 启动失败（$MAX_RETRIES 次验证均超时）"
-err "查看日志: cat /tmp/wda-xcodebuild.log"
-if [[ -n "$IOS_MAJOR" && "$IOS_MAJOR" -ge 26 ]]; then
-    err ""
-    err "iOS $IOS_VERSION 提示: WDA 可能与当前 iOS beta 不兼容"
-    err "备选方案: pymobiledevice3 (pip install pymobiledevice3)"
+    warn "test-without-building 验证失败"
 fi
+
+# ===== Attempt 2: test (full build) =====
+warn "检查 xcodebuild 日志..."
+if grep -q "exit code 74\|exited with code 74" /tmp/wda-xcodebuild.log 2>/dev/null; then
+    warn "检测到 exit code 74 (test runner 启动即崩溃)"
+fi
+
+# Kill previous attempt
+pkill -f "xcodebuild.*WebDriverAgentRunner" 2>/dev/null || true
+sleep 1
+
+log "回退到 xcodebuild test（含完整 build）..."
+xcodebuild test "${XC_ARGS[@]}" &>/tmp/wda-xcodebuild.log &
+WDA_PID=$!
+log "xcodebuild test 启动中 (PID: $WDA_PID)..."
+
+# Full build needs more time
+sleep 5
+if ! kill -0 "$WDA_PID" 2>/dev/null; then
+    XC_EXIT2=$(wait "$WDA_PID" 2>/dev/null; echo $?)
+    err "xcodebuild test 也立即失败 (exit code: $XC_EXIT2)"
+    dump_diagnostics
+    exit 1
+fi
+
+log "Step 5: 端口转发..."
+start_forward
+log "Step 6: 验证 WDA..."
+if verify_wda 4 8; then
+    log "${GREEN}WDA 环境就绪 ✓${NC}"
+    echo ""
+    echo -e "${BOLD}进程信息:${NC}"
+    [[ -n "${TUNNEL_PID:-}" ]] && echo "  tunnel:  PID $TUNNEL_PID"
+    echo "  WDA:     PID $WDA_PID"
+    echo "  forward: PID $FORWARD_PID"
+    echo ""
+    exit 0
+fi
+
+# ===== Both attempts failed =====
+err "WDA 启动失败（test-without-building 和 test 均失败）"
+dump_diagnostics
 exit 1
