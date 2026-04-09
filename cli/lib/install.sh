@@ -106,7 +106,8 @@ _install_clone_or_pull() {
 # see permission approval popups for ae skills.
 _register_global_skills() {
     local role="$1"
-    local skills_dir="$AE_HOME/$role/.claude/skills"
+    local role_dir="$AE_HOME/$role"
+    local skills_dir="$role_dir/.claude/skills"
 
     # Only register if the skills directory exists
     [[ -d "$skills_dir" ]] || return 0
@@ -115,10 +116,10 @@ _register_global_skills() {
     mkdir -p "$HOME/.claude"
 
     local result
-    result=$(python3 - "$skills_dir" "$settings_file" <<'PYEOF'
+    result=$(python3 - "$role_dir" "$skills_dir" "$settings_file" <<'PYEOF'
 import sys, os, json, re
 
-skills_dir, settings_file = sys.argv[1], sys.argv[2]
+role_dir, skills_dir, settings_file = sys.argv[1], sys.argv[2], sys.argv[3]
 
 settings = {}
 if os.path.isfile(settings_file):
@@ -131,11 +132,12 @@ if os.path.isfile(settings_file):
 perms = settings.setdefault("permissions", {})
 changed = False
 
-# 1. Register additionalDirectories
+# 1. Register additionalDirectories (role root for CLAUDE.md + skills dir)
 dirs = perms.setdefault("additionalDirectories", [])
-if skills_dir not in dirs:
-    dirs.append(skills_dir)
-    changed = True
+for d in [role_dir, skills_dir]:
+    if d not in dirs:
+        dirs.append(d)
+        changed = True
 
 # 2. Extract permissions from all SKILL.md frontmatter and merge into allow list
 allow = perms.setdefault("allow", [])

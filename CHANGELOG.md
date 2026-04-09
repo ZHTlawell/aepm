@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.24.1 (2026-04-09) — CLAUDE.md 全局加载修复 `#II8SXT`
+
+### Bug 修复
+- **CLAUDE.md 未注册到 additionalDirectories** — `ae install` / `ae update` 时只注册了 skills 目录，未注册 role 根目录，导致各 role 的 CLAUDE.md 在非本 role workspace 中不可见 (#II8SXT)
+
 ## v0.24.0 (2026-04-09) — 统一 Git CLI 工具 `#II8R1M`
 
 ### 新功能
