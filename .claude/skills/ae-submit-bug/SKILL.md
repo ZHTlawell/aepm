@@ -66,17 +66,7 @@ description: "提交 bug 报告到 Gitee"
 **确定目标仓库：** 读取已安装的 AE 角色 CLAUDE.md（路径为 `~/.ae/go/.claude/CLAUDE.md` 或 `~/.ae/pm/.claude/CLAUDE.md`，**不是当前 workspace 的 CLAUDE.md**）中的「Issue 路由」表，获取目标仓库名。
 
 ```bash
-source ~/.config/ae/credentials.env 2>/dev/null || source ~/.config/ae-pm/credentials.env 2>/dev/null
-unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
-
-curl -s -X POST "https://gitee.com/api/v5/repos/turningsyn/issues" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "access_token": "'"$GITEE_TOKEN"'",
-    "repo": "<目标仓库>",
-    "title": "[BUG] 标题",
-    "body": "正文"
-  }'
+ae git issues create --repo <目标仓库> --title "[BUG] 标题" --body "正文"
 ```
 
 ### Step 5: 确认结果

@@ -72,11 +72,14 @@ GEMINI_API_KEY=your_gemini_api_key    # 图片去版权化等 AI 能力需要
 
 当用户提供 token 时，你应该直接帮他写入该文件（`mkdir -p ~/.config/ae && echo 'KEY=value' >> ~/.config/ae/credentials.env`）。
 
-访问 Gitee API 前必须加载 credentials 并清除代理：
+访问 Gitee API 统一使用 `ae git` 命令（自动处理 credentials 加载和代理清除）：
 
 ```bash
-source ~/.config/ae/credentials.env 2>/dev/null || source ~/.config/ae-pm/credentials.env 2>/dev/null
-unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
+ae git issues list --repo ae-pm --pretty          # 列出 issue
+ae git issues get --repo ae-pm --number IHXXXX     # 查看 issue 详情
+ae git issues comment --repo ae-pm --number IHXXXX --body "内容"  # 评论
+ae git issues create --repo ae-pm --title "标题" --body "正文"     # 创建
+ae git issues close --repo ae-pm --number IHXXXX   # 关闭
 ```
 
 ## 入驻确认
@@ -86,12 +89,7 @@ unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/n
 入驻 issue 编号：**IHQ4H7**
 
 ```bash
-source ~/.config/ae/credentials.env 2>/dev/null || source ~/.config/ae-pm/credentials.env 2>/dev/null
-unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
-
-curl -s -X POST "https://gitee.com/api/v5/repos/turningsyn/ae-pm/issues/IHQ4H7/comments" \
-  -H "Content-Type: application/json" \
-  -d "{\"access_token\": \"$GITEE_TOKEN\", \"body\": \"**[你的名字]** 已完成 ae-pm 配置验证\"}"
+ae git issues comment --repo ae-pm --number IHQ4H7 --body "**[你的名字]** 已完成 ae-pm 配置验证"
 ```
 
 成功标志：在 issue IHQ4H7 下方看到自己的确认回复。
@@ -169,18 +167,13 @@ cd ~/.ae/pm && git pull origin main
 
 - **验证通过** — 在对应 issue 上发 comment 确认：
   ```bash
-  source ~/.config/ae/credentials.env
-  unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
-
-  curl -s -X POST "https://gitee.com/api/v5/repos/turningsyn/{repo}/issues/{number}/comments" \
-    -H "Content-Type: application/json" \
-    -d "{\"access_token\": \"$GITEE_TOKEN\", \"body\": \"**[用户名] 验收确认：** 已在 v{version} 中验证通过，功能符合预期。请 AE Team 关闭此 issue。\"}"
+  ae git issues comment --repo {repo} --number {number} --body "**[用户名] 验收确认：** 已在 v{version} 中验证通过，功能符合预期。请 AE Team 关闭此 issue。"
   ```
 - **验证有问题** — 在对应 issue 上发 comment 说明问题，不要关闭：
   ```bash
-  curl -s -X POST "https://gitee.com/api/v5/repos/turningsyn/{repo}/issues/{number}/comments" \
-    -H "Content-Type: application/json" \
-    -d "{\"access_token\": \"$GITEE_TOKEN\", \"body\": \"**[用户名] 验收反馈：** 在 v{version} 中验证未通过。\\n\\n问题描述：{用户描述的问题}\"}"
+  ae git issues comment --repo {repo} --number {number} --body "**[用户名] 验收反馈：** 在 v{version} 中验证未通过。
+
+问题描述：{用户描述的问题}"
   ```
 
 **Step 4: 汇总**
@@ -274,14 +267,10 @@ PM 在使用 vibe coding 工具（Antigravity 等）生成 demo 原型时，必�
 
 ### 流程
 
-1. **读取 issue** — 通过 Gitee API 获取 issue 内容和已有 comment：
+1. **读取 issue** — 通过 ae git 获取 issue 内容：
    ```bash
-   source ~/.config/ae/credentials.env
-   unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
-
    # 从链接中提取 owner/repo/issue_number
-   curl -s "https://gitee.com/api/v5/repos/{owner}/{repo}/issues/{number}?access_token=$GITEE_TOKEN"
-   curl -s "https://gitee.com/api/v5/repos/{owner}/{repo}/issues/{number}/comments?access_token=$GITEE_TOKEN&per_page=100"
+   ae git issues get --repo {repo} --number {number} --pretty
    ```
 
 2. **与用户讨论** — 向用户摘要 issue 内容，讨论以下关键要素：
@@ -294,9 +283,7 @@ PM 在使用 vibe coding 工具（Antigravity 等）生成 demo 原型时，必�
 
 3. **发 comment** — 讨论达成一致后，直接在 Gitee issue 上发布评审意见：
    ```bash
-   curl -s -X POST "https://gitee.com/api/v5/repos/{owner}/{repo}/issues/{number}/comments" \
-     -H "Content-Type: application/json" \
-     -d "{\"access_token\": \"$GITEE_TOKEN\", \"body\": \"评审意见内容\"}"
+   ae git issues comment --repo {repo} --number {number} --body "评审意见内容"
    ```
 
 4. **回复发起人** — 把 comment 链接告知用户，由用户转发给评审发起人。
