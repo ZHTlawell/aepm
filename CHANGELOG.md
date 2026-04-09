@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.28.0 (2026-04-09) — Skill 供应链 Wave 3：manifest.yml + CLAUDE.md 模块化 `#II96KG`
+
+### 新功能
+- **manifest.yml 生成** — `ae manifest generate pm` 自动从 SKILL.md 生成能力注册表（含依赖、废弃状态） (#II96KG)
+- **CLAUDE.md 模块化** — 从 381→186 行（-51%），拆分技术约束/评审流程/求助指引/更新反馈到 `constraints/` 目录 (#II96KG)
+
 ## v0.27.0 (2026-04-09) — Skill 供应链 Wave 2：发布门禁 + 首批瘦身 `#II96KG`
 
 ### 新功能

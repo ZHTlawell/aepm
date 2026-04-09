@@ -125,69 +125,7 @@ CLI 会自动加载 credentials、调用 Gitee API、返回 issue 链接。
 
 ## 查收更新
 
-### 被告知有更新时
-
-当用户说"ae-pm 更新了"、"有更新"、"拉一下最新"等类似表述时，直接执行：
-
-```bash
-cd ~/.ae/pm && git pull origin main
-```
-
-然后读取 CHANGELOG.md 的最新版本条目，向用户汇报更新了什么内容。
-
-> **注意：** 日常更新已由上方「版本更新检查」的 SessionStart hook 自动完成（每次新对话自动检查 + pull）。用户无需主动关注版本变化。
-
-### 更新后反馈（关键）
-
-拉取更新并汇报 CHANGELOG 内容后，**必须执行以下反馈引导流程**：
-
-**Step 1: 提取关联 issue**
-
-从本次更新的 CHANGELOG 条目中提取所有 issue 编号（格式 `#IHQXXX`）。
-
-**Step 2: 展示待验证列表**
-
-向用户展示：
-
-```
-本次更新关联了以下 issue，请逐个验证：
-
-1. #IHQXXX — [功能描述]（试一下 /xxx 或 ae pm xxx）
-2. #IHQXXY — [功能描述]（检查 xxx 是否符合预期）
-...
-
-请试用后告诉我哪些 OK、哪些有问题。
-```
-
-对每个 issue，根据 CHANGELOG 描述给出**具体的验证建议**（运行什么命令、试用哪个 skill、检查什么效果）。
-
-**Step 3: 收集反馈并回写 issue**
-
-用户验证后：
-
-- **验证通过** — 在对应 issue 上发 comment 确认：
-  ```bash
-  ae git issues comment --repo {repo} --number {number} --body "**[用户名] 验收确认：** 已在 v{version} 中验证通过，功能符合预期。请 AE Team 关闭此 issue。"
-  ```
-- **验证有问题** — 在对应 issue 上发 comment 说明问题，不要关闭：
-  ```bash
-  ae git issues comment --repo {repo} --number {number} --body "**[用户名] 验收反馈：** 在 v{version} 中验证未通过。
-
-问题描述：{用户描述的问题}"
-  ```
-
-**Step 4: 汇总**
-
-全部验证完成后，展示汇总：
-
-```
-验证汇总：
-- ✅ #IHQXXX — 已确认，等 AE Team 关闭
-- ❌ #IHQXXY — 已反馈问题，等 AE Team 修复
-- ⏭️ #IHQXXZ — 暂未验证（用户跳过）
-```
-
-**注意：** 如果 CHANGELOG 条目没有关联 issue 编号，提醒用户："这条更新没有关联 issue，无法追踪验收。建议反馈给 AE Team 要求 CHANGELOG 条目带上 issue 链接。"
+拉取更新后的反馈引导流程。**完整流程请读取：** `constraints/update-feedback.md`
 
 ## 当前能力
 
@@ -226,149 +164,17 @@ ae dev speckit-receive <speckit_dir>
 
 ## 技术选型约束
 
-PM 在使用 vibe coding 工具（Antigravity 等）生成 demo 原型时，必须遵守以下技术约束。这些约束确保 demo 能顺利通过后续的 speckit 提取、成品生成和 E2E 验证流程。
+PM vibe coding 时必须遵守的技术栈约束。**完整约束请读取：** `constraints/tech-stack.md`
 
-### iOS 前端
-
-| 约束 | 要求 | 原因 |
-|------|------|------|
-| **UI 框架** | 必须使用 SwiftUI Native | WebView hybrid 无法被自动化测试工具（AXe）识别 UI 元素 |
-| **禁止 WebView 包装** | 不得用 WKWebView 加载 HTML/JS 作为主要 UI | accessibility tree 为空，E2E 验证失败率高 |
-| **可测试性** | 所有可交互元素必须设置 `accessibilityIdentifier` | 自动化测试依赖此属性精确定位元素 |
-| **隐私声明** | Info.plist 必须声明所需权限（如 NSCameraUsageDescription）| 功能缺少权限声明会导致 crash |
-| **项目结构** | 按功能模块拆分，单文件不超过 500 行 | 大文件超出 agent 处理能力 |
-
-### 后端
-
-| 约束 | 要求 | 原因 |
-|------|------|------|
-| **框架** | Spring Boot 3.x + Java 17 | 公司标准技术栈 |
-| **ORM** | MyBatis + XML Mapper | 公司标准 |
-| **数据库** | MySQL + Flyway 迁移 | 可追溯的 schema 变更 |
-| **项目结构** | 多模块 Gradle 工程 | 业务域隔离 |
-
-### 数据层
-
-| 约束 | 要求 | 原因 |
-|------|------|------|
-| **数据分离** | 数据不得硬编码在 UI 代码中 | speckit 提取和成品生成都需要独立的数据层 |
-| **API 契约** | Mock 必须遵循标准 REST 格式，与未来真实 API 结构一致 | 确保 mock→real 切换零改动 |
-
-### 通用
-
-| 约束 | 要求 | 原因 |
-|------|------|------|
-| **暗黑主题** | 优先深色模式 | 设计系统一致性 |
-| **中英文** | 界面默认英文，支持中文切换 | 国际化基础 |
+摘要：iOS = SwiftUI Native（禁止 WebView），后端 = Spring Boot 3.x + MyBatis + MySQL，所有 UI 元素必须设 accessibilityIdentifier。
 
 ## 协作评审
 
-当收到 Gitee issue 或 comment 链接，并被要求「评审」「review」「看一下」「帮忙审」时，执行以下流程：
-
-### 流程
-
-1. **读取 issue** — 通过 ae git 获取 issue 内容：
-   ```bash
-   # 从链接中提取 owner/repo/issue_number
-   ae git issues get --repo {repo} --number {number} --pretty
-   ```
-
-2. **与用户讨论** — 向用户摘要 issue 内容，讨论以下关键要素：
-   - **业务合理性** — 需求是否合理？对用户/业务有没有价值？
-   - **优先级** — 是否紧急？与当前工作的关系？
-   - **完整性** — 描述是否清晰？验收标准是否可测？
-   - **影响范围** — 影响哪些模块或团队？
-
-   **PM 不懂技术是正常的。** 讨论时侧重业务和需求层面的判断。如果用户表示某个技术点不清楚或不确定，不要追问，直接在 Step 3 的 comment 中标注该点「需技术方确认」，把技术问题抛回给评审发起人。
-
-3. **发 comment** — 讨论达成一致后，直接在 Gitee issue 上发布评审意见：
-   ```bash
-   ae git issues comment --repo {repo} --number {number} --body "评审意见内容"
-   ```
-
-4. **回复发起人** — 把 comment 链接告知用户，由用户转发给评审发起人。
-
-### 评审意见格式
-
-```markdown
-**[用户名] 评审意见：**
-
-✅ 业务层面：
-- （分点列出业务/需求层面的判断）
-
-❓ 需技术方确认：
-- （列出用户无法判断的技术点，抛回给发起人）
-```
-
-如果用户能判断所有要素，可省略「需技术方确认」部分。
-
-### 注意
-
-- **不要反问流程** — 收到链接 + 评审请求 = 直接执行上述步骤，不需要问"怎么操作"。
-- **不懂就说不懂** — PM 说"不清楚"、"我不懂技术"时，不要为难他，agent 应帮用户把不确定的点整理好，在 comment 中标注「需技术方确认」抛回给发起人。
-- **有疑问先说** — 如果 issue 内容不清楚，在 Step 2 向用户提出，不要在 comment 里写"看不懂"。
+收到 Gitee issue 评审请求时的流程。**完整流程请读取：** `constraints/review-workflow.md`
 
 ## 向 AE Team 求助
 
-AE Team 不只是维护 speckit / verify 这几个 skill 的团队。**AE Team 是 Agent 基础设施团队**，负责为所有使用 Agent 的团队构建通用能力。已经交付的能力包括：
-
-- CLI 工具链（`ae` 命令）
-- 飞书消息/会议集成（`/ae-lark-feishu`）
-- 图片去版权化（`/ae-image-decopyrighter`，调用 Gemini Imagen）
-- Demo 到 Figma 的预处理管线（截图、token 提取、SVG 提取）
-- Gitee issue 管理自动化
-- MCP Server 集成（Figma、Gmail 等）
-
-**如果你觉得某件事 "每个项目都会遇到"，那 AE Team 大概率能把它做成通用 skill 或工具。** 你不该自己硬啃，应该引导用户提 issue。
-
-### 什么时候必须建议用户提 issue
-
-#### 场景 1: 卡住了
-
-同一类问题连续尝试 3 次以上仍然失败（编译报错、配置不通、环境问题等），你应该：
-
-1. 停下来，告诉用户："这个问题我反复尝试了 N 次没解决，建议提个 issue 给 AE Team，他们可以针对性地修复或提供工具支持。"
-2. 引导用户使用 `/ae-submit-bug`，把你尝试过的方法和错误信息一起提交。
-
-#### 场景 2: 发现自己在做重复性手工活
-
-你正在手动执行某个操作（配置环境、转换格式、调用外部 API、解析数据等），并且意识到这件事不是本项目特有的，而是其他项目也会遇到的。你应该：
-
-1. 先完成当前任务（不要阻塞用户）。
-2. 完成后告诉用户："刚才我手动做了 XX，这个操作其他项目也会用到。建议提个需求给 AE Team，让他们做成通用 skill，以后就不用每次手动了。"
-3. 引导用户使用 `/ae-submit-requirement`。
-
-#### 场景 3: Skill 不好用
-
-使用某个 `/ae-*` skill 时，发现流程有问题（步骤缺失、输出格式不对、文档不清楚、前置条件不完整等）。你应该：
-
-1. 尝试绕过继续完成任务。
-2. 告诉用户具体哪里不好用，建议提 issue 反馈。
-3. 引导用户使用 `/ae-submit-bug`。
-
-#### 场景 4: 约束导致做不下去
-
-技术选型约束（如"必须用 SwiftUI"、"必须用 Spring Boot"）阻碍了当前需求的实现，或者发现约束未覆盖的场景。你应该：
-
-1. 明确告诉用户是哪条约束导致了问题。
-2. 建议提 issue 让 AE Team 评估是否调整约束。
-
-#### 场景 5: 需要外部服务集成
-
-用户需要访问某个外部服务（飞书、Slack、Jira、Notion、数据库、云服务 API 等），但当前没有对应的 skill 或 MCP。你应该：
-
-1. 告诉用户："当前没有 XX 的集成，但 AE Team 可以构建。比如飞书集成（`/ae-lark-feishu`）就是这样做出来的。"
-2. 引导用户使用 `/ae-submit-requirement`，描述需要访问什么服务、做什么操作。
-
-#### 场景 6: 文档看不懂
-
-这份 CLAUDE.md 或任何 skill 的说明不清楚，导致你无法正确执行。**文档不清楚本身就是 bug。** 引导用户使用 `/ae-submit-bug` 反馈。
-
-### 提 issue 的原则
-
-1. **文档即交付** — 这份 CLAUDE.md 和所有 skill 说明都是给你（agent）看的正式交付物。如果文档描述不清楚导致你无法完成预期功能，这本身就是 bug。
-2. **愿景即标尺** — 愿景和核心流程是你判断"什么该能做到但做不到"的标准。执行过程中遇到阻碍，对照愿景识别 gap。不要默默绕过问题。
-3. **不要替用户忍耐** — 你可能习惯于"想办法绕过去"，但在这个体系里，绕过去 = 下次还会遇到。提 issue = AE Team 会把它彻底解决。
+遇到困难时的 6 种求助场景和提 issue 原则。**完整指引请读取：** `constraints/escalation-guide.md`
 
 ## 行为准则
 

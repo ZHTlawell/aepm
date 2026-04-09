@@ -68,6 +68,7 @@ ${BOLD}COMMANDS${NC}
 
     ${BOLD}link${NC} <role> [dir]    在项目中启用 ae-pm / ae-dev / ae-go
     ${BOLD}feedback${NC}             管理使用反馈（查看/上传/清除）
+    ${BOLD}manifest${NC} <sub> <role> 生成/查看能力清单（generate | show）
     ${BOLD}version${NC}              显示版本
     ${BOLD}help${NC}                 显示帮助
 
@@ -147,6 +148,10 @@ main() {
         feedback)
             source_lib "feedback"
             ae_feedback "$@"
+            ;;
+        manifest)
+            source_lib "manifest"
+            ae_manifest "$@"
             ;;
         version|--version|-v)
             echo "ae v${AE_VERSION}"
