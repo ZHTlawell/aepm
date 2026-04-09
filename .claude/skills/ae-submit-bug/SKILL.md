@@ -1,6 +1,14 @@
 ---
 name: ae-submit-bug
 description: "提交 bug 报告到 Gitee"
+dependencies:
+  mcp: []
+  cli:
+    - name: ae
+      verify: "ae --version"
+  api_keys:
+    - GITEE_TOKEN
+  scripts: []
 ---
 
 # Skill: 提交 Bug (submit-bug)

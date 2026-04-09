@@ -1,5 +1,10 @@
 ---
 description: "生成产品 Onboarding 幻灯片页面（HTML/CSS/JS，可嵌入 WebView 或 Superwall）"
+dependencies:
+  mcp: []
+  cli: []
+  api_keys: []
+  scripts: []
 ---
 
 # Skill: Onboarding 页面生成 (onboarding-design)

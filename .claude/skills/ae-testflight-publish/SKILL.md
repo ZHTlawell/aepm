@@ -8,6 +8,16 @@ permissions:
     - "Bash(xcodebuild *)"
     - "Bash(xcrun *)"
     - "Bash(security find-identity:*)"
+dependencies:
+  mcp:
+    - playwright
+  cli:
+    - name: xcodebuild
+      verify: "xcodebuild -version"
+    - name: xcrun
+      verify: "xcrun --version"
+  api_keys: []
+  scripts: []
 ---
 
 # Skill: TestFlight 发布引导 (testflight-publish)

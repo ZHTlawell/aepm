@@ -9,6 +9,17 @@ permissions:
     - "Bash(sips *)"
     - "Bash(security find-identity:*)"
     - "Bash(grep *)"
+dependencies:
+  mcp: []
+  cli:
+    - name: xcodebuild
+      verify: "xcodebuild -version"
+    - name: security
+      verify: "which security"
+    - name: sips
+      verify: "sips --help"
+  api_keys: []
+  scripts: []
 ---
 
 # Skill: iOS 发布前预检 (ae-preflight)

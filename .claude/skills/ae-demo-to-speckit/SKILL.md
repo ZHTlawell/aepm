@@ -1,5 +1,10 @@
 ---
 description: "从 demo 源码自动提取 6 模块标准规格书 (Speckit)"
+dependencies:
+  mcp: []
+  cli: []
+  api_keys: []
+  scripts: []
 ---
 
 # Skill: Demo 原型转 Speckit (demo-to-speckit)

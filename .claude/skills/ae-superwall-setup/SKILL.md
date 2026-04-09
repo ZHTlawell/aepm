@@ -1,5 +1,10 @@
 ---
 description: "Superwall 账号配置、App 创建、SDK 集成引导"
+dependencies:
+  mcp: []
+  cli: []
+  api_keys: []
+  scripts: []
 ---
 
 # Skill: Superwall 项目集成 (superwall-setup)

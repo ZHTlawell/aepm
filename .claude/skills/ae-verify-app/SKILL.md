@@ -11,6 +11,17 @@ permissions:
     - "Bash(ios list:*)"
     - "Write({workdir}/verify-report/**)"
     - "Edit({workdir}/verify-report/**)"
+dependencies:
+  mcp:
+    - mobile-mcp
+  cli:
+    - name: xcodebuild
+      verify: "xcodebuild -version"
+    - name: xcrun
+      verify: "xcrun simctl help"
+  api_keys: []
+  scripts:
+    - ocr-screenshot.py
 ---
 
 # Skill: App 差异比对验证 (verify-app)

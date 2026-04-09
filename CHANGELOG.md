@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.26.0 (2026-04-09) — Skill 供应链基础设施：依赖声明 + doctor 增强 `#II96KG`
+
+### 新功能
+- **Skill 依赖声明** — 所有 15 个 PM skill 的 SKILL.md frontmatter 新增 `dependencies` 块，声明 MCP/CLI/API Key/脚本依赖 (#II96KG)
+- **`ae doctor` 依赖检查** — doctor 命令自动解析 SKILL.md dependencies 并逐项验证（MCP 连接、CLI 可用、API Key 已配置、脚本存在），输出 ✅/❌ 报告 (#II96KG)
+
+### 改进
+- **供应链设计论文** — 提交 `content/research/skill-ecosystem-design.md`，包含 5 波施工计划、开源替代方案全景、8 条设计原则 (#II96KG)
+
 ## v0.25.0 (2026-04-09) — Speckit→上架供应链 Module 1: ae-preflight `#II8UYE`
 
 ### 新功能

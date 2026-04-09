@@ -1,5 +1,13 @@
 ---
 description: "图片去版权化 — AI 重绘生成可商用替代"
+dependencies:
+  mcp: []
+  cli:
+    - name: python3
+      verify: "python3 --version"
+  api_keys:
+    - GEMINI_API_KEY
+  scripts: []
 ---
 
 # Skill: 图片去版权化 (image-decopyrighter)

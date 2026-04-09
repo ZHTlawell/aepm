@@ -1,5 +1,13 @@
 ---
 description: "从 verify-app diff report 批量提交 bug"
+dependencies:
+  mcp: []
+  cli:
+    - name: ae
+      verify: "ae --version"
+  api_keys:
+    - GITEE_TOKEN
+  scripts: []
 ---
 
 # Skill: 从验证报告批量提 Bug (file-bugs)

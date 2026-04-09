@@ -1,5 +1,10 @@
 ---
 description: "生成产品 Paywall 页面（HTML WebView 或 Native StoreKit 2）"
+dependencies:
+  mcp: []
+  cli: []
+  api_keys: []
+  scripts: []
 ---
 
 # Skill: Paywall 页面生成 (paywall-design)

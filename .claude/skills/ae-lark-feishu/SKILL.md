@@ -1,6 +1,13 @@
 ---
 name: ae-lark-feishu
 description: "飞书/Lark 消息读取、搜索、发送、会议妙记/逐字稿 — 当用户提到飞书、Lark、群消息、聊天记录、会议纪要、妙记时触发"
+dependencies:
+  mcp: []
+  cli:
+    - name: lark-cli
+      verify: "lark-cli --version"
+  api_keys: []
+  scripts: []
 ---
 
 # Skill: 飞书消息与会议操作 (lark-feishu)

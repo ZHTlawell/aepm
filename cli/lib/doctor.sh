@@ -80,6 +80,21 @@ ae_doctor() {
     _check "ae CLI" "test -f '$AE_HOME/pm/cli/ae' && echo '已就绪' || (test -f '$AE_HOME/dev/cli/ae' && echo '已就绪')"
     echo ""
 
+    # ── Skill Dependencies ──
+    if [[ "$role" == "all" ]]; then
+        for _role in pm go dev; do
+            local _skill_dir="$AE_HOME/$_role/.claude/skills"
+            if [[ -d "$_skill_dir" ]]; then
+                _check_skill_dependencies "$_role" && true
+            fi
+        done
+    else
+        local _skill_dir="$AE_HOME/$role/.claude/skills"
+        if [[ -d "$_skill_dir" ]]; then
+            _check_skill_dependencies "$role" && true
+        fi
+    fi
+
     # ── Summary ──
     if $all_ok; then
         ok "环境就绪 ✓"
@@ -144,4 +159,244 @@ _check_gitee_token() {
         printf "  ${RED}✗${NC} %-22s %s\n" "Gitee Token" "无效"
         all_ok=false
     fi
+}
+
+# ── Skill Dependency Checker ──
+# Parse SKILL.md frontmatter dependencies and verify each one
+_check_skill_dependencies() {
+    local role="$1"
+    local skill_dir="$AE_HOME/$role/.claude/skills"
+    local header_printed=false
+    local any_fail=false
+
+    # Collect all SKILL.md files
+    local skill_files=()
+    while IFS= read -r -d '' f; do
+        skill_files+=("$f")
+    done < <(find "$skill_dir" -maxdepth 2 -name SKILL.md -print0 2>/dev/null | sort -z)
+
+    [[ ${#skill_files[@]} -eq 0 ]] && return 0
+
+    for skill_file in "${skill_files[@]}"; do
+        # Extract skill name from path: .../skills/<name>/SKILL.md
+        local skill_name
+        skill_name=$(basename "$(dirname "$skill_file")")
+
+        # Use Python to parse YAML frontmatter and extract dependencies as JSON
+        local deps_json
+        deps_json=$(python3 -c "
+import sys, json, re
+
+try:
+    with open(sys.argv[1], 'r') as f:
+        content = f.read()
+except Exception:
+    print('{}')
+    sys.exit(0)
+
+# Extract YAML frontmatter between --- markers
+m = re.match(r'^---\s*\n(.*?)\n---', content, re.DOTALL)
+if not m:
+    print('{}')
+    sys.exit(0)
+
+fm_text = m.group(1)
+
+# Try PyYAML first, fall back to manual parsing
+deps = {}
+try:
+    import yaml
+    fm = yaml.safe_load(fm_text)
+    if isinstance(fm, dict) and 'dependencies' in fm:
+        deps = fm['dependencies']
+        if not isinstance(deps, dict):
+            deps = {}
+except ImportError:
+    # Manual parsing for simple YAML structure
+    in_deps = False
+    current_key = None
+    for line in fm_text.split('\n'):
+        stripped = line.strip()
+        if stripped == '' or stripped.startswith('#'):
+            continue
+        # Top-level key
+        if not line.startswith(' ') and not line.startswith('\t'):
+            if stripped == 'dependencies:':
+                in_deps = True
+                continue
+            elif in_deps:
+                break  # Left dependencies block
+            continue
+        if not in_deps:
+            continue
+        # Second-level key (mcp:, cli:, api_keys:, scripts:)
+        indent = len(line) - len(line.lstrip())
+        if indent <= 4 and stripped.endswith(':') and not stripped.startswith('-'):
+            current_key = stripped[:-1].strip()
+            deps[current_key] = []
+            continue
+        # List items
+        if current_key and stripped.startswith('-'):
+            val = stripped[1:].strip()
+            # Handle name: / verify: dict items for cli
+            if current_key == 'cli' and val.startswith('name:'):
+                # Start a new dict entry
+                entry = {'name': val.split(':', 1)[1].strip().strip('\"').strip(\"'\")}
+                deps[current_key].append(entry)
+            elif current_key == 'cli' and isinstance(deps[current_key], list) and len(deps[current_key]) > 0 and isinstance(deps[current_key][-1], dict):
+                # This might be a simple string item
+                deps[current_key].append(val.strip('\"').strip(\"'\"))
+            else:
+                deps[current_key].append(val.strip('\"').strip(\"'\"))
+            continue
+        # Indented key-value under a list item (e.g., verify:)
+        if current_key == 'cli' and 'verify:' in stripped:
+            if deps[current_key] and isinstance(deps[current_key][-1], dict):
+                verify_val = stripped.split('verify:', 1)[1].strip().strip('\"').strip(\"'\")
+                deps[current_key][-1]['verify'] = verify_val
+except Exception:
+    deps = {}
+
+print(json.dumps(deps))
+" "$skill_file" 2>/dev/null) || deps_json="{}"
+
+        # Skip if no dependencies
+        [[ "$deps_json" == "{}" ]] && continue
+
+        # Print section header once
+        if ! $header_printed; then
+            echo -e "${BOLD}Skill Dependencies ($role)${NC}"
+            echo -e "──────────────────"
+            header_printed=true
+        fi
+
+        echo -e "  ${BOLD}${skill_name}${NC}:"
+
+        # Parse and check each dependency type using Python
+        eval "$(python3 -c "
+import json, sys, os, subprocess, shlex
+
+deps = json.loads(sys.argv[1])
+role = sys.argv[2]
+ae_home = os.environ.get('AE_HOME', os.path.expanduser('~/.ae'))
+
+lines = []
+
+# --- MCP dependencies ---
+for item in deps.get('mcp', []):
+    name = item if isinstance(item, str) else item.get('name', str(item))
+    lines.append(('mcp', name, '', ''))
+
+# --- CLI dependencies ---
+for item in deps.get('cli', []):
+    if isinstance(item, dict):
+        name = item.get('name', '')
+        verify = item.get('verify', '')
+    else:
+        name = str(item)
+        verify = name + ' --version'
+    lines.append(('cli', name, verify, ''))
+
+# --- API key dependencies ---
+for item in deps.get('api_keys', []):
+    name = item if isinstance(item, str) else str(item)
+    lines.append(('api_key', name, '', ''))
+
+# --- Script dependencies ---
+for item in deps.get('scripts', []):
+    name = item if isinstance(item, str) else str(item)
+    lines.append(('script', name, '', ''))
+
+# Output as shell commands
+for dtype, name, verify, _ in lines:
+    # Escape for shell
+    name_esc = name.replace(\"'\", \"'\\\"'\\\"'\")
+    verify_esc = verify.replace(\"'\", \"'\\\"'\\\"'\")
+    print(f\"_check_dep '{dtype}' '{name_esc}' '{verify_esc}' '{role}'\")
+" "$deps_json" "$role" 2>/dev/null)"
+
+    done
+
+    if $header_printed; then
+        echo ""
+    fi
+
+    if $any_fail; then
+        all_ok=false
+    fi
+}
+
+# Check a single dependency item
+# Usage: _check_dep <type> <name> <verify_cmd> <role>
+_check_dep() {
+    local dtype="$1"
+    local name="$2"
+    local verify_cmd="$3"
+    local role="$4"
+
+    case "$dtype" in
+        mcp)
+            # Check if MCP server is configured in ~/.claude.json or ~/.claude/settings.json
+            local mcp_found=false
+            for cfg in "$HOME/.claude.json" "$HOME/.claude/settings.json"; do
+                if [[ -f "$cfg" ]]; then
+                    if python3 -c "
+import json, sys
+with open(sys.argv[1]) as f:
+    d = json.load(f)
+servers = d.get('mcpServers', {})
+sys.exit(0 if sys.argv[2] in servers else 1)
+" "$cfg" "$name" 2>/dev/null; then
+                        mcp_found=true
+                        break
+                    fi
+                fi
+            done
+            if $mcp_found; then
+                printf "    ${GREEN}✅${NC} MCP: %s\n" "$name"
+            else
+                printf "    ${RED}❌${NC} MCP: %s — not configured in ~/.claude.json\n" "$name"
+                any_fail=true
+            fi
+            ;;
+        cli)
+            local result
+            result=$(eval "$verify_cmd" 2>&1) || result=""
+            if [[ -n "$result" ]]; then
+                printf "    ${GREEN}✅${NC} CLI: %s (%s)\n" "$name" "$verify_cmd"
+            else
+                printf "    ${RED}❌${NC} CLI: %s (%s) — not found\n" "$name" "$verify_cmd"
+                any_fail=true
+            fi
+            ;;
+        api_key)
+            # Check environment variable and credentials files
+            local key_found=false
+            if [[ -n "${!name:-}" ]]; then
+                key_found=true
+            else
+                for cred_file in "$HOME/.config/ae/credentials.env" "$HOME/.config/ae-pm/credentials.env"; do
+                    if [[ -f "$cred_file" ]] && grep -q "^${name}=" "$cred_file" 2>/dev/null; then
+                        key_found=true
+                        break
+                    fi
+                done
+            fi
+            if $key_found; then
+                printf "    ${GREEN}✅${NC} API Key: %s\n" "$name"
+            else
+                printf "    ${RED}❌${NC} API Key: %s — not set\n" "$name"
+                any_fail=true
+            fi
+            ;;
+        script)
+            local script_path="$AE_HOME/$role/scripts/$name"
+            if [[ -f "$script_path" ]]; then
+                printf "    ${GREEN}✅${NC} Script: %s\n" "$name"
+            else
+                printf "    ${RED}❌${NC} Script: %s — not found in ~/.ae/%s/scripts/\n" "$name" "$role"
+                any_fail=true
+            fi
+            ;;
+    esac
 }

@@ -1,5 +1,10 @@
 ---
 description: "将工业产品级代码快速转为本地可运行原型，分离公司独有 vs 通用依赖"
+dependencies:
+  mcp: []
+  cli: []
+  api_keys: []
+  scripts: []
 ---
 
 # Skill: 生产代码本地原型化 (prod-to-local)

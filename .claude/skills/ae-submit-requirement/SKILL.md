@@ -1,6 +1,14 @@
 ---
 name: ae-submit-requirement
 description: "向 AE Team 提交能力需求"
+dependencies:
+  mcp: []
+  cli:
+    - name: ae
+      verify: "ae --version"
+  api_keys:
+    - GITEE_TOKEN
+  scripts: []
 ---
 
 # Skill: 提交需求 (submit-requirement)

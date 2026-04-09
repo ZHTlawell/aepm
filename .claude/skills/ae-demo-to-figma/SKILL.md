@@ -1,5 +1,11 @@
 ---
 description: "将 demo 原型转为 Figma 设计稿"
+dependencies:
+  mcp:
+    - figma
+  cli: []
+  api_keys: []
+  scripts: []
 ---
 
 # Skill: Demo 原型转 Figma 设计稿 (demo-to-figma)

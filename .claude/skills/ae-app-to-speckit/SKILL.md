@@ -23,6 +23,20 @@ permissions:
     - "Bash(python3 *coverage-stats.py:*)"
     - "Bash(bash *wda-start.sh:*)"
     - "Bash(python3 *wda-cli.py:*)"
+dependencies:
+  mcp:
+    - mobile-mcp
+  cli:
+    - name: go-ios
+      verify: "ios version"
+    - name: python3
+      verify: "python3 --version"
+  api_keys: []
+  scripts:
+    - wda-start.sh
+    - ocr-screenshot.py
+    - privacy-mask.py
+    - wda-cli.py
 ---
 
 # Skill: App 逆向提取 Speckit (app-to-speckit)
