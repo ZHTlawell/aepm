@@ -137,7 +137,7 @@ CLI 会自动加载 credentials、调用 Gitee API、返回 issue 链接。
 | 提 Bug | `/ae-submit-bug` — 通过 CLI 提交 bug 报告到 Gitee | 可用 |
 | 批量提 Bug | `/ae-file-bugs` — 从 verify-app diff report 自动生成 issue，PM 确认后批量提交 | 可用 |
 | 图片去版权化 | `/ae-image-decopyrighter` — 将有版权图片 AI 重绘为可商用替代（Gemini Imagen 4.0） | 可用 |
-| 飞书消息与会议 | 直接使用 `lark-cli` 命令（官方 CLI，200+ 命令）。搜群：`lark-cli im chat search`，读消息：`lark-cli im message list`，会议妙记：`lark-cli vc meeting-minutes get` | 可用（已迁移到 larksuite/cli） |
+| 飞书消息与会议 | `/ae-lark-feishu` — 搜索群聊、读取/搜索消息、下载图片、会议妙记/逐字稿、发送消息 | 可用 |
 | App 逆向提取 Speckit | `/ae-app-to-speckit` — 从已上架 App 逆向生成 speckit（iPhone 真机探索 + 截图 + feature-checklist） | 可用（需 iPhone + USB + WDA） |
 | Onboarding 页面生成 | `/ae-onboarding-design` — 生成产品 Onboarding 幻灯片（HTML/CSS/JS，Superwall Flow 或 WebView） | 可用 |
 | Paywall 页面生成 | `/ae-paywall-design` — 生成 Paywall 付费墙页面（HTML 或 Native StoreKit 2） | 可用 |
