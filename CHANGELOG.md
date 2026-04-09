@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.31.0 (2026-04-09) — 全量 skill README 设计文档 `#II99OK`
+
+### 新功能
+- **12 个 PM skill 补齐 README.md** — 按 ae-skill-creator 标准为所有 PM skill 编写人类设计文档（问题陈述/设计决策/已放弃方案/开源供应链/生命周期），从 CHANGELOG 和 SKILL.md 还原设计要素 (#II99OK)
+- **3 个跨角色 skill 补齐 README.md** — ae-submit-bug / ae-submit-requirement / ae-lark-feishu (#II99OK)
+
 ## v0.30.0 (2026-04-09) — ae-skill-creator：标准化 skill 构建 skill `#II99OK`
 
 ### 新功能
