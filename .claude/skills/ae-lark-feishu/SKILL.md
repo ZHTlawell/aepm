@@ -13,9 +13,18 @@ dependencies:
   scripts: []
 ---
 
-> **⚠️ DEPRECATED** — 本 skill 已被 larksuite/cli（官方 CLI，200+ 命令）和 Lark OpenAPI MCP server 替代。
-> 迁移指引：`content/migration-guides/lark-feishu-to-larksuite-cli.md`
-> 自 ae-pm v0.26.0 / ae-go v0.8.0 起标记废弃，将在未来版本中移除。
+> **⚠️ DEPRECATED — 请勿使用本 skill，直接使用 larksuite/cli。**
+>
+> larksuite/cli 是飞书官方 CLI，200+ 命令，已包含本 skill 的全部能力。
+>
+> **用户已安装**（ae-go 安装时自动装了 `@larksuite/cli`），直接用即可：
+> - 搜索群聊：`lark-cli im chat search --query "关键词"`
+> - 读取消息：`lark-cli im message list --chat-id <id>`
+> - 发送消息：`lark-cli im message send --chat-id <id> --content "内容"`
+> - 会议妙记：`lark-cli vc meeting-minutes get --meeting-id <id>`
+> - 更多命令：`lark-cli --help`
+>
+> 如未安装：`npm install -g @larksuite/cli && lark-cli auth login`
 
 # Skill: 飞书消息与会议操作 (lark-feishu)
 
