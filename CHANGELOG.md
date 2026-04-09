@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.25.0 (2026-04-09) — Speckit→上架供应链 Module 1: ae-preflight `#II8UYE`
+
+### 新功能
+- **`/ae-preflight` skill** — iOS 项目发布前预检：自动扫描签名配置、硬编码秘钥、PrivacyInfo.xcprivacy、App Icon、隐私合规等生产就绪问题，输出结构化报告 + constraint_candidate 列表 (#II8UYE)
+- **publish-state.yaml 状态追踪** — 跨 session 持久化供应链各模块进展（preflight → apple_identity → store_assets → ship → postflight），每个模块记录 blockers / warnings / passed / constraint_candidates
+
+### 供应链规划
+- 完整供应链 5 模块设计：ae-preflight → ae-apple-identity → ae-store-assets → ae-ship → ae-postflight
+- bible-app (Faithful Guide) 作为第一个实跑验证案例，Module 1 已在真实项目上验证通过（模拟器 BUILD SUCCEEDED）
+
 ## v0.24.5 (2026-04-09) — Playwright MCP 必须用系统 Chrome 访问 Apple 网站 `#II8VWP`
 
 ### Bug 修复
