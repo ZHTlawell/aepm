@@ -13,18 +13,28 @@ dependencies:
   scripts: []
 ---
 
-> **⚠️ DEPRECATED — 请勿使用本 skill，直接使用 larksuite/cli。**
+> **⚠️ 本 skill 已被 larksuite/cli 替代。** 触发飞书相关需求时，按以下流程执行：
 >
-> larksuite/cli 是飞书官方 CLI，200+ 命令，已包含本 skill 的全部能力。
+> **Step 1: 检查 lark-cli**
+> ```bash
+> which lark-cli || npm install -g @larksuite/cli
+> ```
 >
-> **用户已安装**（ae-go 安装时自动装了 `@larksuite/cli`），直接用即可：
+> **Step 2: 检查认证**（未认证则引导用户在浏览器授权）
+> ```bash
+> lark-cli auth status || lark-cli auth login
+> ```
+>
+> **Step 3: 直接用 lark-cli 命令完成用户需求**
 > - 搜索群聊：`lark-cli im chat search --query "关键词"`
 > - 读取消息：`lark-cli im message list --chat-id <id>`
+> - 搜索消息：`lark-cli im message search --query "关键词"`
 > - 发送消息：`lark-cli im message send --chat-id <id> --content "内容"`
 > - 会议妙记：`lark-cli vc meeting-minutes get --meeting-id <id>`
+> - 会议逐字稿：`lark-cli vc meeting-transcript get --meeting-id <id>`
 > - 更多命令：`lark-cli --help`
 >
-> 如未安装：`npm install -g @larksuite/cli && lark-cli auth login`
+> **不要执行下方旧 skill 的流程**，仅供参考。lark-cli 的命令覆盖了下方所有能力。
 
 # Skill: 飞书消息与会议操作 (lark-feishu)
 
