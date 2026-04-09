@@ -101,9 +101,13 @@ log "Step 2: 检查 WDA 状态..."
 if curl -s --connect-timeout 2 "http://localhost:${WDA_PORT}/status" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
-sid = data.get('sessionId') or data.get('value', {}).get('sessionId', '')
-if sid:
-    print(f'WDA 已在运行 (session: {sid[:8]}...)')
+val = data.get('value', {})
+ready = val.get('ready', False) if isinstance(val, dict) else False
+state = val.get('state', '') if isinstance(val, dict) else ''
+sid = data.get('sessionId') or (val.get('sessionId', '') if isinstance(val, dict) else '')
+if ready or state == 'success' or sid:
+    label = f'session={sid[:8]}...' if sid else f'state={state}'
+    print(f'WDA 已在运行 ({label})')
     sys.exit(0)
 sys.exit(1)
 " 2>/dev/null; then
@@ -229,10 +233,24 @@ fi
 # --- Helper: start port forward ---
 start_forward() {
     pkill -f "ios forward.*${WDA_PORT}" 2>/dev/null || true
-    sleep 1
+    # Wait until port is actually freed (up to 5s)
+    for i in $(seq 1 10); do
+        if ! lsof -i :${WDA_PORT} -sTCP:LISTEN &>/dev/null; then
+            break
+        fi
+        sleep 0.5
+    done
     ios forward ${WDA_PORT} ${WDA_PORT} --udid="$UDID" &>/dev/null &
     FORWARD_PID=$!
     sleep 1
+    # Verify forward process is alive and port is bound
+    if ! kill -0 "$FORWARD_PID" 2>/dev/null; then
+        warn "端口转发启动失败，重试..."
+        sleep 2
+        ios forward ${WDA_PORT} ${WDA_PORT} --udid="$UDID" &>/dev/null &
+        FORWARD_PID=$!
+        sleep 1
+    fi
 }
 
 # --- Helper: verify WDA responds ---
@@ -245,9 +263,14 @@ verify_wda() {
         if curl -s --connect-timeout 3 "http://localhost:${WDA_PORT}/status" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
-sid = data.get('sessionId') or data.get('value', {}).get('sessionId', '')
-if sid:
-    print(f'WDA 就绪 (session: {sid[:8]}...)')
+val = data.get('value', {})
+# Accept: ready=true OR state=success OR non-null sessionId
+ready = val.get('ready', False) if isinstance(val, dict) else False
+state = val.get('state', '') if isinstance(val, dict) else ''
+sid = data.get('sessionId') or (val.get('sessionId', '') if isinstance(val, dict) else '')
+if ready or state == 'success' or sid:
+    label = f'session={sid[:8]}...' if sid else f'state={state}'
+    print(f'WDA 就绪 ({label})')
     sys.exit(0)
 sys.exit(1)
 " 2>/dev/null; then
@@ -316,8 +339,9 @@ if grep -q "exit code 74\|exited with code 74" /tmp/wda-xcodebuild.log 2>/dev/nu
     warn "检测到 exit code 74 (test runner 启动即崩溃)"
 fi
 
-# Kill previous attempt
+# Kill previous attempt (xcodebuild + stale forward)
 pkill -f "xcodebuild.*WebDriverAgentRunner" 2>/dev/null || true
+pkill -f "ios forward.*${WDA_PORT}" 2>/dev/null || true
 sleep 1
 
 log "回退到 xcodebuild test（含完整 build）..."

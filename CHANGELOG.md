@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.31.1 (2026-04-09) — WDA 启动验证修复 `#II9E5P`
+
+### Bug 修复
+- **wda-start.sh verify 逻辑修复** — iOS 26 上 WDA 返回 `sessionId: null` + `ready: true`，旧逻辑仅检查 sessionId 导致验证永远失败；改为同时接受 ready/state/sessionId 三种判断 (#II9E5P)
+- **端口转发竞态修复** — Attempt 1→2 切换时未杀旧 `ios forward`，新 forward 绑定失败；增加端口释放等待和重试 (#II9E5P)
+
 ## v0.31.0 (2026-04-09) — 全量 skill README 设计文档 `#II99OK`
 
 ### 新功能
