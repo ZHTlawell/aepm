@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.24.5 (2026-04-09) — Playwright MCP 必须用系统 Chrome 访问 Apple 网站 `#II8VWP`
+
+### Bug 修复
+- **Apple 页面白屏 / 点击无响应** — Apple CDN 通过 TLS 指纹检测拦截 Playwright 自带 Chromium，导致 developer.apple.com 和 appstoreconnect.apple.com 的 CSS/JS 返回空响应。修复：Playwright MCP 注册时必须加 `--browser chrome` 使用系统 Chrome (#II8VWP)
+- **ae-testflight-publish skill 更新** — Playwright 环境检查和故障排查文档同步更新，明确 `--browser chrome` 要求
+
 ## v0.24.4 (2026-04-09) — ae git issues list-comments 子命令 `#II8YJH`
 
 ### 新功能

@@ -43,13 +43,16 @@ Phase 1 需要通过浏览器操作 Apple Developer Portal。如果 `browser_nav
 
 ```bash
 # 注册 Playwright MCP Server（全局，一次性）
-claude mcp add playwright -s user -- npx @playwright/mcp@latest
-
-# 安装 Chromium（首次约 200MB）
-npx playwright install chromium
+# ⚠️ 必须加 --browser chrome — Apple CDN 会 TLS 指纹检测拦截 Playwright 自带的 Chromium，
+#    导致 developer.apple.com 和 appstoreconnect.apple.com 的 CSS/JS 返回空响应（页面白屏）。
+#    使用系统 Chrome 的 TLS 指纹与正常用户一致，不会被拦截。
+claude mcp add playwright -s user -- npx @playwright/mcp@latest --browser chrome
 ```
 
 注册后需**重新开始对话**，新对话中 `browser_navigate` 等工具才会出现。
+
+> **故障排查：** 如果 Apple 页面出现白屏 / CSS 不加载 / 点击无响应，先检查 Playwright MCP 是否使用了 `--browser chrome`。
+> 执行 `claude mcp get playwright` 确认 Args 中包含 `--browser chrome`。
 
 ## 输入
 
@@ -436,6 +439,7 @@ App 信息：
 
 | 问题 | 怎么办 |
 |------|--------|
+| Apple 页面白屏 / CSS 不加载 / 点击无响应 | Playwright MCP 必须用 `--browser chrome`（系统 Chrome），不能用自带 Chromium。Apple CDN 通过 TLS 指纹拦截 Chromium。执行 `claude mcp get playwright` 确认 |
 | developer.apple.com 登录后看到「Enroll」 | Apple Developer Program 还没付费（$99/年），需要先完成注册 |
 | ASC 创建 App 时 Bundle ID 下拉为空 | Phase 1 的 App ID 还没注册，或注册后需等几分钟刷新 |
 | ASC 创建 App 报名称已被占用 | App 名称全球唯一，换一个名字（Bundle ID 不影响） |
