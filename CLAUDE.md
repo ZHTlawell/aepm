@@ -143,6 +143,9 @@ CLI 会自动加载 credentials、调用 Gitee API、返回 issue 链接。
 | Paywall 页面生成 | `/ae-paywall-design` — 生成 Paywall 付费墙页面（HTML 或 Native StoreKit 2） | 可用 |
 | Superwall 集成 | `/ae-superwall-setup` — Superwall 账号配置、SDK 集成、Placement 注册引导 | 可用 |
 | Skill 构建 | `/ae-skill-creator` — 标准化 skill 构建全流程（六段标准 + 审计模式） | 可用 |
+| 发布前预检 | `/ae-preflight` — iOS 一体化生产就绪扫描（签名/Icon/隐私/API Key 泄漏/资源尺寸） | 可用 |
+| 线上项目本地化 | `/ae-prod-to-local` — 分析线上项目结构，生成可本地编译运行的配置 | 可用 |
+| Demo 转 Figma | `/ae-demo-to-figma` — 将 demo 项目的 UI 导入 Figma 设计稿 | 可用（需 Figma MCP） |
 | 查收更新 | 自动检查新版本（每 24h）+ 查看 CHANGELOG.md 了解更新内容 | 可用 |
 
 ### 调用 Dev Agent 生成成品
@@ -176,6 +179,12 @@ PM vibe coding 时必须遵守的技术栈约束。**完整约束请读取：** 
 ## 向 AE Team 求助
 
 遇到困难时的 6 种求助场景和提 issue 原则。**完整指引请读取：** `constraints/escalation-guide.md`
+
+## 用户覆盖
+
+执行任何 `/ae-*` skill 前，先检查当前项目中是否存在 `.claude/overrides/` 目录。如果目录中有 `.md` 文件（README.md 除外），读取并遵守其中的规则——它们是用户对 AE 默认行为的定制，**优先级高于 constraints/ 中的默认策略**。
+
+`ae update` 不会修改 overrides/ 中的文件，用户的定制永远安全。
 
 ## 行为准则
 
