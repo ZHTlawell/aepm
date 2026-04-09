@@ -299,6 +299,40 @@ def cmd_issues_list(args):
     output({"issues": issues[:args.per_page], "total": len(issues)}, args.pretty)
 
 
+def cmd_issues_list_comments(args):
+    token = load_token(args.token)
+    if not token:
+        error_exit("未找到 GITEE_TOKEN，请运行 ae setup 配置", EXIT_AUTH_ERROR)
+
+    comments = []
+    page = 1
+    per_page = min(args.per_page, 100)
+
+    while True:
+        url = (f"{GITEE_ENTERPRISE_API}/{args.owner}/issues/{args.number}/comments"
+               f"?access_token={token}&per_page={per_page}&page={page}")
+        batch = api_request("GET", url)
+
+        if not isinstance(batch, list):
+            break
+
+        for item in batch:
+            user = item.get("user", {})
+            comments.append({
+                "id": item.get("id", ""),
+                "author": user.get("name", "") or user.get("login", ""),
+                "created_at": item.get("created_at", ""),
+                "updated_at": item.get("updated_at", ""),
+                "body": item.get("body", ""),
+            })
+
+        if len(batch) < per_page or len(comments) >= args.per_page:
+            break
+        page += 1
+
+    output({"comments": comments[:args.per_page], "total": len(comments)}, args.pretty)
+
+
 def cmd_issues_close(args):
     token = load_token(args.token)
     if not token:
@@ -430,6 +464,11 @@ def build_parser():
     p.add_argument("--state", default="open", choices=["open", "closed", "all"])
     p.add_argument("--per-page", type=int, default=20)
 
+    p = issues_sub.add_parser("list-comments", help="List comments on an issue", parents=[global_opts])
+    p.add_argument("--repo", required=True)
+    p.add_argument("--number", required=True)
+    p.add_argument("--per-page", type=int, default=50)
+
     p = issues_sub.add_parser("close", help="Close an issue", parents=[global_opts])
     p.add_argument("--repo", required=True)
     p.add_argument("--number", required=True)
@@ -453,6 +492,7 @@ COMMANDS = {
     ("issues", "comment"): cmd_issues_comment,
     ("issues", "get"): cmd_issues_get,
     ("issues", "list"): cmd_issues_list,
+    ("issues", "list-comments"): cmd_issues_list_comments,
     ("issues", "close"): cmd_issues_close,
     ("upload-image", None): cmd_upload_image,
     ("auth", "validate"): cmd_auth_validate,

@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.24.4 (2026-04-09) — ae git issues list-comments 子命令 `#II8YJH`
+
+### 新功能
+- **list-comments 子命令** — `ae git issues list-comments --repo <repo> --number <number> --pretty`，列出 issue 的所有评论（id、作者、时间、body），支持分页 (#II8YJH)
+
 ## v0.24.3 (2026-04-09) — ae link 注入日常开发通用权限 `#II8UJR`
 
 ### Bug 修复
