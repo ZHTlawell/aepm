@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.27.0 (2026-04-09) — Skill 供应链 Wave 2：发布门禁 + 首批瘦身 `#II96KG`
+
+### 新功能
+- **publish.sh doctor 门禁** — 发布前自动检查 skill 依赖，缺失时 warn（可用 `--skip-doctor` 跳过） (#II96KG)
+
+### 改进
+- **ae-lark-feishu 标记废弃** — 迁移到 larksuite/cli + Lark OpenAPI MCP，附迁移指引 (#II96KG)
+
 ## v0.26.0 (2026-04-09) — Skill 供应链基础设施：依赖声明 + doctor 增强 `#II96KG`
 
 ### 新功能

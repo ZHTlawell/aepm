@@ -1,6 +1,9 @@
 ---
 name: ae-lark-feishu
 description: "飞书/Lark 消息读取、搜索、发送、会议妙记/逐字稿 — 当用户提到飞书、Lark、群消息、聊天记录、会议纪要、妙记时触发"
+deprecated: true
+deprecated_since: "2026-04-09"
+superseded_by: "larksuite/cli + larksuite/lark-openapi-mcp"
 dependencies:
   mcp: []
   cli:
@@ -9,6 +12,10 @@ dependencies:
   api_keys: []
   scripts: []
 ---
+
+> **⚠️ DEPRECATED** — 本 skill 已被 larksuite/cli（官方 CLI，200+ 命令）和 Lark OpenAPI MCP server 替代。
+> 迁移指引：`content/migration-guides/lark-feishu-to-larksuite-cli.md`
+> 自 ae-pm v0.26.0 / ae-go v0.8.0 起标记废弃，将在未来版本中移除。
 
 # Skill: 飞书消息与会议操作 (lark-feishu)
 
