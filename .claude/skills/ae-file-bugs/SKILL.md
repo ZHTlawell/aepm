@@ -8,6 +8,10 @@ dependencies:
   api_keys:
     - GITEE_TOKEN
   scripts: []
+smoke_test:
+  command: "ae --version"
+  expected_exit: 0
+  description: "ae CLI available for Gitee issue creation"
 ---
 
 # Skill: 从验证报告批量提 Bug (file-bugs)

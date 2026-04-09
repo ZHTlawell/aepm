@@ -22,6 +22,10 @@ dependencies:
   api_keys: []
   scripts:
     - ocr-screenshot.py
+smoke_test:
+  command: "xcodebuild -version && xcrun simctl help >/dev/null 2>&1"
+  expected_exit: 0
+  description: "xcodebuild + simctl available"
 ---
 
 # Skill: App 差异比对验证 (verify-app)

@@ -8,6 +8,10 @@ dependencies:
   api_keys:
     - GEMINI_API_KEY
   scripts: []
+smoke_test:
+  command: "grep -q GEMINI_API_KEY ~/.config/ae/credentials.env 2>/dev/null"
+  expected_exit: 0
+  description: "GEMINI_API_KEY configured"
 ---
 
 # Skill: 图片去版权化 (image-decopyrighter)

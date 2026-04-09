@@ -37,6 +37,10 @@ dependencies:
     - ocr-screenshot.py
     - privacy-mask.py
     - wda-cli.py
+smoke_test:
+  command: "ios version 2>/dev/null || which ios"
+  expected_exit: 0
+  description: "go-ios available for iPhone communication"
 ---
 
 # Skill: App 逆向提取 Speckit (app-to-speckit)

@@ -5,6 +5,10 @@ dependencies:
   cli: []
   api_keys: []
   scripts: []
+smoke_test:
+  command: "echo ok"
+  expected_exit: 0
+  description: "guidance skill, no external dependencies"
 ---
 
 # Skill: Superwall 项目集成 (superwall-setup)

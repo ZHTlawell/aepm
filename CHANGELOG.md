@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.31.2 (2026-04-10) — VISION 审计：质量门禁全面补齐 `#II9DON`
+
+### 质量基础设施
+- **smoke_test 100% 覆盖** — 13 个 pm skill 全部补齐 smoke_test frontmatter（从 2/13 → 13/13）
+- **test-scenarios.md 100% 覆盖** — 13 个 pm skill 全部创建 test-scenarios.md，每个 5 场景（L2 用户视角验收）
+- **publish.sh manifest 集成** — generate-manifest.sh 接入发布流水线，manifest.yml 作为构建产物
+- **publish.sh 门禁强化** — smoke test 失败从 warn 改为 exit 1（--skip-doctor 可跳过）
+
+### CLAUDE.md 改进
+- **overrides/ 引用** — 补充用户覆盖段落，agent 执行 skill 前会检查 .claude/overrides/ 目录
+- **能力表补齐** — 补充 ae-preflight、ae-prod-to-local、ae-demo-to-figma 的能力描述
+
 ## v0.31.1 (2026-04-09) — WDA 启动验证修复 `#II9E5P`
 
 ### Bug 修复

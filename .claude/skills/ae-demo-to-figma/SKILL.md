@@ -6,6 +6,10 @@ dependencies:
   cli: []
   api_keys: []
   scripts: []
+smoke_test:
+  command: "claude mcp list 2>/dev/null | grep -q figma"
+  expected_exit: 0
+  description: "Figma MCP registered"
 ---
 
 # Skill: Demo 原型转 Figma 设计稿 (demo-to-figma)

@@ -18,6 +18,10 @@ dependencies:
       verify: "xcrun --version"
   api_keys: []
   scripts: []
+smoke_test:
+  command: "xcodebuild -version && claude mcp list 2>/dev/null | grep -q playwright"
+  expected_exit: 0
+  description: "xcodebuild + Playwright MCP available"
 ---
 
 # Skill: TestFlight 发布引导 (testflight-publish)

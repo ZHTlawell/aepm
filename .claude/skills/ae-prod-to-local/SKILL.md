@@ -5,6 +5,10 @@ dependencies:
   cli: []
   api_keys: []
   scripts: []
+smoke_test:
+  command: "echo ok"
+  expected_exit: 0
+  description: "pure LLM skill, no external dependencies"
 ---
 
 # Skill: 生产代码本地原型化 (prod-to-local)
