@@ -1,9 +1,13 @@
 # Changelog
 
-## v0.24.1 (2026-04-09) — CLAUDE.md 全局加载修复 `#II8SXT`
+## v0.24.2 (2026-04-09) — CLI 架构修复：消除 stale clone + ae git 可用 `#II8SXT`
 
 ### Bug 修复
-- **CLAUDE.md 未注册到 additionalDirectories** — `ae install` / `ae update` 时只注册了 skills 目录，未注册 role 根目录，导致各 role 的 CLAUDE.md 在非本 role workspace 中不可见 (#II8SXT)
+- **ae git 命令不可用** — `~/.ae/bin/ae` 指向旧版独立 clone，`ae git` 子命令无法到达用户 (#II8SXT)
+- **CLAUDE.md 未注册到 additionalDirectories** — skills 目录已注册但 role 根目录未注册 (#II8SXT)
+
+### 架构改进
+- **消除 `~/.ae/cli/` 独立 clone** — CLI 直接 symlink 到 role 包的 `cli/ae`，`ae update` 自动迁移
 
 ## v0.24.0 (2026-04-09) — 统一 Git CLI 工具 `#II8R1M`
 

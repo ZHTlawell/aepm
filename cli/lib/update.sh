@@ -12,13 +12,17 @@ ae_update() {
     _update_repo "ae-dev"             "$AE_HOME/dev"             "dev"
     _update_repo "ae-speckit-examples" "$AE_HOME/speckit-examples" ""
 
-    # Update ae-cli itself if installed from ae-platform
+    # Migrate from legacy ~/.ae/cli/ clone (v0.24.0 and earlier)
     if [[ -d "$AE_HOME/cli/.git" ]]; then
-        _update_repo "ae-cli" "$AE_HOME/cli" ""
+        info "清理旧版 CLI clone (~/.ae/cli/)..."
+        rm -rf "$AE_HOME/cli"
     fi
 
-    # Re-register hooks (picks up latest script versions)
+    # Refresh CLI symlink (point to latest role's CLI)
     source_lib "install"
+    _refresh_cli_symlink
+
+    # Re-register hooks (picks up latest script versions)
     _register_update_hook
     _register_feedback_hook
 

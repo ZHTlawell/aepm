@@ -64,6 +64,12 @@ _install_repos() {
 
     mkdir -p "$AE_HOME"
 
+    # Migrate from legacy ~/.ae/cli/ clone (v0.24.0 and earlier)
+    if [[ -d "$AE_HOME/cli/.git" ]]; then
+        info "清理旧版 CLI clone (~/.ae/cli/)..."
+        rm -rf "$AE_HOME/cli"
+    fi
+
     # ae-go
     _install_clone_or_pull "ae-go" "https://gitee.com/turningsyn/ae-go.git" "$AE_HOME/go"
     _register_global_skills "go"
@@ -78,6 +84,9 @@ _install_repos() {
 
     # ae-speckit-examples (optional)
     _install_clone_or_pull "ae-speckit-examples" "https://github.com/ligenjian001-ai/ae-speckit-examples.git" "$AE_HOME/speckit-examples" || true
+
+    # Refresh CLI symlink (point ~/.ae/bin/ae to first available role)
+    _refresh_cli_symlink
 
     # Register hooks
     _register_update_hook
@@ -98,6 +107,26 @@ _install_clone_or_pull() {
             warn "$name 克隆失败。请确认网络和权限。"
         }
     fi
+}
+
+# Refresh ~/.ae/bin/ae symlink to point to the first available role's CLI.
+# Each role package bundles the full CLI at <role>/cli/ae, so no separate
+# clone is needed. This also handles migration from the legacy ~/.ae/cli/ approach.
+_refresh_cli_symlink() {
+    local bin_dir="$AE_HOME/bin"
+    mkdir -p "$bin_dir"
+
+    for role in pm go dev; do
+        local ae_bin="$AE_HOME/$role/cli/ae"
+        if [[ -f "$ae_bin" ]]; then
+            chmod +x "$ae_bin"
+            ln -sf "$ae_bin" "$bin_dir/ae"
+            ok "  CLI 已链接到 $ae_bin"
+            return
+        fi
+    done
+
+    warn "未找到可用的 cli/ae，ae 命令可能不可用"
 }
 
 # Register ~/.ae/<role>/.claude/skills in Claude Code global settings so

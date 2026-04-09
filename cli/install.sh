@@ -2,10 +2,13 @@
 set -euo pipefail
 
 # ae-cli installer — curl -sSL <url> | sh
-# Installs ae CLI to ~/.ae/cli/ and adds to PATH
+# Installs ae CLI by cloning the first available role package, then symlinking.
+#
+# Architecture: each role package (ae-pm, ae-go, ae-dev) bundles the full CLI
+# at <role>/cli/ae. We clone one role and symlink ~/.ae/bin/ae to its CLI.
+# After `ae install`, all roles are cloned and the symlink is refreshed.
 
 AE_HOME="${AE_HOME:-$HOME/.ae}"
-AE_CLI_DIR="$AE_HOME/cli"
 AE_BIN="$AE_HOME/bin"
 
 RED='\033[0;31m'
@@ -23,39 +26,64 @@ echo -e "${BOLD}AE CLI Installer${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# 1. Clone or update ae-platform (for cli/)
-if [[ -d "$AE_CLI_DIR/.git" ]]; then
-    info "ae-cli 已存在，更新中..."
-    (cd "$AE_CLI_DIR" && git pull origin master 2>/dev/null) || true
-else
-    info "安装 ae-cli..."
-    mkdir -p "$AE_HOME"
-
-    # Clone ae-pm from Gitee (CLI is bundled inside ae-pm)
-    git clone --depth 1 https://gitee.com/turningsyn/ae-pm.git "$AE_CLI_DIR" 2>/dev/null || {
-        err "克隆失败。可能的原因："
-        echo "  1. 网络问题 — 请检查网络连接"
-        echo "  2. 没有权限 — 请联系管理员获取 Gitee 仓库访问权限"
-        echo ""
-        echo "  手动安装:"
-        echo "    git clone https://gitee.com/turningsyn/ae-pm.git ~/.ae/cli"
-        exit 1
-    }
+# 1. Migrate from legacy ~/.ae/cli/ clone (v0.24.0 and earlier)
+if [[ -d "$AE_HOME/cli/.git" ]]; then
+    info "清理旧版 CLI clone (~/.ae/cli/)..."
+    rm -rf "$AE_HOME/cli"
 fi
 
-# 2. Create bin/ symlink
+# 2. Clone a role package if none exists yet
+#    Priority: pm > go > dev (pm has the most complete skill set)
+_clone_role() {
+    local name="$1" url="$2" dir="$3"
+    if [[ -d "$dir/.git" ]]; then
+        return 0
+    fi
+    info "安装 $name..."
+    git clone "$url" "$dir" 2>/dev/null || return 1
+}
+
+role_cloned=false
+for pair in \
+    "ae-pm|https://gitee.com/turningsyn/ae-pm.git|$AE_HOME/pm" \
+    "ae-go|https://gitee.com/turningsyn/ae-go.git|$AE_HOME/go" \
+    "ae-dev|https://gitee.com/turningsyn/ae-dev.git|$AE_HOME/dev"; do
+    IFS='|' read -r name url dir <<< "$pair"
+    if [[ -d "$dir/.git" ]] || _clone_role "$name" "$url" "$dir"; then
+        role_cloned=true
+        break
+    fi
+done
+
+if ! $role_cloned; then
+    err "无法克隆任何 role 仓库。可能的原因："
+    echo "  1. 网络问题 — 请检查网络连接"
+    echo "  2. 没有权限 — 请联系管理员获取 Gitee 仓库访问权限"
+    echo ""
+    echo "  手动安装:"
+    echo "    git clone https://gitee.com/turningsyn/ae-pm.git ~/.ae/pm"
+    exit 1
+fi
+
+# 3. Create bin/ symlink — find first available role with cli/ae
 mkdir -p "$AE_BIN"
+linked=false
+for role in pm go dev; do
+    local_ae="$AE_HOME/$role/cli/ae"
+    if [[ -f "$local_ae" ]]; then
+        chmod +x "$local_ae"
+        ln -sf "$local_ae" "$AE_BIN/ae"
+        info "ae 命令已链接到 $local_ae"
+        linked=true
+        break
+    fi
+done
 
-# CLI lives at cli/ae inside the ae-pm repo
-local_ae="$AE_CLI_DIR/cli/ae"
-if [[ -f "$local_ae" ]]; then
-    chmod +x "$local_ae"
-    ln -sf "$local_ae" "$AE_BIN/ae"
-else
-    warn "ae 命令未找到，请确认 ae-pm 仓库包含 cli/ 目录"
+if ! $linked; then
+    warn "未找到 cli/ae，请运行 ae install 安装完整环境"
 fi
 
-# 3. Add to PATH if needed
+# 4. Add to PATH if needed
 _add_to_path() {
     local shell_rc="$1"
     local path_line='export PATH="$HOME/.ae/bin:$PATH"'
@@ -77,7 +105,7 @@ elif [[ -n "${BASH_VERSION:-}" ]] || [[ "$SHELL" == */bash ]]; then
     [[ -f "$HOME/.bash_profile" ]] && _add_to_path "$HOME/.bash_profile"
 fi
 
-# 4. Make available in current session
+# 5. Make available in current session
 export PATH="$AE_BIN:$PATH"
 
 echo ""
