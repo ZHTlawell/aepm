@@ -1,0 +1,42 @@
+# ae link 注入的日常开发通用权限
+# 与 skill 专用权限一起合并到项目 settings.local.json
+# {workdir} 会被替换为实际项目目录
+
+permissions:
+  allow:
+    # Claude Code 内置工具
+    - "Read"
+    - "Glob"
+    - "Grep"
+    - "WebFetch"
+    - "WebSearch"
+    - "Write({workdir}/**)"
+    - "Edit({workdir}/**)"
+
+    # 版本控制
+    - "Bash(git:*)"
+
+    # AE CLI
+    - "Bash(ae:*)"
+
+    # 常用 CLI 工具
+    - "Bash(cat:*)"
+    - "Bash(which:*)"
+    - "Bash(ls:*)"
+    - "Bash(open:*)"
+    - "Bash(source:*)"
+    - "Bash(mkdir:*)"
+    - "Bash(cp:*)"
+    - "Bash(mv:*)"
+
+    # iOS / macOS 开发
+    - "Bash(xcodebuild:*)"
+    - "Bash(xcodegen:*)"
+    - "Bash(xcrun:*)"
+
+    # 包管理
+    - "Bash(brew:*)"
+    - "Bash(npm:*)"
+    - "Bash(npx:*)"
+    - "Bash(pip3:*)"
+    - "Bash(python3:*)"

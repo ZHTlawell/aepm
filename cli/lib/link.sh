@@ -69,17 +69,34 @@ _merge_skill_permissions() {
     local ae_role_dir="$2"
     local settings_file="$project_dir/.claude/settings.local.json"
 
-    # Extract permissions from all SKILL.md frontmatter, merge into settings.local.json
+    # Extract permissions from:
+    #   1) cli/config/base-permissions.yml  — 日常开发通用权限
+    #   2) 各 SKILL.md frontmatter          — skill 专用权限
+    # 合并到 settings.local.json
     mkdir -p "$project_dir/.claude"
     local added
-    added=$(python3 - "$ae_role_dir" "$project_dir" "$settings_file" <<'PYEOF'
+    added=$(python3 - "$ae_role_dir" "$project_dir" "$settings_file" "$AE_CLI_DIR" <<'PYEOF'
 import sys, os, yaml, json
 
-ae_role_dir, project_dir, settings_file = sys.argv[1], sys.argv[2], sys.argv[3]
+ae_role_dir, project_dir, settings_file, cli_dir = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 skills_dir = os.path.join(ae_role_dir, ".claude", "skills")
 
-# 1. Collect permissions from all skills
 new_perms = []
+
+# 1. Load base permissions from cli/config/base-permissions.yml
+base_perm_file = os.path.join(cli_dir, "config", "base-permissions.yml")
+if os.path.isfile(base_perm_file):
+    try:
+        with open(base_perm_file) as f:
+            base = yaml.safe_load(f.read())
+        for p in (base.get("permissions") or {}).get("allow") or []:
+            p = p.replace("{workdir}", project_dir)
+            if p not in new_perms:
+                new_perms.append(p)
+    except:
+        pass
+
+# 2. Collect permissions from all SKILL.md frontmatter
 if os.path.isdir(skills_dir):
     for name in sorted(os.listdir(skills_dir)):
         skill_md = os.path.join(skills_dir, name, "SKILL.md")
@@ -105,7 +122,7 @@ if not new_perms:
     print("0")
     sys.exit(0)
 
-# 2. Merge into settings.local.json
+# 3. Merge into settings.local.json
 settings = {}
 if os.path.isfile(settings_file):
     try:
@@ -131,7 +148,7 @@ PYEOF
     ) || return 0
 
     if [[ "$added" != "0" ]]; then
-        ok "  合并了 ${added} 条 skill 权限到 settings.local.json"
+        ok "  合并了 ${added} 条权限到 settings.local.json（含通用 + skill 专用）"
     fi
 }
 

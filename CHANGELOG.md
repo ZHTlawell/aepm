@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.24.3 (2026-04-09) — ae link 注入日常开发通用权限 `#II8UJR`
+
+### Bug 修复
+- **ae link 缺少通用权限** — `ae link pm .` 只注入 skill 专用权限，缺少 Write/Edit 项目目录、git、xcodebuild 等日常开发权限，导致用户频繁手动授权 (#II8UJR)
+
+### 改进
+- 新增 `cli/config/base-permissions.yml` 配置文件，集中管理通用权限
+- `ae link` 自动合并：通用权限 + skill 专用权限，一次 link 即可无缝开发
+- 覆盖权限：Read/Write/Edit、git、ae、xcodebuild/xcodegen/xcrun、brew/npm/pip3、cat/which/ls/open 等
+
 ## v0.24.2 (2026-04-09) — CLI 架构修复：消除 stale clone + ae git 可用 `#II8SXT`
 
 ### Bug 修复
