@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.24.0 (2026-04-09) — 统一 Git CLI 工具 `#II8R1M`
+
+### 新功能
+- **ae-git.py 统一封装** — 新增 `scripts/ae-git.py`，封装 Gitee API 调用，替代所有 `curl + python3` 裸调用。支持 issue 创建/评论/列表/查看/关闭、图片上传、token 验证 (#II8R1M)
+- **鲁棒 JSON 解析** — 自动清洗 Gitee API 返回的控制字符，429/5xx 自动重试，有意义的错误码 (#II8R1M)
+- **proxy 自动处理** — 每次 API 调用前自动 unset 代理变量，调用方无需手动处理 (#II8R1M)
+
+### 改进
+- **CLI 迁移** — `ae pm submit-bug`、`ae pm submit-requirement`、`ae pm comment-issue`、`ae feedback upload`、`ae setup`、`ae doctor` 全部迁移到 ae-git.py，消除代码重复 (#II8R1M)
+
 ## v0.23.0 (2026-04-08) — Feedback Loop 自动化 `#II887G`
 
 ### 新功能

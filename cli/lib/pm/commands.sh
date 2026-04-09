@@ -57,59 +57,33 @@ ${BOLD}EXAMPLES${NC}
 EOF
 }
 
-# ── Gitee API helper ──────────────────────────────────────────────
+# ── Gitee API helper (via ae-git.py) ─────────────────────────────
 
-_pm_load_gitee_token() {
-    local loaded=false
-    local cred_file=""
-    for f in "$HOME/.config/ae/credentials.env" "$HOME/.config/ae-pm/credentials.env"; do
-        if [[ -f "$f" ]]; then
-            cred_file="$f"
-            source "$f"
-            loaded=true
-            break
-        fi
-    done
-    if ! $loaded; then
-        err "Gitee token 未配置。请先运行:"
-        echo "  mkdir -p ~/.config/ae"
-        echo "  echo 'GITEE_TOKEN=你的token' > ~/.config/ae/credentials.env"
+_pm_ae_git() {
+    local ae_git="$(dirname "$AE_CLI_DIR")/scripts/ae-git.py"
+    if [[ ! -f "$ae_git" ]]; then
+        err "ae-git.py 未找到"
         exit 1
     fi
-    if [[ -z "${GITEE_TOKEN:-}" ]]; then
-        err "GITEE_TOKEN 为空，请检查 $cred_file"
-        exit 1
-    fi
-    # Clear proxy for Gitee access
-    unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
+    python3 "$ae_git" "$@"
 }
 
 # _pm_gitee_create_issue <repo> <title> <body>
-# Generic helper — creates issue via Gitee API and prints the result URL.
+# Creates issue via ae-git.py and prints the result URL.
 _pm_gitee_create_issue() {
     local repo="$1" title="$2" body="$3"
 
-    _pm_load_gitee_token
-
     info "正在提交 issue 到 ${BOLD}${repo}${NC} ..."
 
-    # Python generates JSON payload piped to curl (avoids nested $() quoting issues)
     local response
-    response=$(GITEE_TOKEN="$GITEE_TOKEN" python3 -c "
-import json, sys, os
-print(json.dumps({
-    'access_token': os.environ['GITEE_TOKEN'],
-    'repo': sys.argv[1],
-    'title': sys.argv[2],
-    'body': sys.argv[3]
-}))" "$repo" "$title" "$body" | curl -s --max-time 30 -X POST \
-        "https://gitee.com/api/v5/repos/turningsyn/issues" \
-        -H "Content-Type: application/json" \
-        -d @-)
+    response=$(_pm_ae_git issues create --repo "$repo" --title "$title" --body "$body" 2>&1) || {
+        err "Issue 创建失败"
+        echo "$response"
+        exit 1
+    }
 
-    # Check for error
     local html_url
-    html_url=$(echo "$response" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('html_url',''))" 2>/dev/null || true)
+    html_url=$(echo "$response" | python3 -c "import json,sys; print(json.load(sys.stdin).get('html_url',''))" 2>/dev/null || true)
 
     if [[ -n "$html_url" ]]; then
         ok "Issue 创建成功！"
@@ -134,34 +108,15 @@ _pm_gitee_upload_image() {
         return 1
     fi
 
-    _pm_load_gitee_token
-
-    local basename
-    basename=$(basename "$image_path")
-    local ts
-    ts=$(date +%s)
-    local date_path
-    date_path=$(date +%Y/%m)
-    local remote_path="_attachments/${date_path}/${ts}-${basename}"
-
-    # Python generates JSON payload with base64 content, piped to curl.
-    # This avoids shell ARG_MAX limits for large images.
     local response
-    response=$(GITEE_TOKEN="$GITEE_TOKEN" python3 -c "
-import base64, json, os, sys
-with open(sys.argv[1], 'rb') as f:
-    content_b64 = base64.b64encode(f.read()).decode()
-print(json.dumps({
-    'access_token': os.environ['GITEE_TOKEN'],
-    'message': 'chore: upload attachment ' + sys.argv[2],
-    'content': content_b64
-}))" "$image_path" "$basename" | curl -s --max-time 60 -X POST \
-        "https://gitee.com/api/v5/repos/turningsyn/${repo}/contents/${remote_path}" \
-        -H "Content-Type: application/json" \
-        -d @-)
+    response=$(_pm_ae_git upload-image --repo "$repo" --file "$image_path" 2>&1) || {
+        err "图片上传失败"
+        echo "$response" >&2
+        return 1
+    }
 
     local download_url
-    download_url=$(echo "$response" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('content',{}).get('download_url',''))" 2>/dev/null || true)
+    download_url=$(echo "$response" | python3 -c "import json,sys; print(json.load(sys.stdin).get('download_url',''))" 2>/dev/null || true)
 
     if [[ -n "$download_url" ]]; then
         echo "$download_url"
@@ -173,27 +128,21 @@ print(json.dumps({
 }
 
 # _pm_gitee_add_comment <repo> <issue_number> <body>
-# Posts a comment on an existing issue, prints comment URL.
+# Posts a comment on an existing issue.
 _pm_gitee_add_comment() {
     local repo="$1" issue_number="$2" body="$3"
-
-    _pm_load_gitee_token
 
     info "正在评论 ${BOLD}${repo}#${issue_number}${NC} ..."
 
     local response
-    response=$(GITEE_TOKEN="$GITEE_TOKEN" python3 -c "
-import json, sys, os
-print(json.dumps({
-    'access_token': os.environ['GITEE_TOKEN'],
-    'body': sys.argv[1]
-}))" "$body" | curl -s --max-time 30 -X POST \
-        "https://gitee.com/api/v5/repos/turningsyn/${repo}/issues/${issue_number}/comments" \
-        -H "Content-Type: application/json" \
-        -d @-)
+    response=$(_pm_ae_git issues comment --repo "$repo" --number "$issue_number" --body "$body" 2>&1) || {
+        err "评论失败"
+        echo "$response"
+        exit 1
+    }
 
     local comment_id
-    comment_id=$(echo "$response" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null || true)
+    comment_id=$(echo "$response" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || true)
 
     if [[ -n "$comment_id" ]]; then
         ok "评论成功！"

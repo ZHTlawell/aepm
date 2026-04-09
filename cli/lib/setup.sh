@@ -236,20 +236,22 @@ _setup_credentials() {
         [[ -f "$f" ]] && existing_cred="$f" && break
     done
 
+    local ae_git="$(dirname "$AE_CLI_DIR")/scripts/ae-git.py"
+
     if [[ -n "$existing_cred" ]]; then
         # Validate existing token
         source "$existing_cred"
         if [[ -n "${GITEE_TOKEN:-}" ]]; then
-            unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
             local resp
-            resp=$(curl -s --max-time 10 -o /dev/null -w "%{http_code}" \
-                "https://gitee.com/api/v5/user?access_token=$GITEE_TOKEN" 2>/dev/null) || resp="000"
+            resp=$(python3 "$ae_git" --token "$GITEE_TOKEN" auth validate 2>/dev/null) || resp=""
+            local valid
+            valid=$(echo "$resp" | python3 -c "import json,sys; print(json.load(sys.stdin).get('valid',False))" 2>/dev/null) || valid="False"
 
-            if [[ "$resp" == "200" ]]; then
+            if [[ "$valid" == "True" ]]; then
                 ok "  Gitee Token 已配置且有效"
                 return 0
             else
-                warn "  已有 Token 无效 (HTTP $resp)，需要重新配置"
+                warn "  已有 Token 无效，需要重新配置"
             fi
         fi
     fi
@@ -272,13 +274,13 @@ _setup_credentials() {
     done
 
     # Validate before saving
-    unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
     local resp
-    resp=$(curl -s --max-time 10 -o /dev/null -w "%{http_code}" \
-        "https://gitee.com/api/v5/user?access_token=$token" 2>/dev/null) || resp="000"
+    resp=$(python3 "$ae_git" --token "$token" auth validate 2>/dev/null) || resp=""
+    local valid
+    valid=$(echo "$resp" | python3 -c "import json,sys; print(json.load(sys.stdin).get('valid',False))" 2>/dev/null) || valid="False"
 
-    if [[ "$resp" != "200" ]]; then
-        err "  Token 验证失败 (HTTP $resp)。请检查 Token 是否正确。"
+    if [[ "$valid" != "True" ]]; then
+        err "  Token 验证失败。请检查 Token 是否正确。"
         echo "  你可以稍后运行 ${BOLD}ae setup${NC} 重新配置。"
         return 1
     fi
@@ -348,10 +350,11 @@ _setup_onboarding() {
     fi
 
     # Get user name from Gitee API
-    unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
+    local ae_git="$(dirname "$AE_CLI_DIR")/scripts/ae-git.py"
+    local user_info
+    user_info=$(python3 "$ae_git" auth user 2>/dev/null) || user_info=""
     local user_name
-    user_name=$(curl -s --max-time 10 "https://gitee.com/api/v5/user?access_token=$GITEE_TOKEN" 2>/dev/null \
-        | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('name', d.get('login', '')))" 2>/dev/null) || user_name=""
+    user_name=$(echo "$user_info" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('name','') or d.get('login',''))" 2>/dev/null) || user_name=""
 
     if [[ -z "$user_name" ]]; then
         warn "  无法获取 Gitee 用户名，跳过入驻确认"
@@ -362,20 +365,14 @@ _setup_onboarding() {
 
     # Post comment to onboarding issue
     local resp
-    resp=$(curl -s --max-time 15 -X POST \
-        "https://gitee.com/api/v5/repos/turningsyn/ae-pm/issues/IHQ4H7/comments" \
-        -H "Content-Type: application/json" \
-        -d "$(python3 -c "
-import json, os, sys
-print(json.dumps({
-    'access_token': os.environ.get('GITEE_TOKEN', ''),
-    'body': f'**{sys.argv[1]}** 已通过 ae setup 完成环境搭建 ✓'
-}))" "$user_name")" 2>/dev/null)
+    resp=$(python3 "$ae_git" issues comment \
+        --repo ae-pm --number IHQ4H7 \
+        --body "**${user_name}** 已通过 ae setup 完成环境搭建 ✓" 2>/dev/null) || resp=""
 
-    local comment_url
-    comment_url=$(echo "$resp" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('html_url',''))" 2>/dev/null || true)
+    local comment_id
+    comment_id=$(echo "$resp" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || true)
 
-    if [[ -n "$comment_url" ]]; then
+    if [[ -n "$comment_id" ]]; then
         ok "  入驻确认成功"
     else
         warn "  入驻确认失败（不影响使用，可稍后重试）"

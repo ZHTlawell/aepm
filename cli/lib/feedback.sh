@@ -117,9 +117,6 @@ _feedback_upload() {
         return 0
     fi
 
-    # Load Gitee credentials
-    _feedback_load_gitee_token || return 0
-
     # Build markdown comment body
     local body
     body=$(_feedback_build_markdown)
@@ -129,22 +126,28 @@ _feedback_upload() {
         return 1
     fi
 
-    # Post to Gitee
+    # Post to Gitee via ae-git.py
     info "上传反馈到 Gitee..."
 
+    local ae_git="$(dirname "$AE_CLI_DIR")/scripts/ae-git.py"
+    if [[ ! -f "$ae_git" ]]; then
+        err "ae-git.py 未找到"
+        return 1
+    fi
+
     local response
-    response=$(GITEE_TOKEN="$GITEE_TOKEN" python3 -c "
-import json, sys, os
-print(json.dumps({
-    'access_token': os.environ['GITEE_TOKEN'],
-    'body': sys.argv[1]
-}))" "$body" | curl -s --max-time 30 -X POST \
-        "https://gitee.com/api/v5/repos/turningsyn/${FEEDBACK_ISSUE_REPO}/issues/${FEEDBACK_ISSUE_NUMBER}/comments" \
-        -H "Content-Type: application/json" \
-        -d @-)
+    response=$(python3 "$ae_git" issues comment \
+        --repo "$FEEDBACK_ISSUE_REPO" \
+        --number "$FEEDBACK_ISSUE_NUMBER" \
+        --body "$body" 2>&1) || {
+        err "上传失败"
+        echo "$response"
+        warn "反馈保留在本地，下次再试。"
+        return 1
+    }
 
     local comment_id
-    comment_id=$(echo "$response" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null || true)
+    comment_id=$(echo "$response" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || true)
 
     if [[ -n "$comment_id" ]]; then
         ok "反馈上传成功！"
@@ -155,7 +158,7 @@ print(json.dumps({
         # Archive uploaded entries
         _feedback_archive
     else
-        err "上传失败，API 返回:"
+        err "上传失败"
         echo "$response"
         warn "反馈保留在本地，下次再试。"
     fi
@@ -200,23 +203,7 @@ _check_and_upload_feedback() {
 
 # ── Internal helpers ─────────────────────────────────────────────────
 
-_feedback_load_gitee_token() {
-    local loaded=false
-    for f in "$HOME/.config/ae/credentials.env" "$HOME/.config/ae-pm/credentials.env"; do
-        if [[ -f "$f" ]]; then
-            source "$f"
-            loaded=true
-            break
-        fi
-    done
-    if ! $loaded || [[ -z "${GITEE_TOKEN:-}" ]]; then
-        warn "Gitee token 未配置，跳过反馈上传。"
-        return 1
-    fi
-    # Clear proxy for Gitee access
-    unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
-    return 0
-}
+## _feedback_load_gitee_token — removed, auth now handled by ae-git.py
 
 # Build a markdown comment body from all pending feedback
 _feedback_build_markdown() {

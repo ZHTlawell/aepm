@@ -118,34 +118,30 @@ _check_any() {
 }
 
 _check_gitee_token() {
-    local cred=""
-    for f in "$HOME/.config/ae/credentials.env" "$HOME/.config/ae-pm/credentials.env"; do
-        if [[ -f "$f" ]]; then cred="$f"; break; fi
-    done
-    if [[ -z "$cred" ]]; then
-        printf "  ${RED}✗${NC} %-22s %s\n" "Gitee Token" "未配置"
+    local ae_git="$(dirname "$AE_CLI_DIR")/scripts/ae-git.py"
+    if [[ ! -f "$ae_git" ]]; then
+        printf "  ${RED}✗${NC} %-22s %s\n" "Gitee Token" "ae-git.py 未找到"
         all_ok=false
         return
     fi
 
-    # Source and test token (without proxy)
-    # Save and restore proxy vars to avoid side effects
+    # Save and restore proxy vars to avoid side effects on the bash process
     local _saved_http_proxy="${http_proxy:-}" _saved_https_proxy="${https_proxy:-}"
-    source "$cred"
-    unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy 2>/dev/null
 
     local resp
-    resp=$(curl -s --max-time 10 -o /dev/null -w "%{http_code}" \
-        "https://gitee.com/api/v5/user?access_token=$GITEE_TOKEN" 2>/dev/null) || resp="000"
+    resp=$(python3 "$ae_git" auth validate 2>/dev/null) || resp=""
 
-    # Restore proxy
+    # Restore proxy (ae-git.py clears proxy in its subprocess)
     [[ -n "$_saved_http_proxy" ]] && export http_proxy="$_saved_http_proxy"
     [[ -n "$_saved_https_proxy" ]] && export https_proxy="$_saved_https_proxy"
 
-    if [[ "$resp" == "200" ]]; then
+    local valid
+    valid=$(echo "$resp" | python3 -c "import json,sys; print(json.load(sys.stdin).get('valid',False))" 2>/dev/null) || valid="False"
+
+    if [[ "$valid" == "True" ]]; then
         printf "  ${GREEN}✓${NC} %-22s %s\n" "Gitee Token" "有效"
     else
-        printf "  ${RED}✗${NC} %-22s %s\n" "Gitee Token" "无效 (HTTP $resp)"
+        printf "  ${RED}✗${NC} %-22s %s\n" "Gitee Token" "无效"
         all_ok=false
     fi
 }
