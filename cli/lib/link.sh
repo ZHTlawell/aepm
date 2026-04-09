@@ -231,7 +231,10 @@ _link_role() {
     # 2.5 Register role skills in Claude Code global additionalDirectories
     _register_link_global_skills "$role"
 
-    # 3. Add reference to CLAUDE.md if not already present
+    # 3. Set up user overrides directory
+    _setup_overrides_dir "$project_dir"
+
+    # 4. Add reference to CLAUDE.md if not already present
     local claude_md="$project_dir/CLAUDE.md"
     local marker="~/.ae/$role/CLAUDE.md"
 
@@ -243,4 +246,65 @@ _link_role() {
         echo "请同时遵守 $marker 中的技术选型约束和工作流。" >> "$claude_md"
         ok "  已在 CLAUDE.md 中添加 ae-$role 引用"
     fi
+}
+
+# Create project/.claude/overrides/ directory for user customizations.
+# Overrides are .md files that Claude Code reads as additional context,
+# allowing users to override default AE behavior without modifying skills.
+# ae update does NOT touch this directory — it lives in the user's project.
+_setup_overrides_dir() {
+    local project_dir="$1"
+    local overrides_dir="$project_dir/.claude/overrides"
+
+    # Idempotent: skip if already set up
+    if [[ -d "$overrides_dir" && -f "$overrides_dir/README.md" ]]; then
+        ok "  overrides/ 目录已存在"
+    else
+        mkdir -p "$overrides_dir"
+        cat > "$overrides_dir/README.md" <<'READMEEOF'
+# AE Overrides
+
+此目录中的 `.md` 文件会被 Claude Code 自动读取，用于覆盖 AE 默认行为。
+`ae update` 不会修改此目录中的文件。
+
+## 示例
+
+创建文件 `skip-privacy-check.md`：
+
+```
+ae-preflight 执行时，跳过隐私声明（PrivacyInfo.xcprivacy）检查项。
+原因：本项目暂不上架 App Store，不需要隐私声明。
+```
+
+创建文件 `custom-issue-routing.md`：
+
+```
+提交 bug 和需求时，目标仓库使用 my-team-repo 而非 ae-pm。
+```
+READMEEOF
+        ok "  已创建 overrides/ 目录（用户自定义覆盖）"
+    fi
+
+    # Register overrides/ in settings.local.json as additionalDirectories
+    local settings_file="$project_dir/.claude/settings.local.json"
+    python3 - "$overrides_dir" "$settings_file" <<'PYEOF'
+import sys, os, json
+
+overrides_dir, settings_file = sys.argv[1], sys.argv[2]
+
+settings = {}
+if os.path.isfile(settings_file):
+    try:
+        with open(settings_file) as f:
+            settings = json.load(f)
+    except:
+        pass
+
+dirs = settings.setdefault("permissions", {}).setdefault("additionalDirectories", [])
+if overrides_dir not in dirs:
+    dirs.append(overrides_dir)
+    with open(settings_file, "w") as f:
+        json.dump(settings, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+PYEOF
 }

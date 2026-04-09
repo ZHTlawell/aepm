@@ -66,6 +66,8 @@ _update_repo() {
     fi
     branch="${branch:-main}"
 
+    # NOTE: User overrides live in project/.claude/overrides/ (not in ~/.ae/),
+    # so git pull on ~/.ae/<role>/ does not affect them.
     info "更新 $name..."
     if (cd "$dir" && git pull origin "$branch" 2>/dev/null); then
         after=$(cd "$dir" && git rev-parse HEAD 2>/dev/null)

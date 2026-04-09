@@ -95,6 +95,21 @@ ae_doctor() {
         fi
     fi
 
+    # ── User Overrides ──
+    local overrides_dir="$PWD/.claude/overrides"
+    if [[ -d "$overrides_dir" ]]; then
+        local override_count
+        override_count=$(find "$overrides_dir" -name "*.md" ! -name "README.md" | wc -l | tr -d ' ')
+        if [[ "$override_count" -gt 0 ]]; then
+            printf "\n${BOLD}User Overrides${NC}\n"
+            echo "──────────────────"
+            find "$overrides_dir" -name "*.md" ! -name "README.md" -exec basename {} \; | while read f; do
+                printf "  %s %s\n" "📝" "$f"
+            done
+            echo ""
+        fi
+    fi
+
     # ── Summary ──
     if $all_ok; then
         ok "环境就绪 ✓"

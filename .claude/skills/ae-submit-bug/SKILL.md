@@ -9,6 +9,10 @@ dependencies:
   api_keys:
     - GITEE_TOKEN
   scripts: []
+smoke_test:
+  command: "ae --version"
+  expected_exit: 0
+  description: "ae CLI available"
 ---
 
 # Skill: 提交 Bug (submit-bug)

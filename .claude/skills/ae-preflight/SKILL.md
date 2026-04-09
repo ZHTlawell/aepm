@@ -20,6 +20,10 @@ dependencies:
       verify: "sips --help"
   api_keys: []
   scripts: []
+smoke_test:
+  command: "xcodebuild -version"
+  expected_exit: 0
+  description: "xcodebuild available"
 ---
 
 # Skill: iOS 发布前预检 (ae-preflight)

@@ -211,12 +211,19 @@ for path in skill_paths:
     deps = fm.get('dependencies', {})
     if not isinstance(deps, dict):
         deps = {}
+    smoke_test = fm.get('smoke_test', None)
 
     entry = {
         'description': desc,
         'type': 'internal',
         'deprecated': bool(deprecated),
     }
+    if smoke_test and isinstance(smoke_test, dict) and 'command' in smoke_test:
+        entry['smoke_test'] = {
+            'command': str(smoke_test.get('command', '')),
+            'expected_exit': int(smoke_test.get('expected_exit', 0)),
+            'description': str(smoke_test.get('description', '')),
+        }
     if deprecated:
         if deprecated_since:
             entry['deprecated_since'] = str(deprecated_since)
@@ -285,6 +292,15 @@ for sname in sorted_names:
                         lines.append('          verify: \"' + str(item['verify']) + '\"')
                 else:
                     lines.append('        - ' + str(item))
+
+    # Smoke test (optional)
+    smoke = entry.get('smoke_test')
+    if smoke:
+        lines.append('    smoke_test:')
+        lines.append('      command: \"' + str(smoke.get('command', '')) + '\"')
+        lines.append('      expected_exit: ' + str(smoke.get('expected_exit', 0)))
+        lines.append('      description: \"' + str(smoke.get('description', '')) + '\"')
+
     lines.append('')
 
 print('\n'.join(lines))

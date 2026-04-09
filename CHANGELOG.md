@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.29.0 (2026-04-09) — Skill 供应链 Wave 4：用户覆盖 + 冒烟测试 `#II96KG`
+
+### 新功能
+- **用户 overrides 机制** — `ae link` 自动创建 `project/.claude/overrides/` 目录，用户定制不被 `ae update` 覆盖 (#II96KG)
+- **冒烟测试框架** — SKILL.md 可声明 `smoke_test`，`publish.sh` Step 3.6 自动执行 (#II96KG)
+- **ae doctor 显示 overrides** — 检测并列出项目中的用户覆盖文件 (#II96KG)
+
 ## v0.28.0 (2026-04-09) — Skill 供应链 Wave 3：manifest.yml + CLAUDE.md 模块化 `#II96KG`
 
 ### 新功能
