@@ -142,6 +142,7 @@ CLI 会自动加载 credentials、调用 Gitee API、返回 issue 链接。
 | Onboarding 页面生成 | `/ae-onboarding-design` — 生成产品 Onboarding 幻灯片（HTML/CSS/JS，Superwall Flow 或 WebView） | 可用 |
 | Paywall 页面生成 | `/ae-paywall-design` — 生成 Paywall 付费墙页面（HTML 或 Native StoreKit 2） | 可用 |
 | Superwall 集成 | `/ae-superwall-setup` — Superwall 账号配置、SDK 集成、Placement 注册引导 | 可用 |
+| Skill 构建 | `/ae-skill-creator` — 标准化 skill 构建全流程（六段标准 + 审计模式） | 可用 |
 | 查收更新 | 自动检查新版本（每 24h）+ 查看 CHANGELOG.md 了解更新内容 | 可用 |
 
 ### 调用 Dev Agent 生成成品

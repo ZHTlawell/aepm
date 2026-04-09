@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.30.0 (2026-04-09) — ae-skill-creator：标准化 skill 构建 skill `#II99OK`
+
+### 新功能
+- **ae-skill-creator skill** — 标准化 skill 构建全流程引导（需求澄清→核心链路跑通→SKILL.md 六段标准→场景验收→README 设计文档→发布），含审计模式可对已有 skill 进行标准化检查 (#II99OK)
+- **Skill 目录结构标准** — 每个 skill 推荐包含 SKILL.md（必须）+ README.md（人类设计文档）+ test-scenarios.md（用户场景验收清单） (#II99OK)
+- **SKILL.md 六段标准** — frontmatter / 身份锚定 / 操作流程 / 硬性规则(3-7条) / 反模式(❌→) / 故障排查表 (#II99OK)
+- **已有 skill 审计基线** — 对 ae-preflight(4/8)、ae-image-decopyrighter(3/8)、ae-file-bugs(3/8) 完成首次审计 (#II99OK)
+
 ## v0.29.0 (2026-04-09) — Skill 供应链 Wave 4：用户覆盖 + 冒烟测试 `#II96KG`
 
 ### 新功能
