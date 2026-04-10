@@ -63,3 +63,13 @@ cd ~/.ae/pm && git pull origin main
 ```
 
 **注意：** 如果 CHANGELOG 条目没有关联 issue 编号，提醒用户："这条更新没有关联 issue，无法追踪验收。建议反馈给 AE Team 要求 CHANGELOG 条目带上 issue 链接。"
+
+## 本地 workaround 清理
+
+当 CHANGELOG 条目标注了「用户清理提示」（通常来自 `/ae-report-fix` 回流的修复），**必须在验证通过后提醒用户清理本地 workaround**：
+
+> 这次更新已内置了 {功能描述}。如果你之前手动配置过 {具体配置}，现在可以移除了——skill 已内置该配置。
+
+**为什么要清理：** 本地 workaround 和官方修复同时存在不会报错，但会造成：
+- 配置冗余，用户不知道哪个在生效
+- 后续官方修复升级时，本地的旧配置可能和新版本不兼容
