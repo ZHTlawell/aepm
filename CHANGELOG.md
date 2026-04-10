@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.33.0 (2026-04-10) — TestFlight 发布 skill 实战重写 `#II8RAE`
+
+### 重写
+- **`/ae-testflight-publish` skill** — 基于 bible-app (Faithful Guide) 端到端实跑踩坑记录完全重写；融入 23 条已验证约束 (ios-pub-001~023)；覆盖 Apple 身份注册→签名配置→Archive→Upload→TestFlight 分发全流程 (#II8RAE, #II8UYE)
+  - 新增：多 Apple ID 权限分裂识别与处理（Developer Portal vs ASC 权限边界）
+  - 新增：Playwright 操作 Apple 站点的反爬对策（PointerEvent dispatch、TLS 指纹绕过）
+  - 新增：iPad 方向声明、出口合规预配置、ExportOptions.plist 模板
+  - 新增：内部测试 vs 外部测试 vs 公开链接分发路径指引
+  - 新增：constraint_candidates 收集 + publish-state.yaml 状态持久化
+
 ## v0.32.0 (2026-04-10) — 修复回流机制 `#IIAV9O`
 
 ### 新功能
