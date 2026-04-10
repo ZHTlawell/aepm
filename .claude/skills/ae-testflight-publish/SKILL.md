@@ -60,8 +60,11 @@ Phase 1 需要通过浏览器操作 Apple Developer Portal。如果 `browser_nav
 # ⚠️ 必须加 --browser chrome — Apple CDN 会 TLS 指纹检测拦截 Playwright 自带的 Chromium，
 #    导致 developer.apple.com 和 appstoreconnect.apple.com 的 CSS/JS 返回空响应（页面白屏）。
 #    使用系统 Chrome 的 TLS 指纹与正常用户一致，不会被拦截。
-claude mcp add playwright -s user -- npx @playwright/mcp@latest --browser chrome
+claude mcp add playwright -s user -- npx @playwright/mcp@latest --browser chrome --user-data-dir ~/.config/playwright-profile
 ```
+
+- `--browser chrome` — Apple CDN 通过 TLS 指纹拦截 Playwright 自带 Chromium，必须用系统 Chrome
+- `--user-data-dir` — 持久化登录态，重启浏览器/对话后无需重新登录（Apple 双重认证尤其重要）
 
 注册后需**重新开始对话**，新对话中 `browser_navigate` 等工具才会出现。
 

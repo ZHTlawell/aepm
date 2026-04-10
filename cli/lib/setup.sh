@@ -88,6 +88,25 @@ EOF
         fi
     fi
 
+    # Playwright MCP（go/pm/all 均需要：ae-web-browse + ae-testflight-publish）
+    if command -v claude &>/dev/null; then
+        if claude mcp list 2>/dev/null | grep -qi "playwright"; then
+            ok "  Playwright MCP: 已连接"
+        else
+            warn "  Playwright MCP 未连接"
+            echo "    连接方法: claude mcp add playwright -s user -- npx @playwright/mcp@latest --browser chrome --user-data-dir ~/.config/playwright-profile"
+            read -p "    是否现在连接 Playwright MCP？(y/N) " -n 1 -r
+            echo ""
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                claude mcp add playwright -s user -- npx @playwright/mcp@latest --browser chrome --user-data-dir ~/.config/playwright-profile \
+                    && ok "  Playwright MCP 连接成功（使用系统 Chrome + 持久化 profile）" \
+                    || warn "  连接失败，请手动执行上述命令"
+            fi
+        fi
+    else
+        warn "  跳过 Playwright MCP 检查（需先安装 Claude Code）"
+    fi
+
     # Figma MCP（仅 PM 角色需要）
     if [[ "$role" == "pm" || "$role" == "all" ]]; then
         if command -v claude &>/dev/null; then

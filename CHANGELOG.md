@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.31.3 (2026-04-10) — Playwright MCP 持久化登录态 `#IIAV52`
+
+### Bug 修复
+- **ae-testflight-publish Playwright 安装命令** — 增加 `--user-data-dir ~/.config/playwright-profile`，解决每次重启丢失 Apple Developer Portal 登录态的问题 (#IIAV52)
+
 ## v0.31.2 (2026-04-10) — VISION 审计：质量门禁全面补齐 `#II9DON`
 
 ### 质量基础设施
