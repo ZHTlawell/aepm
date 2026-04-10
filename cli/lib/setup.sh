@@ -94,12 +94,12 @@ EOF
             ok "  Playwright MCP: 已连接"
         else
             warn "  Playwright MCP 未连接"
-            echo "    连接方法: claude mcp add playwright -s user -- npx @playwright/mcp@latest --browser chrome --user-data-dir ~/.config/playwright-profile"
+            echo "    连接方法: claude mcp add playwright -s user -- npx @playwright/mcp@latest --browser chrome --user-data-dir ~/.config/playwright-profile --timeout-action 15000"
             read -p "    是否现在连接 Playwright MCP？(y/N) " -n 1 -r
             echo ""
             if [[ $REPLY =~ ^[Yy]$ ]]; then
-                claude mcp add playwright -s user -- npx @playwright/mcp@latest --browser chrome --user-data-dir ~/.config/playwright-profile \
-                    && ok "  Playwright MCP 连接成功（使用系统 Chrome + 持久化 profile）" \
+                claude mcp add playwright -s user -- npx @playwright/mcp@latest --browser chrome --user-data-dir ~/.config/playwright-profile --timeout-action 15000 \
+                    && ok "  Playwright MCP 连接成功（系统 Chrome + 持久化 profile + action 超时 15s）" \
                     || warn "  连接失败，请手动执行上述命令"
             fi
         fi

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.33.1 (2026-04-10) — Playwright MCP browser_click 超时修复 `#IIB4Y3`
+
+### Bug 修复
+- **Playwright MCP `--timeout-action 15000`** — 安装命令增加 action 超时参数，从默认 5s 提升到 15s，修复 Apple 重型 SPA 上 `browser_click` / `browser_fill_form` 频繁超时 (#IIB4Y3)
+- **ae-testflight-publish 故障排查表** — 新增 3 条 Playwright 超时场景（click 超时 / 元素已 visible 仍超时 / page.reload 超时）及 `force: true` workaround (#IIB4Y3)
+- **ae-testflight-publish ASC 操作指引** — 将 `browser_evaluate` PointerEvent workaround 升级为 `browser_run_code` + `force: true` 方案，更可靠 (#IIB4Y3)
+
 ## v0.33.0 (2026-04-10) — TestFlight 发布 skill 实战重写 `#II8RAE`
 
 ### 重写

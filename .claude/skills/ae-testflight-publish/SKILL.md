@@ -69,7 +69,8 @@ claude mcp list 2>/dev/null | grep playwright
 # ⚠️ 必须用 --browser chrome — Apple CDN 通过 TLS 指纹拦截 Playwright 自带 Chromium，
 #    导致 developer.apple.com 和 appstoreconnect.apple.com 的 CSS/JS 返回空响应（页面白屏）
 # ⚠️ 必须用 --user-data-dir — 持久化登录态，避免每次重新 2FA
-claude mcp add playwright -s user -- npx @playwright/mcp@latest --browser chrome --user-data-dir ~/.config/playwright-profile
+# ⚠️ 必须用 --timeout-action 15000 — Apple 重型 SPA 的 click/fill 操作默认 5s 必超时
+claude mcp add playwright -s user -- npx @playwright/mcp@latest --browser chrome --user-data-dir ~/.config/playwright-profile --timeout-action 15000
 ```
 
 注册后需**重新开始对话**，新对话中 `browser_navigate` 等工具才会出现。
@@ -217,10 +218,15 @@ Bundle ID 注册后**永远不可更改**，跟 PM 确认：
 3. browser_click → 点击「+」→「New App」
 ```
 
-**⚠️ Playwright 踩坑：** ASC 的「新建 App」对话框中，标准 `browser_click` 可能超时。需要用 `browser_evaluate` 发送底层事件：
+**⚠️ Playwright 踩坑：** ASC 是重型 React SPA，`browser_click` 在点击后等待导航稳定，经常超时。**优先用 `browser_run_code` + `force: true`：**
 
 ```javascript
-// 如果 browser_click 超时，用 evaluate 模拟点击
+// 方案 1（推荐）：force click 跳过 actionability 等待
+await page.locator('button:has-text("新建 App")').click({ force: true });
+```
+
+```javascript
+// 方案 2（兜底）：如果 locator 也不好使，用 evaluate 直接发事件
 const el = document.querySelector('button[data-test="create-app-button"]');
 if (el) {
   el.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true}));
@@ -228,6 +234,8 @@ if (el) {
   el.dispatchEvent(new MouseEvent('click', {bubbles: true}));
 }
 ```
+
+> **通用规则：** Apple 页面上所有 `browser_click` 超时都可用 `browser_run_code` + `page.locator('...').click({ force: true })` 替代。
 
 继续填写表单：
 
@@ -682,7 +690,9 @@ testflight_publish:
 |------|------|------|
 | Apple 页面白屏 / CSS 不加载 | Playwright 用了内置 Chromium，被 TLS 指纹拦截 | 必须 `--browser chrome` 用系统 Chrome |
 | 登录后 session 丢失（每次对话都要重新登录） | 未配置持久化 profile | 加 `--user-data-dir ~/.config/playwright-profile` |
-| ASC 对话框点击超时 | React 组件事件绑定不兼容 Playwright 标准 click | 用 `browser_evaluate` 发送 PointerEvent |
+| `browser_click` / `browser_fill_form` 5s 超时 | Playwright MCP 默认 `--timeout-action 5000`，Apple 重型 SPA 操作耗时超 5s | 重新注册 MCP 加 `--timeout-action 15000`；仍超时则用 `browser_run_code` + `{ force: true }` |
+| ASC 对话框点击超时（元素已 visible/stable） | React 组件事件绑定 + 点击触发 SPA 导航，Playwright actionability check 等到超时 | 用 `browser_run_code` 执行 `page.locator('...').click({ force: true })` 跳过 actionability 等待 |
+| `page.reload` / `browser_navigate` 超时 | 页面资源重，`load` 事件等待所有资源完成 | 用 `browser_run_code` 执行 `page.reload({ waitUntil: 'domcontentloaded' })` |
 | Apple 站点反爬检测 | 频繁操作触发 | 操作间加 2-3 秒间隔 |
 
 ### 签名 / 编译
