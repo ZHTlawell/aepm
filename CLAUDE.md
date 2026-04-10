@@ -13,9 +13,14 @@
 PM vibe coding V0 原型（在约束下）→ 能发布则发布 → 不能发布则 /ae-demo-to-speckit → Speckit → ae-dev 精细化 → 上线
 ```
 
-**反馈机制：遇到困难或发现改进机会时，必须主动引导用户向 AE Team 提 issue。** 详见下方「向 AE Team 求助」章节。
+**反馈机制：遇到困难时先尝试自行修复，修复成功后用 `/ae-report-fix` 回流方案；无法解决时用 `/ae-submit-bug` 报告问题。** 详见下方「向 AE Team 求助」章节。
 
-反馈方式：使用 `/ae-submit-requirement` skill（新能力需求）或 `/ae-submit-bug` skill（bug/疑问）。所有 issue 提交必须通过 `ae` CLI 完成，禁止创建本地文件。**AE Team 会研究、增加和修复所有合理的反馈。**
+反馈方式：
+- 修复成功 → `/ae-report-fix`（回流修复方案，AE Team review + 合并 + 推送）
+- Bug / 疑问 → `/ae-submit-bug`
+- 新能力需求 → `/ae-submit-requirement`
+
+所有提交必须通过 `ae` CLI 完成，禁止创建本地文件。**用户是最好的 skill 构建者——AE Team 负责 review、合并和分发。**
 
 ## 版本更新检查
 
@@ -135,6 +140,7 @@ CLI 会自动加载 credentials、调用 Gitee API、返回 issue 链接。
 | App 差异比对验证 | `/ae-verify-app` — E2E 对比 demo vs 成品，自动归因差异 | 可用 |
 | 提需求 | `/ae-submit-requirement` — 提交标准化的可复用能力需求 | 可用 |
 | 提 Bug | `/ae-submit-bug` — 通过 CLI 提交 bug 报告到 Gitee | 可用 |
+| 修复回流 | `/ae-report-fix` — 本地修复成功后，结构化回流方案给 AE Team | 可用 |
 | 批量提 Bug | `/ae-file-bugs` — 从 verify-app diff report 自动生成 issue，PM 确认后批量提交 | 可用 |
 | 图片去版权化 | `/ae-image-decopyrighter` — 将有版权图片 AI 重绘为可商用替代（Gemini Imagen 4.0） | 可用 |
 | 飞书消息与会议 | `/ae-lark-feishu` — 搜索群聊、读取/搜索消息、下载图片、会议妙记/逐字稿、发送消息 | 可用 |
@@ -193,4 +199,4 @@ PM vibe coding 时必须遵守的技术栈约束。**完整约束请读取：** 
 3. **透明** — 执行 API 调用时告知用户正在做什么
 4. **中文优先** — 与用户交互默认使用中文
 5. **需求即能力** — 鼓励用户将需求表达为可复用的机制，而非一次性任务
-6. **发现问题当场提 issue** — 执行任何 `/ae-*` skill 过程中发现脚本 bug、流程缺陷、工具不好用时，**当场使用 `/ae-submit-bug` 或 `ae pm submit-bug "标题" "描述"` 提交 issue，然后继续当前任务**。不要积攒到最后汇总——即时反馈让 AE Team 能更快修复
+6. **不要让修复经验沉没** — 执行任何 `/ae-*` skill 过程中遇到问题：**先尝试自行修复。修复成功后建议用户 `/ae-report-fix` 回流方案；无法修复则 `/ae-submit-bug` 报告问题**。不要积攒——即时回流让所有用户受益

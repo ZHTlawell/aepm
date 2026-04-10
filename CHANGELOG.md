@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.32.0 (2026-04-10) — 修复回流机制 `#IIAV9O`
+
+### 新功能
+- **`/ae-report-fix` skill** — 用户/agent 本地修复成功后，结构化回流修复方案给 AE Team（采集→格式化→提交 issue comment→确认） (#IIAV9O)
+
+### 原则更新
+- **"不要替用户忍耐" → "不要让修复经验沉没"** — 鼓励用户先尝试自行修复，修复成功后回流方案；AE Team 角色从"全栈修复者"变为"质量守门人 + 分发者" (#IIAV9O)
+- **escalation-guide 新增场景 7** — 自行修复成功 → 建议 `/ae-report-fix` 回流 (#IIAV9O)
+- **场景 3 更新** — Skill 不好用时先尝试自行修复，不再直接跳到提 bug (#IIAV9O)
+
 ## v0.31.3 (2026-04-10) — Playwright MCP 持久化登录态 `#IIAV52`
 
 ### Bug 修复
