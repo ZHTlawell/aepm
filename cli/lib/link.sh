@@ -194,6 +194,57 @@ PYEOF
     fi
 }
 
+# Record a (role, project_dir) pair in ~/.ae/.linked-projects so that
+# ae update can refresh symlinks when new skills are added.
+_track_linked_project() {
+    local role="$1"
+    local project_dir="$2"
+    local registry="$AE_HOME/.linked-projects"
+
+    local entry="$role	$project_dir"
+    if [[ -f "$registry" ]] && grep -qxF "$entry" "$registry" 2>/dev/null; then
+        return 0  # already tracked
+    fi
+    echo "$entry" >> "$registry"
+}
+
+# Sync skill symlinks for a single role into a project. Creates missing
+# symlinks and removes broken ones. Used by both ae link and ae update.
+_sync_skill_symlinks() {
+    local role="$1"
+    local project_dir="$2"
+    local ae_role_dir="$AE_HOME/$role"
+
+    local skills_dir="$project_dir/.claude/skills"
+    mkdir -p "$skills_dir"
+
+    local linked=0
+    local skipped=0
+    local repaired=0
+    for skill_dir in "$ae_role_dir/.claude/skills/"*/; do
+        [[ -f "$skill_dir/SKILL.md" ]] || continue
+        local name
+        name=$(basename "$skill_dir")
+
+        # Repair broken symlinks (target was deleted/moved)
+        if [[ -L "$skills_dir/$name" && ! -e "$skills_dir/$name" ]]; then
+            rm -f "$skills_dir/$name"
+            ln -sf "$skill_dir" "$skills_dir/$name"
+            ((repaired++))
+            continue
+        fi
+
+        if [[ -L "$skills_dir/$name" || -d "$skills_dir/$name" ]]; then
+            ((skipped++))
+            continue
+        fi
+        ln -sf "$skill_dir" "$skills_dir/$name"
+        ((linked++))
+    done
+
+    echo "$linked $skipped $repaired"
+}
+
 _link_role() {
     local role="$1"
     local project_dir="$2"
@@ -207,23 +258,20 @@ _link_role() {
     info "在 $project_dir 启用 ae-$role..."
 
     # 1. Link skills (dedup: skip if already exists from any role)
-    local skills_dir="$project_dir/.claude/skills"
-    mkdir -p "$skills_dir"
+    local result
+    result=$(_sync_skill_symlinks "$role" "$project_dir")
+    local linked skipped repaired
+    linked=$(echo "$result" | cut -d' ' -f1)
+    skipped=$(echo "$result" | cut -d' ' -f2)
+    repaired=$(echo "$result" | cut -d' ' -f3)
 
-    local linked=0
-    local skipped=0
-    for skill_dir in "$ae_role_dir/.claude/skills/"*/; do
-        [[ -f "$skill_dir/SKILL.md" ]] || continue
-        local name
-        name=$(basename "$skill_dir")
-        if [[ -L "$skills_dir/$name" || -d "$skills_dir/$name" ]]; then
-            ((skipped++))
-            continue
-        fi
-        ln -sf "$skill_dir" "$skills_dir/$name"
-        ((linked++))
-    done
-    ok "  链接了 $linked 个 skills$(( skipped > 0 )) && echo -n "，跳过 $skipped 个已存在的" || true"
+    local msg="  链接了 ${linked} 个 skills"
+    (( skipped > 0 )) && msg="${msg}，跳过 ${skipped} 个已存在的"
+    (( repaired > 0 )) && msg="${msg}，修复 ${repaired} 个失效链接"
+    ok "$msg"
+
+    # 1.5 Track this project for ae update refresh
+    _track_linked_project "$role" "$project_dir"
 
     # 2. Merge skill permissions into project settings.local.json
     _merge_skill_permissions "$project_dir" "$ae_role_dir"

@@ -29,6 +29,11 @@ ae_update() {
     # Clear update cache since we just updated
     rm -f "$HOME/.config/ae/.update-available"
 
+    # Refresh skill symlinks in all linked projects
+    if $any_updated; then
+        _refresh_linked_projects
+    fi
+
     # Check for pending feedback and offer to upload
     source_lib "feedback"
     _check_and_upload_feedback
@@ -38,6 +43,51 @@ ae_update() {
         ok "更新完成。所有通过软链接挂载的项目自动生效。"
     else
         ok "所有组件已是最新。"
+    fi
+}
+
+# After ae update pulls new skills, refresh symlinks in all previously
+# linked projects so new skills appear without manual re-linking.
+_refresh_linked_projects() {
+    local registry="$AE_HOME/.linked-projects"
+    [[ -f "$registry" ]] || return 0
+
+    source_lib "link"
+
+    local total_new=0
+    local total_repaired=0
+    local stale_lines=()
+
+    while IFS=$'\t' read -r role project_dir; do
+        [[ -z "$role" || -z "$project_dir" ]] && continue
+
+        # Prune stale entries (project no longer exists)
+        if [[ ! -d "$project_dir/.claude/skills" ]]; then
+            stale_lines+=("$role	$project_dir")
+            continue
+        fi
+
+        local result
+        result=$(_sync_skill_symlinks "$role" "$project_dir")
+        local linked repaired
+        linked=$(echo "$result" | cut -d' ' -f1)
+        repaired=$(echo "$result" | cut -d' ' -f3)
+        (( total_new += linked ))
+        (( total_repaired += repaired ))
+    done < "$registry"
+
+    # Remove stale entries
+    if (( ${#stale_lines[@]} > 0 )); then
+        for stale in "${stale_lines[@]}"; do
+            grep -vxF "$stale" "$registry" > "$registry.tmp" 2>/dev/null && mv "$registry.tmp" "$registry"
+        done
+    fi
+
+    if (( total_new > 0 || total_repaired > 0 )); then
+        local msg="  刷新已链接项目："
+        (( total_new > 0 )) && msg="$msg 新增 $total_new 个 skill 链接"
+        (( total_repaired > 0 )) && msg="$msg 修复 $total_repaired 个失效链接"
+        ok "$msg"
     fi
 }
 

@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.35.1 (2026-04-13) — ae update 自动刷新已链接项目的 skill 软链接 `#IIOQ0R`
+
+### 修复
+- **ae link** — 提取 `_sync_skill_symlinks` 公共函数，新增失效链接自动修复（#IIOQ0R）
+- **ae update** — 拉取新 skill 后自动刷新所有已链接项目的软链接，无需手动 re-link（#IIOQ0R）
+- **已链接项目追踪** — `ae link` 时记录 (role, project_dir) 到 `~/.ae/.linked-projects`，`ae update` 据此定位需要刷新的项目（#IIOQ0R）
+
+## v0.35.0 (2026-04-13) — App Store Connect CLI 封装 `#IIOOTZ`
+
+### 新功能
+- **`ae asc` CLI** — App Store Connect REST API 封装，替代 Playwright 浏览器自动化（#IIOOTZ）
+  - `ae asc auth validate` — JWT 凭据验证
+  - `ae asc app list/create` — App 管理
+  - `ae asc bundle-id list/register` — Bundle ID 管理
+  - `ae asc testflight list-builds/create-group/add-tester/set-compliance` — TestFlight 全流程
+- 依赖 PyJWT + cryptography，通过 ASC API Key（.p8）认证，无需 2FA
+
 ## v0.34.0 (2026-04-13) — 埋点 skill 新建 + 供应链 skill 实战更新 `#II8RAE` `#II8UYE`
 
 ### 新功能

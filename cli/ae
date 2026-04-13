@@ -66,6 +66,12 @@ ${BOLD}COMMANDS${NC}
         upload-image --repo REPO --file PATH
         auth validate/user
 
+    ${BOLD}asc${NC} <subcommand>     App Store Connect API 工具
+        auth validate                      验证 ASC 凭据
+        app list/create                    App 管理
+        bundle-id list/register            Bundle ID 管理
+        testflight list-builds/create-group/add-tester/set-compliance
+
     ${BOLD}link${NC} <role> [dir]    在项目中启用 ae-pm / ae-dev / ae-go
     ${BOLD}feedback${NC}             管理使用反馈（查看/上传/清除）
     ${BOLD}manifest${NC} <sub> <role> 生成/查看能力清单（generate | show）
@@ -140,6 +146,14 @@ main() {
                 exit 1
             fi
             python3 "$ae_git" "$@"
+            ;;
+        asc)
+            local ae_asc="$(dirname "$AE_CLI_DIR")/scripts/ae-asc.py"
+            if [[ ! -f "$ae_asc" ]]; then
+                err "ae-asc.py 未找到: $ae_asc"
+                exit 1
+            fi
+            python3 "$ae_asc" "$@"
             ;;
         link)
             source_lib "link"
