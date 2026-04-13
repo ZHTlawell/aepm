@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.34.0 (2026-04-13) — 埋点 skill 新建 + 供应链 skill 实战更新 `#II8RAE` `#II8UYE`
+
+### 新功能
+- **`/ae-analytics-setup` skill** — Firebase Analytics + Adjust SDK 双轨埋点全流程，含杭州团队协作步骤、AnalyticsService 封装层、核心漏斗事件模板 (#II8RAE)
+
+### 更新
+- **`/ae-superwall-setup`** — 基于 WePray 实战完全重写：融入文龙确认的 Superwall + StoreKit 2 方案，增加 ASC 订阅商品创建 (Playwright)、Adjust 付费事件联动、Sandbox 测试流程、杭州团队协助项 (#II8RAE)
+- **`/ae-testflight-publish`** — 增加埋点作为推荐前置条件 (约束 ios-pub-027)；新增 4 条约束 (ios-pub-024~027)：账号迁移、DPLA 协议、Adjust Connection、盲测警告；管线关系图增加 ae-analytics-setup 节点 (#II8RAE)
+- **`/ae-preflight`** — 增加 Phase 3.5 埋点 SDK 检查（Firebase/Adjust 缺失警告）；增加 DPLA 协议提示；管线关系图更新 (#II8RAE)
+
 ## v0.33.1 (2026-04-10) — Playwright MCP browser_click 超时修复 `#IIB4Y3`
 
 ### Bug 修复

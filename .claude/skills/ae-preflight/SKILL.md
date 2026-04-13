@@ -171,6 +171,34 @@ grep -rn "privacy\|legal\|consent\|GDPR\|terms" --include="*.swift" . -i
 
 - 无任何合规提示 → 警告（App Store 审核可能被拒）
 
+### Phase 3.5: 埋点 SDK 检查（建议项）
+
+**3.5a. Firebase Analytics**
+
+```bash
+# 检查 Firebase SDK 是否已接入
+grep -rn "FirebaseAnalytics\|import Firebase\|Analytics.logEvent" --include="*.swift" .
+# 检查 GoogleService-Info.plist
+find . -name "GoogleService-Info.plist" -not -path "*/Pods/*"
+```
+
+- 均无匹配 → 警告：无埋点的 TestFlight 版本等于盲测，建议先跑 `/ae-analytics-setup`
+- 有 SDK 但无 plist → 阻塞：Firebase 初始化会 crash
+
+**3.5b. Adjust SDK**
+
+```bash
+grep -rn "import Adjust\|ADJConfig\|Adjust.initSdk" --include="*.swift" .
+```
+
+- 无匹配 → 警告：无归因数据，投放无法追踪
+
+**3.5c. DPLA 协议提示**
+
+```
+⚠️ 如果近期更换了 Apple Developer 账号或长时间未登录，Account Holder 可能需要接受更新的 DPLA 协议，否则无法创建新 App 或上传构建。建议在 Phase 结束前提醒 PM 确认。
+```
+
 ### Phase 4: 资产完整性
 
 **4a. App Icon**
@@ -212,6 +240,8 @@ BLOCKERS (必须修复才能继续):
 WARNINGS (建议修复):
   ⚠️ [合规] 无首次启动隐私合规弹窗
   ⚠️ [支付] Paywall 无 StoreKit 集成，Restore 为空实现
+  ⚠️ [埋点] 无 Firebase Analytics 接入 → 建议 /ae-analytics-setup
+  ⚠️ [埋点] 无 Adjust SDK → 投放归因缺失
 
 PASSED:
   ✅ [秘钥] API Key 已外部化到 Secrets.plist
@@ -286,9 +316,10 @@ preflight:
 ```
 /ae-preflight  →  扫描 + 修复 → 编译通过
       │
-      ├── 签名阻塞 → /ae-apple-identity（注册 App ID、创建 ASC App）
+      ├── 签名阻塞 → /ae-testflight-publish Phase 1（Apple 注册）
       ├── 资产缺失 → /ae-store-assets（生成 Icon、截图、描述）
-      └── 编译通过 → /ae-ship（Archive → Upload → TestFlight）
+      ├── 埋点缺失 → /ae-analytics-setup（Firebase + Adjust）
+      └── 编译通过 → /ae-testflight-publish Phase 3-4（Archive → TestFlight）
                           │
                           └── /ae-postflight（约束闭环）
 ```

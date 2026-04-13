@@ -1,162 +1,257 @@
 ---
-description: "Superwall 账号配置、App 创建、SDK 集成引导"
+description: "Superwall 支付集成全流程 — 账号配置 + ASC 订阅商品 + SDK 接入 + StoreKit 2 购买"
+permissions:
+  allow:
+    - "mcp__playwright__*"
+    - "Bash(xcodebuild *)"
+    - "Bash(xcodegen *)"
 dependencies:
-  mcp: []
-  cli: []
+  mcp:
+    - playwright
+  cli:
+    - name: xcodebuild
+      verify: "xcodebuild -version"
   api_keys: []
   scripts: []
 smoke_test:
-  command: "echo ok"
+  command: "xcodebuild -version"
   expected_exit: 0
-  description: "guidance skill, no external dependencies"
+  description: "xcodebuild available"
 ---
 
-# Skill: Superwall 项目集成 (superwall-setup)
+# Skill: Superwall 支付集成 (ae-superwall-setup)
+
+> **经 WePray (bible-app) 实战验证。** 方案由文龙确认：走 Superwall + StoreKit 2 原生 API，不走 BCStoreKit / purchase-service。
 
 ## 触发条件
 
-当 PM 需要在 iOS 项目中集成 Superwall SDK 时触发。典型场景：
-- 0.1 产品采用"夹心"架构（Native + Superwall WebView + Native）
-- 需要配置 Superwall Dashboard 的 App、API Key、Placement
-- 项目已添加 SuperwallKit SPM 依赖但 API Key 还是 placeholder
+PM 需要在 iOS App 中集成真实 StoreKit 支付时触发。典型场景：
+- Demo 的 Paywall 只有 UI，需要接入真实购买逻辑
+- preflight 报告中标记「Paywall 无 StoreKit 集成」
+- 需要 A/B 测试不同 Paywall 方案
 
 ## 核心原则
 
-**Superwall 是 onboarding + paywall 的远程配置层，支持 A/B 测试和热更新。** 正确集成后：
-- Onboarding / Paywall 页面可在 Dashboard 远程修改，无需发版
-- 可配置 A/B 测试，对比不同页面的转化率
-- 事件触发（placement）与页面内容解耦
+1. **Superwall 管支付逻辑，Native UI 可保留** — 两种模式：Superwall 远程 Paywall（支持 A/B 测试）或 Native SwiftUI Paywall + Superwall 仅做支付处理
+2. **ASC 订阅商品必须先建好** — Superwall SDK 需要从 ASC 拉取真实商品，没有商品 = SDK 报错
+3. **杭州团队协助项前置沟通** — ASC Shared Secret、Adjust 付费事件联动等需要杭州团队配合
+
+## 角色分工
+
+| 事项 | 谁做 | 说明 |
+|------|------|------|
+| Superwall 账号注册 | PM | 建议用公司邮箱（文龙建议） |
+| ASC 订阅商品创建 | PM（agent 操作 Playwright） | 需确认 SKU + 价格 |
+| ASC Shared Secret | **杭州团队** | Superwall 验证订阅状态需要 |
+| SDK 集成代码 | Agent | SPM 引入 + 初始化 + 购买流程 |
+| Adjust 付费事件联动 | Agent + **杭州团队** | 客户端预埋 + 服务端事件需杭州配置 |
+| Sandbox 测试 | PM | 真机 Sandbox 账号完整走通购买流程 |
 
 ## 前置条件
 
-- iOS 项目已创建（Xcode）
-- 已有 Apple Developer 账号
-- SuperwallKit SPM 依赖已添加（或准备添加）
+| 条件 | 说明 |
+|------|------|
+| ae-preflight 已通过 | 编译通过 + API Key 外部化 |
+| ae-analytics-setup 已完成 | Firebase + Adjust 已接入（付费事件需联动） |
+| Apple Developer 账号 | ASC 已有 App Record |
+| ASC 订阅商品定价已确认 | 需产品/市场确认价格方案 |
 
 ## 输入
 
 | 输入 | 必填 | 说明 |
 |------|------|------|
 | iOS 项目路径 | 是 | Xcode 项目根目录 |
-| 产品名称 | 是 | 用于在 Superwall Dashboard 创建 App |
-| Placement 列表 | 否 | 默认 `app_install`（onboarding）+ `paywall` |
-| Apple App ID | 否 | 用于关联 StoreKit 产品 |
+| 产品名称 | 是 | 如 "WePray" |
+| 订阅定价方案 | 是 | Weekly/Monthly/Annual + 价格 + 试用期 |
+| ASC App ID | 是 | 如 6761982880 |
 
-## 执行流程
+---
 
-### Step 1: 检查项目状态
+## Phase 1: 前置准备（需杭州团队 + PM 配合）
 
-读取项目代码，确认：
+### Step 1.1: 确认订阅定价
 
-1. **SPM 依赖** — 检查 `Package.resolved` 或 `.xcodeproj` 中是否已有 `SuperwallKit`
-2. **现有配置** — 搜索代码中的 `Superwall.configure`，检查是否已有 API Key
-3. **App 入口** — 找到 `@main` App struct 或 `AppDelegate`，确认 SDK 初始化位置
+向 PM 确认（需与产品/市场对齐）：
 
-```bash
-# 检查 SuperwallKit 依赖
-grep -r "SuperwallKit" <project_path>/Package.resolved 2>/dev/null
-grep -r "Superwall" <project_path>/*.xcodeproj/project.pbxproj 2>/dev/null
+> **订阅方案确认：**
+>
+> | 方案 | Product ID | 价格 | 试用期 |
+> |------|-----------|------|--------|
+> | Weekly | com.{bundleid}.weekly | $X.XX/week | 无 |
+> | Monthly | com.{bundleid}.monthly | $X.XX/month | 无 |
+> | Annual | com.{bundleid}.yearly | $X.XX/year | 7天免费试用 |
+>
+> WePray 参考：Weekly $5.99 / Monthly $9.99 / Annual $39.99（7天试用）
 
-# 检查现有配置
-grep -rn "Superwall.configure\|superwallApiKey\|SUPERWALL" <project_path>/
+### Step 1.2: Superwall 账号注册
+
+引导 PM 注册 Superwall 账号：
+
+> 1. 访问 [superwall.com](https://superwall.com) → Sign Up
+> 2. **建议用公司邮箱注册**（文龙建议，方便团队管理）
+> 3. 选择 Free 计划（250 MAU，验证阶段足够）
+> 4. Dashboard → Apps → Create App → 填产品名 → iOS
+> 5. **获取 API Key**（格式 `pk_xxxxxxxx`）
+
+拿到 API Key 后继续。
+
+### Step 1.3: ASC 创建订阅商品（Playwright）
+
+```
+1. browser_navigate → https://appstoreconnect.apple.com/apps/<AppID>/distribution/subscriptions
+2. browser_snapshot → 确认在 Subscriptions 页面
+3. 创建 Subscription Group:
+   - browser_click → Create Subscription Group
+   - browser_type → 组名（如 "WePray Pro"）
+   - browser_click → Create
+4. 逐个创建订阅商品:
+   - browser_click → Create Subscription
+   - browser_type → Reference Name + Product ID
+   - browser_click → Create
+   - 配置价格 + 试用期
+5. browser_snapshot → 确认所有商品创建完成
 ```
 
-如果未添加 SPM 依赖，引导 PM：
-> 在 Xcode 中：File → Add Package Dependencies → 输入 `https://github.com/superwall/Superwall-iOS` → Add Package
+**ASC 订阅商品状态必须为 "Ready to Submit" 或 "Approved" 才能在 Sandbox 测试。**
 
-### Step 2: Superwall Dashboard 配置引导
+### Step 1.4: 杭州团队协助项
 
-引导 PM 在 Superwall Dashboard 完成配置（Agent 无法直接操作 Dashboard UI，需要 PM 配合）：
+> **需要杭州团队（文龙/运营）提供：**
+>
+> | 项目 | 用途 | 提供方式 |
+> |------|------|---------|
+> | ASC App-Specific Shared Secret | Superwall 验证订阅状态 | ASC → App → App Information → App-Specific Shared Secret |
+> | Adjust 服务端事件 Token 确认 | AJ_purchase / AJ_cancel / AJ_refund 需服务端触发 | 飞书文档或 Adjust 后台 |
+>
+> **如果暂时拿不到 Shared Secret：** Superwall 仍可在 Sandbox 环境测试购买流程，只是无法验证订阅续期状态。可先推进 Phase 2-3，Shared Secret 后补。
 
-**2a. 创建账号（如未有）**
-1. 访问 [superwall.com](https://superwall.com)，点击 Sign Up
-2. 使用 Apple Developer 关联的邮箱注册
-3. 选择 Free 计划（0.1 验证阶段足够）
+---
 
-**2b. 创建 App**
-1. Dashboard → Apps → Create App
-2. 填写产品名称
-3. 选择 Platform: iOS
-4. 获得 **API Key**（格式：`pk_xxxxxxxx`）
+## Phase 2: SDK 集成
 
-**2c. 注册 Placement**
-1. Dashboard → Placements → Create
-2. 创建以下 placement：
+### Step 2.1: SPM 添加 SuperwallKit
 
-| Placement 名称 | 触发时机 | 关联页面 |
-|----------------|---------|---------|
-| `app_install` | 首次安装打开 | Onboarding 页面 |
-| `paywall` | 触发付费墙时 | Paywall 页面 |
+**XcodeGen 项目** — 在 `project.yml` 中添加：
 
-**2d. 上传页面（可选，如已用 /ae-onboarding-design 和 /ae-paywall-design 生成）**
-1. Dashboard → Paywalls → Create → Custom HTML
-2. 上传 `onboarding/` 目录内容 → 绑定到 `app_install`
-3. 上传 `paywall/` 目录内容 → 绑定到 `paywall`
+```yaml
+packages:
+  SuperwallKit:
+    url: https://github.com/superwall/Superwall-iOS
+    from: "4.0.0"
 
-每完成一步，让 PM 确认并提供 API Key。
+targets:
+  <TargetName>:
+    dependencies:
+      - package: SuperwallKit
+```
 
-### Step 3: 项目代码集成
+```bash
+xcodegen generate
+```
 
-拿到 API Key 后，修改项目代码：
+**标准 Xcode 项目：**
+> Xcode → File → Add Package Dependencies → 输入 `https://github.com/superwall/Superwall-iOS` → Add Package
 
-**3a. SDK 初始化**
+### Step 2.2: API Key 存入 Secrets.plist
 
-在 App 入口处添加 Superwall 配置：
+Superwall API Key (`pk_` 开头) 虽然是公开 Key，但统一走 Secrets.plist 管理（与 preflight 约束对齐）：
+
+```xml
+<!-- Secrets.plist -->
+<key>SuperwallAPIKey</key>
+<string>pk_xxxxxxxx</string>
+```
+
+### Step 2.3: SDK 初始化
+
+在 App 入口添加 Superwall 配置：
 
 ```swift
-// App.swift 或 AppDelegate.swift
 import SuperwallKit
 
 @main
 struct MyApp: App {
     init() {
-        Superwall.configure(apiKey: "pk_xxxxxxxx")  // 替换为真实 Key
-    }
-
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-        }
+        // Superwall 初始化（必须在 App 启动时）
+        let apiKey = Bundle.main.object(forInfoDictionaryKey: "SuperwallAPIKey") as? String
+            ?? (Bundle.main.infoDictionary?["SuperwallAPIKey"] as? String)
+            ?? { fatalError("Missing SuperwallAPIKey in Secrets.plist") }()
+        Superwall.configure(apiKey: apiKey)
     }
 }
 ```
 
-**3b. Placement 触发**
+### Step 2.4: Placement 注册
 
-在合适位置触发 placement：
+创建两个核心 Placement：
 
 ```swift
-// Onboarding — 首次安装时
-func showOnboardingIfNeeded() {
-    let isFirstLaunch = !UserDefaults.standard.bool(forKey: "hasLaunchedBefore")
-    if isFirstLaunch {
-        Superwall.shared.register(placement: "app_install")
-        UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
-    }
+// Onboarding 结束后展示 Paywall
+func showPaywallAfterOnboarding() {
+    Superwall.shared.register(placement: "onboarding_complete")
 }
 
-// Paywall — 用户触发付费功能时
+// 用户触发付费功能时
 func showPaywall() {
     Superwall.shared.register(placement: "paywall")
 }
 ```
 
-**3c. 购买处理（如用 Superwall 管理支付）**
+同时在 Superwall Dashboard → Placements 中创建对应的 placement 并绑定 Paywall 页面。
+
+### Step 2.5: 订阅状态管理
 
 ```swift
-// Superwall 默认自动处理 StoreKit 购买
-// 如需自定义，实现 SuperwallDelegate:
-Superwall.shared.delegate = self
+// 判断用户是否为 VIP
+var isVIP: Bool {
+    Superwall.shared.subscriptionStatus == .active
+}
 
+// 在需要付费的功能前检查
+func accessPremiumFeature() {
+    if isVIP {
+        // 直接使用
+    } else {
+        showPaywall()
+    }
+}
+```
+
+### Step 2.6: 恢复购买
+
+Apple 审核要求必须有恢复购买功能：
+
+```swift
+// 在 Settings/Profile 页面提供恢复购买按钮
+Button("Restore Purchases") {
+    Superwall.shared.restorePurchases()
+}
+```
+
+---
+
+## Phase 3: Adjust 付费事件联动
+
+### Step 3.1: 客户端事件（Agent 处理）
+
+将 Adjust 付费事件从 Paywall 按钮点击移到 Superwall 支付回调：
+
+```swift
+// SuperwallDelegate
 extension AppFlowManager: SuperwallDelegate {
     func handleSuperwallEvent(withInfo eventInfo: SuperwallEventInfo) {
         switch eventInfo.event {
-        case .transactionComplete(_, _, _, _):
-            // 购买成功
-            break
+        case .transactionComplete(let transaction, let product, _, _):
+            // 真实购买成功，触发 Adjust 事件
+            AdjustService.shared.trackSubscription(product: product)
+            AnalyticsService.shared.logPurchaseSuccess(productId: product.productIdentifier)
+
+        case .subscriptionStart(let product, _):
+            AdjustService.shared.trackVIP()
+
         case .paywallClose:
-            // 用户关闭 paywall
-            break
+            AnalyticsService.shared.logPaywallDismiss()
+
         default:
             break
         }
@@ -164,85 +259,115 @@ extension AppFlowManager: SuperwallDelegate {
 }
 ```
 
-### Step 4: 验证集成
+### Step 3.2: 服务端事件（杭州团队配置）
 
-**4a. 日志检查**
+以下事件需要服务端触发，**由杭州团队在 Adjust 后台或 purchase-service 中配置**：
 
-运行 App，在 Xcode Console 中确认：
-```
-[Superwall] Configured with API key: pk_xxxx...
-[Superwall] Device registered
-```
+| 事件 | Token | 触发时机 | 配置方 |
+|------|-------|---------|--------|
+| AJ_purchase | 由杭州提供 | 实际扣款成功 | 杭州团队 |
+| AJ_cancel | 由杭州提供 | 试用取消 | 杭州团队 |
+| AJ_refund | 由杭州提供 | 退款 | 杭州团队 |
 
-**4b. Placement 触发测试**
+> **通知杭州团队：** Superwall 会通过 Webhook 通知购买状态变更。如果使用 Superwall 的服务端验证（非 purchase-service），需要在 Superwall Dashboard → Settings → Webhooks 中配置回调 URL。
 
-触发每个 placement，确认 Dashboard 中出现对应事件：
-- Dashboard → Analytics → Events 中应看到 `app_install` / `paywall` 事件
+---
 
-**4c. 页面展示测试**
+## Phase 4: Sandbox 测试验证
 
-如果已上传页面到 Dashboard：
-- 触发 `app_install` → 应显示 onboarding 页面
-- 触发 `paywall` → 应显示 paywall 页面
+### Step 4.1: 创建 Sandbox 测试账号
 
-### Step 5: 配置清单输出
+> 1. ASC → Users and Access → Sandbox Testers → 「+」
+> 2. 创建一个测试邮箱（不能是真实 Apple ID）
+> 3. 在 iPhone → Settings → App Store → Sandbox Account 登录
 
-完成后向 PM 输出配置清单：
+### Step 4.2: 完整购买流程验证
 
-```
-Superwall 集成完成：
+在 TestFlight 或 Debug 版本上测试：
 
-✅ SDK 初始化 — API Key 已配置
-✅ Placement 注册:
-   - app_install → Onboarding
-   - paywall → Paywall
-✅ 日志验证 — SDK 初始化成功
+| 测试项 | 预期结果 | 验证方式 |
+|--------|---------|---------|
+| Paywall 展示 | 显示所有订阅方案 + 价格 | 目视确认 |
+| 选择方案 → 购买 | StoreKit 弹出支付确认 → 成功 | Sandbox 账号 |
+| 购买后状态 | VIP 功能解锁 | 检查 `subscriptionStatus == .active` |
+| 恢复购买 | 已购买的订阅恢复 | 卸载重装 → 恢复 |
+| Adjust 事件 | 购买事件在 Adjust Dashboard 可见 | 检查 Adjust 后台 |
+| Firebase 事件 | `purchase_success` 在 Firebase Console 可见 | 检查 Firebase 后台 |
 
-Dashboard 信息：
-- App: {产品名称}
-- API Key: pk_xxxx...（已写入代码）
-- URL: https://superwall.com/dashboard/apps/{app_id}
+### Step 4.3: 上线前切换
 
-后续操作：
-- 上传 onboarding/paywall HTML 到 Dashboard
-- 配置 StoreKit Product IDs
-- 设置 A/B 测试（如需）
-```
+- [ ] Adjust 环境从 `ADJEnvironmentSandbox` 改为 `ADJEnvironmentProduction`
+- [ ] 确认 Superwall API Key 是 Production Key（非 Test Key）
+- [ ] 确认 ASC 订阅商品状态为 "Approved"
 
-## 注意事项
+---
 
-### API Key 安全
-
-- API Key（`pk_` 开头）是**公开 Key**，可以安全地写入代码中
-- 不需要存入 credentials.env 或 .gitignore
-
-### Superwall Free 计划限制
-
-- 最多 250 MAU（0.1 验证阶段足够）
-- 支持 A/B 测试
-- 不支持自定义 HTML（需 Pro 计划）—— 如果用免费计划，onboarding/paywall 需要用 Superwall 内置模板
-
-### 与 /ae-onboarding-design 和 /ae-paywall-design 的关系
+## Phase 5: 输出
 
 ```
-/ae-onboarding-design → 生成 HTML 页面
-/ae-paywall-design    → 生成 HTML 页面
-                          ↓
-/ae-superwall-setup   → 配置 Superwall → 上传页面 → 绑定 placement
+═══════════════════════════════════════════
+  Superwall 集成完成 ✅
+═══════════════════════════════════════════
+
+配置信息:
+  Superwall API Key: pk_xxxx...
+  Subscription Group: {组名}
+  Products:
+    - {weekly_id}: ${price}/week
+    - {monthly_id}: ${price}/month
+    - {yearly_id}: ${price}/year (7天试用)
+
+Placement:
+  - onboarding_complete → Paywall
+  - paywall → Paywall
+
+验证结果:
+  ✅ Sandbox 购买成功
+  ✅ VIP 状态正确
+  ✅ 恢复购买正常
+  ✅ Adjust 付费事件可见
+  ✅ Firebase 购买事件可见
+
+杭州团队待确认:
+  - [ ] ASC Shared Secret 已配置到 Superwall
+  - [ ] Adjust 服务端事件已配置
+  - [ ] Adjust 环境已切 Production
+═══════════════════════════════════════════
 ```
 
-三个 skill 配合使用：先生成页面，再配置 Superwall 上传并关联。
+---
 
 ## 故障排查
 
-| 问题 | 解决方案 |
-|------|----------|
-| `Superwall not configured` | 检查 `configure(apiKey:)` 是否在 App 启动时调用 |
-| Placement 触发无反应 | Dashboard 中检查 placement 是否已创建并绑定了页面 |
-| 页面不显示 | 确认 Custom HTML 已上传且 placement 绑定正确 |
-| StoreKit 错误 | sandbox 环境需在 Settings → App Store → Sandbox Account 登录测试账号 |
-| Free 计划不支持 Custom HTML | 升级到 Pro 或改用 Superwall 内置模板 |
+| 问题 | 原因 | 解决 |
+|------|------|------|
+| `Superwall not configured` | `configure(apiKey:)` 未在 App 启动时调用 | 检查 App init() |
+| Paywall 不显示商品/价格为 $0 | ASC 订阅商品未创建或状态不对 | 检查 ASC 商品状态 |
+| StoreKit 购买弹窗不出现 | Sandbox 账号未登录 | Settings → App Store → Sandbox Account |
+| 购买成功但状态不更新 | Superwall delegate 未设置 | 确认 `Superwall.shared.delegate = self` |
+| Adjust 看不到付费事件 | 事件触发点在按钮而非支付回调 | 移到 `transactionComplete` 回调中 |
+| Free 计划不支持 Custom HTML | Superwall Free 限制 | 用 Native Paywall + Superwall 仅做支付，或升级 Pro |
+| `Superwall API Key is invalid` | 用了 Test Key 而非 Production Key | Dashboard → API Keys 检查 |
 
-## 复用说明
+## 与其他 skill 的关系
 
-所有 0.1 产品都需要 Superwall 集成。配置流程标准化后，每个新产品只需 10 分钟完成集成。
+```
+/ae-preflight ─────→ 编译通过
+        │
+        ▼
+/ae-analytics-setup → Firebase + Adjust 接入
+        │
+        ▼
+/ae-superwall-setup → Superwall + StoreKit 2 支付
+        │
+        ▼
+/ae-testflight-publish → Archive → TestFlight（带真实支付）
+```
+
+## 技术决策记录
+
+| 决策 | 选择 | 原因 | 确认人 |
+|------|------|------|--------|
+| 支付方案 | Superwall（非 BCStoreKit） | 无需 purchase-service 后端，大幅简化 | 文龙 |
+| 客户端 SDK | StoreKit 2 原生 API | 新产品无历史包袱，不依赖内部 Pod | 文龙 |
+| Paywall UI | 可选 Native / Superwall 远程 | Native 更灵活，远程支持 A/B | PM 决策 |

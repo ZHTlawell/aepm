@@ -147,7 +147,8 @@ CLI 会自动加载 credentials、调用 Gitee API、返回 issue 链接。
 | App 逆向提取 Speckit | `/ae-app-to-speckit` — 从已上架 App 逆向生成 speckit（iPhone 真机探索 + 截图 + feature-checklist） | 可用（需 iPhone + USB + WDA） |
 | Onboarding 页面生成 | `/ae-onboarding-design` — 生成产品 Onboarding 幻灯片（HTML/CSS/JS，Superwall Flow 或 WebView） | 可用 |
 | Paywall 页面生成 | `/ae-paywall-design` — 生成 Paywall 付费墙页面（HTML 或 Native StoreKit 2） | 可用 |
-| Superwall 集成 | `/ae-superwall-setup` — Superwall 账号配置、SDK 集成、Placement 注册引导 | 可用 |
+| 埋点接入 | `/ae-analytics-setup` — Firebase Analytics + Adjust SDK 双轨埋点（杭州团队协作） | 可用 |
+| Superwall 集成 | `/ae-superwall-setup` — Superwall 支付集成全流程（账号 + ASC 订阅 + SDK + StoreKit 2） | 可用 |
 | Skill 构建 | `/ae-skill-creator` — 标准化 skill 构建全流程（六段标准 + 审计模式） | 可用 |
 | 发布前预检 | `/ae-preflight` — iOS 一体化生产就绪扫描（签名/Icon/隐私/API Key 泄漏/资源尺寸） | 可用 |
 | 线上项目本地化 | `/ae-prod-to-local` — 分析线上项目结构，生成可本地编译运行的配置 | 可用 |

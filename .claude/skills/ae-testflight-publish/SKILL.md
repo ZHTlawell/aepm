@@ -41,7 +41,8 @@ PM 需要将一个能本地编译的 iOS 工程发布到 TestFlight，典型场�
 1. **PM 不懂 iOS 发布术语** — 不抛 "Provisioning Profile"、"Distribution Certificate"，给具体的「做什么 → 预期看到什么」
 2. **Automatic Signing 优先** — 开发 + TestFlight 阶段不走 Manual，让 Xcode 自动管理证书和 Profile
 3. **先跑 ae-preflight** — 本 skill 假设 preflight 扫描已通过（API Key 已外部化、PrivacyInfo 已创建、App Icon 已就位、Bundle ID 已清理）。如未跑过，先执行 `/ae-preflight`
-4. **每个 Phase 完成确认后再继续** — 不跳步，Apple 生态的依赖链环环相扣
+4. **推荐先接埋点** — 没有埋点的 TestFlight 版本 = 盲测，建议先跑 `/ae-analytics-setup` 接入 Firebase + Adjust，再上传 TestFlight（约束 ios-pub-027）
+5. **每个 Phase 完成确认后再继续** — 不跳步，Apple 生态的依赖链环环相扣
 5. **收集 constraint_candidates** — 过程中发现的新约束记录到 publish-state.yaml，供 ae-postflight 回写
 
 ## 前置条件
@@ -52,6 +53,7 @@ PM 需要将一个能本地编译的 iOS 工程发布到 TestFlight，典型场�
 | Apple Developer 账号 | PM 提供 Apple ID | 需已付费 $99/年，许可协议已接受 |
 | Playwright MCP 可用 | `claude mcp list` 包含 playwright | Phase 1 浏览器自动化必需 |
 | ae-preflight 已通过 | 项目根目录有 `publish-state.yaml` 且 preflight.status=done | 或手动确认：编译通过 + 无硬编码 Key + 有 App Icon |
+| ae-analytics-setup 已完成（推荐） | Firebase + Adjust SDK 已接入 | 非必须，但强烈推荐：无埋点 = 盲测 |
 | 项目可编译 | `xcodebuild build` → BUILD SUCCEEDED | 编译不通过 = 全流程阻塞 |
 
 ### Playwright MCP 环境检查
@@ -680,6 +682,15 @@ testflight_publish:
 | ios-pub-022 | 设备注册后需重新生成 Provisioning Profile | 新设备不自动包含 |
 | ios-pub-023 | 多 Apple ID 环境下 Automatic Signing 可能选错账号 | 需明确指定 DEVELOPMENT_TEAM |
 
+### 账号 & 流程类
+
+| ID | 约束 | 发现场景 |
+|----|------|---------|
+| ios-pub-024 | 个人账号开发者名为中文会影响海外转化，企业账号优先 | WePray 从个人 (qin xu) 迁移到企业 (Scale Dynamics) |
+| ios-pub-025 | DPLA 协议更新后 Account Holder 必须登录接受，否则无法创建新 App | ASC 创建 App 时弹协议阻塞 |
+| ios-pub-026 | 新 Apple 账号接入 Adjust 需要杭州团队前置操作（Connection） | 文龙/周文博老师需在 Adjust 后台操作 |
+| ios-pub-027 | 无埋点的 TestFlight 版本等于盲测，应先接 Firebase + Adjust | WePray Build 1 无数据，Build 2-3 才有 |
+
 ---
 
 ## 故障排查
@@ -722,9 +733,14 @@ testflight_publish:
 /ae-preflight ──────────→ 扫描 + 修复 → 编译通过
                                 │
                                 ▼
+/ae-analytics-setup ────→ Firebase + Adjust 埋点接入（推荐）
+                                │
+                                ▼
 /ae-testflight-publish ──→ Apple 注册 → 签名 → Archive → TestFlight ✅
                                 │
                                 ├── 后续迭代：改代码 → bump build → Phase 3-4 循环
+                                │
+                                ├── 支付接入：/ae-superwall-setup → Superwall + StoreKit 2
                                 │
                                 └── 正式上架：/ae-store-assets → /ae-archive-upload (App Store 模式)
                                               │
