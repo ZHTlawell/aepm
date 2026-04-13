@@ -95,18 +95,55 @@ PM 需要在 iOS App 中集成真实 StoreKit 支付时触发。典型场景：
 
 ### Step 1.3: ASC 创建订阅商品
 
-> **当前状态：** 订阅商品创建涉及多步 API 调用（创建 Subscription Group → 创建 Subscription → 设置本地化 → 配置定价），`ae asc` 尚未实现 subscription 命令组。暂通过 ASC Web UI 操作。
+通过 `ae asc` CLI 创建订阅组和订阅商品。
 
-**操作步骤（ASC Web UI）：**
+**Step 1.3a: 检查已有订阅**
+
+```bash
+ae asc subscription list --app-id <AppID> --pretty
+```
+
+如果已有订阅组和商品，跳到 Step 1.4。
+
+**Step 1.3b: 创建订阅组**
+
+```bash
+ae asc subscription create-group \
+  --app-id <AppID> \
+  --name "<产品名> Pro" \
+  --pretty
+```
+
+记录返回的 `id`（Group ID）。
+
+**Step 1.3c: 逐个创建订阅商品**
+
+```bash
+# Weekly
+ae asc subscription create --group-id <GroupID> \
+  --product-id <BundleID>.weekly --name "<产品名> Weekly" \
+  --duration ONE_WEEK --display-name "Weekly" --pretty
+
+# Monthly
+ae asc subscription create --group-id <GroupID> \
+  --product-id <BundleID>.monthly --name "<产品名> Monthly" \
+  --duration ONE_MONTH --display-name "Monthly" --pretty
+
+# Yearly
+ae asc subscription create --group-id <GroupID> \
+  --product-id <BundleID>.yearly --name "<产品名> Yearly" \
+  --duration ONE_YEAR --display-name "Yearly" --pretty
+```
+
+**Step 1.3d: 在 ASC Web UI 配置定价**
+
+> 定价需在 ASC Web UI 中设置（API 定价链路涉及 territory 查询，复杂度高）。
 
 1. 打开 `https://appstoreconnect.apple.com/apps/<AppID>/distribution/subscriptions`
-2. 创建 Subscription Group（如 "WePray Pro"）
-3. 逐个创建订阅商品：填写 Reference Name + Product ID → 配置价格 + 试用期
-4. 确认所有商品状态为 "Ready to Submit"
+2. 点击每个订阅商品 → Subscription Prices → Add Pricing
+3. 设置基础价格（如 Weekly $0.99 / Monthly $2.99 / Yearly $19.99）
 
 **ASC 订阅商品状态必须为 "Ready to Submit" 或 "Approved" 才能在 Sandbox 测试。**
-
-> **后续：** `ae asc subscription create-group` + `ae asc subscription create` 命令开发后，此步将自动化（跟踪 ae-platform #IIOOTZ）。
 
 ### Step 1.4: 杭州团队协助项
 

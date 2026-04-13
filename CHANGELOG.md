@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.37.0 (2026-04-13) — ae asc subscription 命令组 `#IIOSOG`
+
+### 新功能
+- **`ae asc subscription list/create-group/create`** — ASC 订阅商品管理 CLI 化（#IIOSOG）
+  - `subscription list --app-id X` — 列出订阅组及其订阅商品
+  - `subscription create-group --app-id X --name X` — 创建订阅组
+  - `subscription create --group-id X --product-id X --name X --duration X` — 创建订阅（含本地化）
+
+### 更新
+- **`/ae-superwall-setup`** — Step 1.3 从 Web UI 操作迁移至 `ae asc subscription` 命令（#IIOSOG）
+
 ## v0.36.0 (2026-04-13) — Skill 迁移至 ae asc CLI `#IIOOTZ`
 
 ### 更新

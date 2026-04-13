@@ -534,6 +534,100 @@ def cmd_testflight_set_compliance(args):
     }, args.pretty)
 
 
+# ── Subscription Commands ───────────────────────────────
+
+def cmd_subscription_list(args):
+    jwt_token = require_jwt(args)
+    # Get subscription groups via app relationship endpoint
+    url = f"{ASC_API}/apps/{args.app_id}/subscriptionGroups?limit={args.limit}"
+    result = api_request("GET", url, jwt_token=jwt_token)
+    groups = parse_jsonapi(result)
+
+    if not isinstance(groups, list):
+        output(groups, args.pretty)
+        return
+
+    # For each group, fetch its subscriptions
+    output_groups = []
+    for g in groups:
+        group_id = g["id"]
+        sub_url = f"{ASC_API}/subscriptionGroups/{group_id}/subscriptions?limit=50"
+        sub_result = api_request("GET", sub_url, jwt_token=jwt_token)
+        subs = parse_jsonapi(sub_result)
+        subscriptions = []
+        if isinstance(subs, list):
+            subscriptions = [{"id": s["id"], "name": s.get("name", ""),
+                              "productId": s.get("productId", ""),
+                              "state": s.get("state", ""),
+                              "subscriptionPeriod": s.get("subscriptionPeriod", "")}
+                             for s in subs]
+        output_groups.append({
+            "id": group_id,
+            "name": g.get("referenceName", ""),
+            "subscriptions": subscriptions,
+        })
+
+    output({"subscriptionGroups": output_groups, "total": len(output_groups)}, args.pretty)
+
+
+def cmd_subscription_create_group(args):
+    jwt_token = require_jwt(args)
+    body = jsonapi_body("subscriptionGroups", {
+        "referenceName": args.name,
+    }, relationships={
+        "app": {
+            "data": {"type": "apps", "id": args.app_id}
+        }
+    })
+    result = api_request("POST", f"{ASC_API}/subscriptionGroups", body=body, jwt_token=jwt_token)
+    group = parse_jsonapi(result)
+    output({
+        "id": group.get("id", ""),
+        "referenceName": group.get("referenceName", ""),
+    }, args.pretty)
+
+
+def cmd_subscription_create(args):
+    jwt_token = require_jwt(args)
+
+    body = jsonapi_body("subscriptions", {
+        "name": args.name,
+        "productId": args.product_id,
+        "subscriptionPeriod": args.duration,
+        "reviewNote": args.review_note or "",
+    }, relationships={
+        "group": {
+            "data": {"type": "subscriptionGroups", "id": args.group_id}
+        }
+    })
+    result = api_request("POST", f"{ASC_API}/subscriptions", body=body, jwt_token=jwt_token)
+    sub = parse_jsonapi(result)
+    sub_id = sub.get("id", "")
+
+    # Create localization for the subscription (required for it to be visible)
+    if sub_id and args.display_name:
+        loc_body = jsonapi_body("subscriptionLocalizations", {
+            "locale": args.locale,
+            "name": args.display_name,
+            "description": args.description or "",
+        }, relationships={
+            "subscription": {
+                "data": {"type": "subscriptions", "id": sub_id}
+            }
+        })
+        api_request("POST", f"{ASC_API}/subscriptionLocalizations",
+                     body=loc_body, jwt_token=jwt_token)
+
+    output({
+        "id": sub_id,
+        "name": sub.get("name", ""),
+        "productId": sub.get("productId", ""),
+        "subscriptionPeriod": sub.get("subscriptionPeriod", ""),
+        "state": sub.get("state", ""),
+        "note": "定价需在 ASC Web UI 中配置" if sub_id else "",
+    }, args.pretty)
+
+
 # ── CLI Setup ───────────────────────────────────────────
 
 def build_parser():
@@ -608,6 +702,30 @@ def build_parser():
     p.add_argument("--uses-encryption", dest="uses_encryption", default="false",
                    choices=["true", "false"], help="Uses non-exempt encryption (default: false)")
 
+    # ── subscription ──
+    subs = sub.add_parser("subscription", help="Subscription operations", parents=[global_opts])
+    subs_sub = subs.add_subparsers(dest="action")
+
+    p = subs_sub.add_parser("list", help="List subscription groups and products", parents=[global_opts])
+    p.add_argument("--app-id", dest="app_id", required=True, help="ASC App ID")
+    p.add_argument("--limit", type=int, default=20)
+
+    p = subs_sub.add_parser("create-group", help="Create a subscription group", parents=[global_opts])
+    p.add_argument("--app-id", dest="app_id", required=True, help="ASC App ID")
+    p.add_argument("--name", required=True, help="Group reference name (e.g. 'Pro')")
+
+    p = subs_sub.add_parser("create", help="Create a subscription in a group", parents=[global_opts])
+    p.add_argument("--group-id", dest="group_id", required=True, help="Subscription group ID")
+    p.add_argument("--product-id", dest="product_id", required=True, help="Product ID (e.g. com.example.monthly)")
+    p.add_argument("--name", required=True, help="Reference name")
+    p.add_argument("--duration", required=True,
+                   choices=["ONE_WEEK", "ONE_MONTH", "TWO_MONTHS", "THREE_MONTHS", "SIX_MONTHS", "ONE_YEAR"],
+                   help="Subscription period")
+    p.add_argument("--display-name", dest="display_name", help="Localized display name (for App Store)")
+    p.add_argument("--description", help="Localized description")
+    p.add_argument("--locale", default="en-US", help="Locale for display name/description (default: en-US)")
+    p.add_argument("--review-note", dest="review_note", default="", help="Review note for App Review")
+
     return parser
 
 
@@ -621,6 +739,9 @@ COMMANDS = {
     ("testflight", "create-group"): cmd_testflight_create_group,
     ("testflight", "add-tester"): cmd_testflight_add_tester,
     ("testflight", "set-compliance"): cmd_testflight_set_compliance,
+    ("subscription", "list"): cmd_subscription_list,
+    ("subscription", "create-group"): cmd_subscription_create_group,
+    ("subscription", "create"): cmd_subscription_create,
 }
 
 
