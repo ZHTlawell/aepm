@@ -475,6 +475,8 @@ TestFlight Build:
 |----|------|---------|
 | ios-pub-026 | 新 Apple 账号接入 Adjust 需杭州团队前置 Connection 操作 | WePray 换账号后 Adjust 无法关联 |
 | ios-pub-027 | 无埋点的 TestFlight 版本 = 盲测 | WePray Build 1 无数据 |
+| ios-pub-028 | GoogleService-Info.plist 中 `IS_ANALYTICS_ENABLED` 必须为 `true`，否则 SDK 静默不上报 | WePray Build 5 数据为 0，改 plist 后 Build 6 正常 |
+| ios-pub-033 | Adjust Sandbox 环境验证数据时，API 必须显式传 `sandbox=true`，Dashboard 也需切 Sandbox 视图 | WePray Adjust 数据「看不到」实际是查了 Production 视图 |
 | analytics-001 | GoogleService-Info.plist 含 API Key，必须加 .gitignore | 安全合规 |
 | analytics-002 | Adjust 环境上线前必须从 Sandbox 切 Production | 否则事件不计入正式报表 |
 | analytics-003 | Firebase DebugView 需启动参数 -FIRDebugEnabled | 否则实时调试看不到事件 |

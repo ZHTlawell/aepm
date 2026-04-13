@@ -395,6 +395,13 @@ Placement:
 /ae-testflight-publish → Archive → TestFlight（带真实支付）
 ```
 
+## 已验证的约束
+
+| ID | 约束 | 发现场景 |
+|----|------|---------|
+| ios-pub-030 | StoreKit 2 中 `purchase()` 设置的即时订阅状态不能被异步 `currentEntitlements` 检查覆盖。Sandbox 环境 entitlement 有延迟，不能作为唯一真相源 | WePray 购买成功后 Profile 仍显示 "Free Plan"，因为 `checkSubscriptionStatus()` 覆盖了 `purchase()` 的结果 |
+| ios-pub-032 | 所有展示订阅状态的 UI 必须绑定到 SubscriptionService 的 `isSubscribed`，不能硬编码 "Free Plan" | WePray ProfileView 中 "Free Plan" 是硬编码字符串，购买后未更新 |
+
 ## 技术决策记录
 
 | 决策 | 选择 | 原因 | 确认人 |

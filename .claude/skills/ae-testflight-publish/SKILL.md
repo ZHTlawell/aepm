@@ -622,6 +622,7 @@ testflight_publish:
 | ios-pub-025 | DPLA 协议更新后 Account Holder 必须登录接受，否则无法创建新 App | ASC 创建 App 时弹协议阻塞 |
 | ios-pub-026 | 新 Apple 账号接入 Adjust 需要杭州团队前置操作（Connection） | 文龙/周文博老师需在 Adjust 后台操作 |
 | ios-pub-027 | 无埋点的 TestFlight 版本等于盲测，应先接 Firebase + Adjust | WePray Build 1 无数据，Build 2-3 才有 |
+| ios-pub-031 | 切换 Bundle ID / Apple Developer 账号后，TestFlight 内测组、测试员、出口合规声明需要重新配置，不会从旧 App 继承 | WePray 从 com.qinxu.FaithfulGuide 切到 com.kjv.bible.prayer.app 后，旧内测组关联的是旧 ASC App，新 App 需重建 |
 
 ---
 

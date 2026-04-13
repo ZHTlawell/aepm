@@ -324,6 +324,15 @@ preflight:
                           └── /ae-postflight（约束闭环）
 ```
 
+## 已验证的约束
+
+| ID | 约束 | 发现场景 |
+|----|------|---------|
+| ios-pub-001 | API Key 禁止硬编码在源码中 | Config.swift 中明文 OpenAI key |
+| ios-pub-002 | AppIcon 必须有实际 PNG 图片 | appiconset 只有 Contents.json |
+| ios-pub-003 | 有网络请求必须有 PrivacyInfo.xcprivacy | URLSession 存在但无隐私清单 |
+| ios-pub-029 | 依赖境外 API（OpenAI、Gemini 等）的功能，base URL 必须可配置，不能硬编码域名 | WePray AI Chat 在中国网络不可直连，ChatService 需支持 Secrets.plist 配置 OPENAI_BASE_URL |
+
 ## 已知限制
 
 - **无法替代 PM 登录 Apple ID** — Xcode Accounts 登录需要人工操作 + 2FA

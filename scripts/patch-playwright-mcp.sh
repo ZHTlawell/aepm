@@ -7,12 +7,12 @@
 # 导致 Agent 在导航时长时间卡住。
 #
 # 修补内容：
-#   1. navigate(): waitUntil → "commit" + 5s DCL bounded wait，DCL 超时则跳过 load wait
-#   2. Tab 增加 _domReady 标记，DCL 是否在 5s 内完成
+#   1. navigate(): waitUntil → "commit" + 2s DCL bounded wait，DCL 超时则跳过 load wait
+#   2. Tab 增加 _domReady 标记，DCL 是否在 2s 内完成
 #   3. captureSnapshot(): ariaSnapshot timeout = domReady ? 5s : 1s + catch
 #   4. headerSnapshot(): page.title() timeout = domReady ? 3s : 0.5s
 #
-# 效果：飞书从 40-60s → ~7s，百度从 15-17s → ~7s
+# 效果：飞书从 40-60s → ~4s，百度从 15-17s → ~4s
 #
 # 用法：
 #   bash scripts/patch-playwright-mcp.sh
@@ -57,7 +57,7 @@ code = code.replace(
 );
 code = code.replace(
   'await this.waitForLoadState(\"load\", { timeout: 5e3 });',
-  'this._domReady = await this.page.waitForLoadState(\"domcontentloaded\", { timeout: 5e3 }).then(() => true).catch(() => false);\n    if (this._domReady)\n      await this.waitForLoadState(\"load\", { timeout: 5e3 });'
+  'this._domReady = await this.page.waitForLoadState(\"domcontentloaded\", { timeout: 2e3 }).then(() => true).catch(() => false);\n    if (this._domReady)\n      await this.waitForLoadState(\"load\", { timeout: 3e3 });'
 );
 
 // 3. captureSnapshot(): dynamic timeout + catch

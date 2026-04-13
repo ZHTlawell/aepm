@@ -5,6 +5,11 @@ ae_doctor() {
     local all_ok=true
     local role="${1:-all}"
 
+    # 确保 Homebrew 在 PATH 中（macOS arm64）
+    if [[ -x /opt/homebrew/bin/brew ]]; then
+        eval "$(/opt/homebrew/bin/brew shellenv)" 2>/dev/null
+    fi
+
     info "检查 AE 环境..."
     echo ""
 
