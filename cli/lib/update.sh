@@ -30,10 +30,9 @@ ae_update() {
     rm -f "$HOME/.config/ae/.update-available"
 
     # Refresh skill symlinks in all linked projects
-    if $any_updated; then
-        _discover_untracked_projects
-        _refresh_linked_projects
-    fi
+    # Always run — even without new versions, old projects may have missing symlinks
+    _discover_untracked_projects
+    _refresh_linked_projects
 
     # Check for pending feedback and offer to upload
     source_lib "feedback"
