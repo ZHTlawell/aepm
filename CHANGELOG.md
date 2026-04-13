@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.37.1 (2026-04-13) — ae update 自动发现未追踪的旧项目 `#IIOV9S`
+
+### 修复
+- **ae update** — 新增 `_discover_untracked_projects`，自动扫描已有 ae skill symlink 但未注册到 `.linked-projects` 的项目（#IIOV9S）
+- 修复了追踪机制引入前已链接的项目在 `ae update` 后新增 skill 不到达的问题
+
 ## v0.37.0 (2026-04-13) — ae asc subscription 命令组 `#IIOSOG`
 
 ### 新功能

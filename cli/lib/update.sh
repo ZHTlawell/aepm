@@ -31,6 +31,7 @@ ae_update() {
 
     # Refresh skill symlinks in all linked projects
     if $any_updated; then
+        _discover_untracked_projects
         _refresh_linked_projects
     fi
 
@@ -44,6 +45,57 @@ ae_update() {
     else
         ok "所有组件已是最新。"
     fi
+}
+
+# Scan for projects that have ae-* skill symlinks pointing to ~/.ae/ but
+# are not yet tracked in .linked-projects. This catches projects linked
+# before the tracking feature was introduced (commit 65fb7f5).
+_discover_untracked_projects() {
+    local registry="$AE_HOME/.linked-projects"
+
+    # Scan known project directories for .claude/skills/ae-* symlinks
+    local search_dirs=("$HOME/Documents/git" "$HOME/git")
+    for search_dir in "${search_dirs[@]}"; do
+        [[ -d "$search_dir" ]] || continue
+
+        for skills_dir in "$search_dir"/*/.claude/skills; do
+            [[ -d "$skills_dir" ]] || continue
+            local project_dir
+            project_dir=$(dirname "$(dirname "$skills_dir")")
+
+            # Skip ae-pm/ae-go/ae-dev build repos themselves
+            case "$project_dir" in
+                "$AE_HOME"/pm|"$AE_HOME"/go|"$AE_HOME"/dev) continue ;;
+            esac
+
+            # Check which roles this project has symlinks for
+            for role in go pm dev; do
+                local ae_skills="$AE_HOME/$role/.claude/skills"
+                [[ -d "$ae_skills" ]] || continue
+
+                # Look for any symlink pointing to this role's skills
+                local has_role=false
+                local link
+                while IFS= read -r -d '' link; do
+                    local target
+                    target=$(readlink "$link" 2>/dev/null)
+                    if [[ "$target" == "$ae_skills"/* ]]; then
+                        has_role=true
+                        break
+                    fi
+                done < <(find "$skills_dir" -maxdepth 1 -name 'ae-*' -type l -print0 2>/dev/null)
+
+                if $has_role; then
+                    local entry="$role	$project_dir"
+                    if [[ -f "$registry" ]] && grep -qxF "$entry" "$registry" 2>/dev/null; then
+                        continue  # already tracked
+                    fi
+                    echo "$entry" >> "$registry"
+                    info "  自动发现已链接项目: ae-$role → $(basename "$project_dir")"
+                fi
+            done
+        done
+    done
 }
 
 # After ae update pulls new skills, refresh symlinks in all previously
