@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.36.0 (2026-04-13) — Skill 迁移至 ae asc CLI `#IIOOTZ`
+
+### 更新
+- **`/ae-testflight-publish`** — Phase 1 + Phase 3.5 + Phase 4 全面从 Playwright 浏览器自动化迁移至 `ae asc` CLI（#IIOOTZ）
+  - 移除 Playwright MCP 依赖，改用 ASC API Key 认证
+  - Bundle ID 注册 / App 创建 / Build 状态查询 / 出口合规 / 测试组创建 / 测试员添加全部 CLI 化
+- **`/ae-superwall-setup`** — Step 1.3 ASC 订阅商品创建标注为 Web UI 操作，移除 Playwright 依赖（#IIOOTZ）
+
 ## v0.35.1 (2026-04-13) — ae update 自动刷新已链接项目的 skill 软链接 `#IIOQ0R`
 
 ### 修复

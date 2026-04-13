@@ -2,7 +2,8 @@
 description: "从源码工程到 TestFlight 可安装的全流程引导（Apple 注册 → 签名 → Archive → 上传 → 分发）"
 permissions:
   allow:
-    - "mcp__playwright__*"
+    - "Bash(ae asc *)"
+    - "Bash(python3 *ae-asc*)"
     - "Bash(xcodebuild *)"
     - "Bash(xcodegen *)"
     - "Bash(xcrun *)"
@@ -10,19 +11,24 @@ permissions:
     - "Bash(python3 *)"
     - "Bash(plutil *)"
 dependencies:
-  mcp:
-    - playwright
+  mcp: []
   cli:
     - name: xcodebuild
       verify: "xcodebuild -version"
     - name: xcrun
       verify: "xcrun --version"
-  api_keys: []
-  scripts: []
+    - name: ae
+      verify: "ae asc auth validate --pretty"
+  api_keys:
+    - ASC_KEY_ID
+    - ASC_ISSUER_ID
+    - ASC_KEY_PATH
+  scripts:
+    - ae-asc.py
 smoke_test:
-  command: "xcodebuild -version && claude mcp list 2>/dev/null | grep -q playwright"
+  command: "xcodebuild -version && ae asc auth validate --pretty 2>/dev/null | grep -q valid"
   expected_exit: 0
-  description: "xcodebuild + Playwright MCP available"
+  description: "xcodebuild + ASC API credentials available"
 ---
 
 # Skill: TestFlight 发布全流程 (ae-testflight-publish)
@@ -51,31 +57,30 @@ PM 需要将一个能本地编译的 iOS 工程发布到 TestFlight，典型场�
 |------|---------|------|
 | Xcode 15+ 已安装 | `xcodebuild -version` | 需要支持 visionOS 之后的 archive 格式 |
 | Apple Developer 账号 | PM 提供 Apple ID | 需已付费 $99/年，许可协议已接受 |
-| Playwright MCP 可用 | `claude mcp list` 包含 playwright | Phase 1 浏览器自动化必需 |
+| ASC API 凭据已配置 | `ae asc auth validate --pretty` | Phase 1 + Phase 4 的 ASC API 操作必需 |
 | ae-preflight 已通过 | 项目根目录有 `publish-state.yaml` 且 preflight.status=done | 或手动确认：编译通过 + 无硬编码 Key + 有 App Icon |
 | ae-analytics-setup 已完成（推荐） | Firebase + Adjust SDK 已接入 | 非必须，但强烈推荐：无埋点 = 盲测 |
 | 项目可编译 | `xcodebuild build` → BUILD SUCCEEDED | 编译不通过 = 全流程阻塞 |
 
-### Playwright MCP 环境检查
+### ASC API 凭据检查
 
-Phase 1 需要通过浏览器操作 Apple Developer Portal 和 App Store Connect。
-
-```bash
-# 确认 Playwright MCP 已注册
-claude mcp list 2>/dev/null | grep playwright
-```
-
-如果未注册：
+Phase 1 和 Phase 4 通过 `ae asc` CLI 直接调用 App Store Connect REST API，无需浏览器自动化。
 
 ```bash
-# ⚠️ 必须用 --browser chrome — Apple CDN 通过 TLS 指纹拦截 Playwright 自带 Chromium，
-#    导致 developer.apple.com 和 appstoreconnect.apple.com 的 CSS/JS 返回空响应（页面白屏）
-# ⚠️ 必须用 --user-data-dir — 持久化登录态，避免每次重新 2FA
-# ⚠️ 必须用 --timeout-action 15000 — Apple 重型 SPA 的 click/fill 操作默认 5s 必超时
-claude mcp add playwright -s user -- npx @playwright/mcp@latest --browser chrome --user-data-dir ~/.config/playwright-profile --timeout-action 15000
+# 确认 ASC API 凭据可用
+ae asc auth validate --pretty
 ```
 
-注册后需**重新开始对话**，新对话中 `browser_navigate` 等工具才会出现。
+如果报错"缺少 ASC 凭据"，需要在 `~/.config/ae/credentials.env` 中配置：
+
+```bash
+# ASC API Key — 在 ASC → 用户和访问 → 集成 → 团队密钥 中创建
+ASC_KEY_ID=XXXXXXXXXX
+ASC_ISSUER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+ASC_KEY_PATH=~/.config/ae/AuthKey_XXXXXXXXXX.p8
+```
+
+> **注意：** API Key 由 Account Holder 在 ASC 中创建，.p8 文件只能下载一次。依赖 PyJWT + cryptography（`pip3 install PyJWT cryptography`）。
 
 ## 输入
 
@@ -128,60 +133,11 @@ xcodebuild -list 2>/dev/null | grep -A 20 "Schemes:"
 
 ---
 
-## Phase 1: Apple 身份注册（Playwright 浏览器自动化）
+## Phase 1: Apple 身份注册（ae asc CLI）
 
-**目标：在 Apple 的两个网站上完成注册 — Developer Portal 注册 Bundle ID + App Store Connect 创建 App。**
+**目标：通过 `ae asc` CLI 注册 Bundle ID + 创建 App。无需浏览器、无需 2FA。**
 
-### ⚠️ 关键认知：两个网站、可能两个账号
-
-| 网站 | 域名 | 管什么 | 谁有权限 |
-|------|------|--------|---------|
-| Developer Portal | developer.apple.com | Bundle ID、证书、设备、Provisioning Profile | **Account Holder**（个人账号=本人；组织账号=管理员） |
-| App Store Connect | appstoreconnect.apple.com | App 记录、TestFlight、审核、IAP 商品 | Account Holder + Admin + App Manager |
-
-**踩坑实录：** bible-app 发布时，Account Holder (sunshinee_7) 和 Admin (ligenjian007) 是不同的 Apple ID。Admin 在 ASC 有完整权限，但 Developer Portal 显示 "Access Unavailable"。必须用 Account Holder 的 Apple ID 才能在 Portal 注册 Bundle ID。
-
-**先向 PM 确认：**
-
-> 1. 你的 Apple Developer Program 是**个人账号**还是**组织账号**？
-> 2. 你用哪个 Apple ID 登录 developer.apple.com？
-> 3. 如果是组织账号，Account Holder 是谁？你的角色是什么？
-
-### Step 1.1: 登录 Developer Portal
-
-```
-1. browser_navigate → https://developer.apple.com/account
-2. 如果跳转到 idmsa.apple.com 登录页：
-   - browser_type → 填入 Apple ID
-   - browser_click → Sign In
-   - browser_type → 填入密码
-   - browser_click → Sign In
-3. 等待 2FA — 提示 PM 在 iPhone/Mac 上批准或输入验证码
-4. browser_snapshot → 确认看到 Account 页面
-```
-
-**检查项：**
-
-| 看到什么 | 意味着 | 怎么办 |
-|---------|--------|--------|
-| Account 页面 + Membership 信息 | 登录成功，有 Portal 权限 | 记录 Team ID，继续 |
-| "Access Unavailable" | 当前 Apple ID 无 Portal 权限 | 需要用 Account Holder 的 Apple ID 登录 |
-| "Enroll" 按钮 | 还没加入 Developer Program | 需要先付 $99 注册 |
-| 黄色横幅：许可协议 | DPLA 需要接受 | 执行 Step 1.1b |
-| 多个组织选择页 | 同一 Apple ID 关联多个组织 | 选择正确的组织（约束 ios-pub-014） |
-
-### Step 1.1b: 接受 DPLA 许可协议（如有）
-
-Apple Developer Program License Agreement 更新后必须由 Account Holder 接受，否则无法注册 App ID 和上传构建。
-
-```
-1. browser_snapshot → 确认协议提示内容
-2. browser_click → 勾选 "I have read and agree"
-3. browser_click → Submit
-4. browser_snapshot → 确认协议已接受
-```
-
-### Step 1.2: 确认 Bundle ID
+### Step 1.1: 确认 Bundle ID
 
 Bundle ID 注册后**永远不可更改**，跟 PM 确认：
 
@@ -192,71 +148,57 @@ Bundle ID 注册后**永远不可更改**，跟 PM 确认：
 > - ❌ `com.scaleglobal.*` 可能已被其他团队占用（约束 ios-pub-010，Bundle ID 全球唯一）
 >
 > **如果 Bundle ID 被占用，改用组织实际域名或个人前缀。**
-> bible-app 经验：`com.scaleglobal.FaithfulGuide` 被占用 → 改为 `com.qinxu.FaithfulGuide`。
+> bible-app 经验：`com.scaleglobal.FaithfulGuide` 被占用 → 改为 `com.kjv.bible.prayer.app`。
 
-### Step 1.3: 在 Developer Portal 注册 Bundle ID
+### Step 1.2: 检查 Bundle ID 是否已注册
 
-```
-1. browser_navigate → https://developer.apple.com/account/resources/identifiers/list
-2. browser_snapshot → 确认在 Identifiers 页面
-3. browser_click → 点击「+」按钮
-4. browser_click → 选择「App IDs」→ Continue
-5. browser_click → 选择「App」类型 → Continue
-6. browser_type → Description 填产品名称
-7. browser_click → 选择「Explicit」
-8. browser_type → 输入确认的 Bundle ID
-9. 按需勾选 Capabilities（InAppPurchase + AppGroups 推荐默认勾选）
-10. browser_click → Continue → Register
-11. browser_snapshot → 确认注册成功
+```bash
+ae asc bundle-id list --filter-identifier <BUNDLE_ID> --pretty
 ```
 
-**约束 ios-pub-013：** Bundle ID 必须在 Developer Portal 注册后，ASC 创建 App 时的 Bundle ID 下拉框才会出现。顺序不能反。
+- 如果返回结果 → 已注册，跳到 Step 1.4
+- 如果结果为空 → 需要注册，继续 Step 1.3
 
-### Step 1.4: 在 App Store Connect 创建 App
+### Step 1.3: 注册 Bundle ID
 
-```
-1. browser_navigate → https://appstoreconnect.apple.com/apps
-2. browser_snapshot → 确认在 Apps 页面（可能需要重新登录）
-3. browser_click → 点击「+」→「New App」
-```
-
-**⚠️ Playwright 踩坑：** ASC 是重型 React SPA，`browser_click` 在点击后等待导航稳定，经常超时。**优先用 `browser_run_code` + `force: true`：**
-
-```javascript
-// 方案 1（推荐）：force click 跳过 actionability 等待
-await page.locator('button:has-text("新建 App")').click({ force: true });
+```bash
+ae asc bundle-id register \
+  --identifier <BUNDLE_ID> \
+  --name "<产品名称>" \
+  --pretty
 ```
 
-```javascript
-// 方案 2（兜底）：如果 locator 也不好使，用 evaluate 直接发事件
-const el = document.querySelector('button[data-test="create-app-button"]');
-if (el) {
-  el.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true}));
-  el.dispatchEvent(new PointerEvent('pointerup', {bubbles: true}));
-  el.dispatchEvent(new MouseEvent('click', {bubbles: true}));
-}
+成功输出包含 `id`（ASC 内部资源 ID）和 `identifier`（Bundle ID 字符串）。
+
+**约束 ios-pub-013：** Bundle ID 必须先注册，才能创建 App。ASC API 自动处理 Developer Portal + ASC 两侧的注册。
+
+### Step 1.4: 检查 App 是否已创建
+
+```bash
+ae asc app list --filter-bundle-id <BUNDLE_ID> --pretty
 ```
 
-> **通用规则：** Apple 页面上所有 `browser_click` 超时都可用 `browser_run_code` + `page.locator('...').click({ force: true })` 替代。
+- 如果返回结果 → App 已存在，记录 App ID，跳到 Phase 2
+- 如果结果为空 → 继续 Step 1.5
 
-继续填写表单：
+### Step 1.5: 创建 App
 
+```bash
+ae asc app create \
+  --bundle-id <BUNDLE_ID> \
+  --name "<App 名称>" \
+  --sku "<SKU>" \
+  --pretty
 ```
-4. browser_click → Platforms: iOS
-5. browser_type → Name: 产品名称
-6. browser_click → Primary Language: English (U.S.)
-7. browser_click → Bundle ID 下拉 → 选择 Step 1.3 注册的 ID
-8. browser_type → SKU: 唯一标识（如 FaithfulGuide001）
-9. browser_click → Full Access
-10. browser_click → Create
-11. browser_snapshot → 确认 App 创建成功
-12. 记录 App ID（URL 中的数字，如 6761919115）
-```
+
+> **SKU** = 唯一标识符，如 `FaithfulGuide001`。建议用 Bundle ID 最后一段或产品英文名。
+
+成功输出包含 `id`（App ID，如 `6761982880`）。
 
 **Phase 1 完成确认：**
-- [ ] Team ID: `__________`
-- [ ] Bundle ID: `__________`（已在 Portal 注册）
-- [ ] ASC App ID: `__________`（已在 ASC 创建）
+- [ ] Bundle ID: `__________`（已注册）
+- [ ] ASC App ID: `__________`（已创建）
+- [ ] SKU: `__________`
 
 ---
 
@@ -457,19 +399,19 @@ Uploaded <ProductName>
 
 ### Step 3.5: 等待 ASC 处理
 
-可以通过 Playwright 检查处理状态：
+通过 `ae asc` 检查处理状态：
 
-```
-1. browser_navigate → https://appstoreconnect.apple.com/apps/<AppID>/testflight
-2. browser_snapshot → 检查 Build 状态
+```bash
+ae asc testflight list-builds --app-id <AppID> --pretty
 ```
 
-| 状态 | 含义 | 下一步 |
-|------|------|--------|
-| Processing | Apple 正在处理 | 等待 10-30 分钟 |
-| Missing Compliance | 需要回答出口合规 | Phase 4 Step 4.1 |
-| Ready to Test | 可以分发 | Phase 4 Step 4.2+ |
-| Invalid Binary | 构建有问题 | 检查邮件中的具体错误 |
+| processingState | 含义 | 下一步 |
+|-----------------|------|--------|
+| PROCESSING | Apple 正在处理 | 等待 10-30 分钟，再次查询 |
+| VALID | 处理完成 | 检查 `usesNonExemptEncryption` 字段，进入 Phase 4 |
+| INVALID | 构建有问题 | 检查邮件中的具体错误 |
+
+> `usesNonExemptEncryption: null` = Missing Compliance（需要 Step 4.1）；`false` = 已声明，可直接分发。
 
 **Phase 3 完成确认：**
 - [ ] Archive 成功
@@ -486,17 +428,17 @@ Uploaded <ProductName>
 
 如果 Step 2.3 中已预配置 `ITSAppUsesNonExemptEncryption = NO`，此步自动跳过。
 
-否则，构建旁会显示黄色 "Missing Compliance" 标记：
+否则，`ae asc testflight list-builds` 中 `usesNonExemptEncryption: null` 的 Build 需要声明：
 
+```bash
+# 大多数 App 不含自定义加密（只用 HTTPS）→ uses-encryption false
+ae asc testflight set-compliance \
+  --build-id <BuildID> \
+  --uses-encryption false \
+  --pretty
 ```
-1. browser_navigate → https://appstoreconnect.apple.com/apps/<AppID>/testflight
-2. browser_click → 构建版本旁的 "Manage" 或 "Missing Compliance"
-3. 回答问题：「你的 App 是否使用了加密？」
-   - 如果只用 HTTPS → 选「Yes」→「Only using standard encryption exemptions」
-   - 或选「No」（不含任何加密）
-4. browser_click → Save
-5. browser_snapshot → 确认状态变为 Ready to Test
-```
+
+> **BuildID** 从 `ae asc testflight list-builds` 的 `id` 字段获取（UUID 格式）。
 
 ### Step 4.2: 选择分发路径
 
@@ -516,51 +458,41 @@ Uploaded <ProductName>
 
 **约束 ios-pub-020：** 内部测试只能添加 ASC 中已有的团队成员，不能添加外部邮箱。
 
-```
-1. browser_navigate → https://appstoreconnect.apple.com/apps/<AppID>/testflight
-2. browser_snapshot → 确认构建状态为 Ready to Test
-3. browser_click → Internal Testing → 「+」Create Group
-4. browser_type → 组名如 "Internal Team"
-5. browser_click → 勾选 "Enable automatic distribution"（新构建自动推送）
-6. browser_click → Create
-7. browser_click → 「+」Add Testers → 选择团队成员
-8. browser_click → Add
+**Step 4.3a: 创建内部测试组**
+
+```bash
+ae asc testflight create-group \
+  --app-id <AppID> \
+  --name "Internal Team" \
+  --pretty
 ```
 
-被邀请人会收到邮件 → 安装 TestFlight App → 点击邀请链接 → Install。
+记录返回的 `id`（Group ID）。
+
+**Step 4.3b: 添加测试员**
+
+```bash
+ae asc testflight add-tester \
+  --group-id <GroupID> \
+  --email <tester@example.com> \
+  --first-name <名> \
+  --last-name <姓> \
+  --pretty
+```
+
+> 对每个测试员重复执行。被邀请人会收到邮件 → 安装 TestFlight App → 点击邀请链接 → Install。
 
 ### Step 4.4: 外部测试（可选）
 
-如果需要更大范围测试或公开链接分发：
+外部测试需要 Beta 审核（通常 24-48h），需通过 ASC Web UI 操作（`ae asc` 暂不支持外部测试组的创建 + Beta 审核提交）。
 
-```
-1. browser_click → External Testing → Create Group
-2. browser_type → 组名如 "Public Beta"
-3. browser_click → Add Build → 选择构建版本
-4. 填写 Test Information:
-   - What to Test: 一句话说明测试重点
-   - App Description: App 简介
-   - Feedback Email: 接收反馈的邮箱
-5. browser_click → Submit for Review
-```
-
-**注意：** 外部测试需要 Beta 审核（通常 24-48h），但标准远低于正式审核。被拒不影响账号信用。
+如果需要外部测试：
+1. 打开 `https://appstoreconnect.apple.com/apps/<AppID>/testflight`
+2. External Testing → Create Group → 添加 Build → 填写 Test Information → Submit for Review
 
 **⚠️ 外部测试可能需要 Privacy Policy URL。** 如果没有：
 - 方案 A：暂时只走内部测试（不需要 Privacy Policy）
 - 方案 B：用 GitHub Pages 快速部署一个简版隐私政策
-
-### Step 4.5: 公开链接（可选）
-
-外部测试组审核通过后：
-
-```
-1. 进入外部测试组
-2. browser_click → Enable Public Link
-3. browser_snapshot → 复制生成的链接（如 testflight.apple.com/join/xxxxxx）
-```
-
-任何人用 iPhone 打开该链接即可安装，不需要逐个添加邮箱。
 
 **Phase 4 完成确认：**
 - [ ] 出口合规已声明
@@ -695,16 +627,15 @@ testflight_publish:
 
 ## 故障排查
 
-### Playwright / 浏览器
+### ae asc CLI / ASC API
 
 | 问题 | 原因 | 解决 |
 |------|------|------|
-| Apple 页面白屏 / CSS 不加载 | Playwright 用了内置 Chromium，被 TLS 指纹拦截 | 必须 `--browser chrome` 用系统 Chrome |
-| 登录后 session 丢失（每次对话都要重新登录） | 未配置持久化 profile | 加 `--user-data-dir ~/.config/playwright-profile` |
-| `browser_click` / `browser_fill_form` 5s 超时 | Playwright MCP 默认 `--timeout-action 5000`，Apple 重型 SPA 操作耗时超 5s | 重新注册 MCP 加 `--timeout-action 15000`；仍超时则用 `browser_run_code` + `{ force: true }` |
-| ASC 对话框点击超时（元素已 visible/stable） | React 组件事件绑定 + 点击触发 SPA 导航，Playwright actionability check 等到超时 | 用 `browser_run_code` 执行 `page.locator('...').click({ force: true })` 跳过 actionability 等待 |
-| `page.reload` / `browser_navigate` 超时 | 页面资源重，`load` 事件等待所有资源完成 | 用 `browser_run_code` 执行 `page.reload({ waitUntil: 'domcontentloaded' })` |
-| Apple 站点反爬检测 | 频繁操作触发 | 操作间加 2-3 秒间隔 |
+| `缺少 ASC 凭据` | credentials.env 未配置 ASC_KEY_ID / ASC_ISSUER_ID / ASC_KEY_PATH | 在 ASC → 用户和访问 → 集成 → 团队密钥 创建 API Key，配置到 `~/.config/ae/credentials.env` |
+| `认证失败 (HTTP 401)` | JWT 签名失败或 .p8 文件错误 | 检查 Key ID / Issuer ID 是否匹配，.p8 文件是否完整 |
+| `资源冲突 (HTTP 409)` | Bundle ID 已注册或 App 已存在 | 用 `ae asc bundle-id list` / `ae asc app list` 检查是否已有 |
+| `PyJWT / cryptography 缺失` | 依赖未安装 | `pip3 install PyJWT cryptography` |
+| API 调用超时 | 网络问题 | ae-asc.py 内置 3 次重试 + 指数退避 |
 
 ### 签名 / 编译
 

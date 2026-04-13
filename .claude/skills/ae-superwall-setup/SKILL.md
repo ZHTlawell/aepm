@@ -2,12 +2,10 @@
 description: "Superwall 支付集成全流程 — 账号配置 + ASC 订阅商品 + SDK 接入 + StoreKit 2 购买"
 permissions:
   allow:
-    - "mcp__playwright__*"
     - "Bash(xcodebuild *)"
     - "Bash(xcodegen *)"
 dependencies:
-  mcp:
-    - playwright
+  mcp: []
   cli:
     - name: xcodebuild
       verify: "xcodebuild -version"
@@ -95,24 +93,20 @@ PM 需要在 iOS App 中集成真实 StoreKit 支付时触发。典型场景：
 
 拿到 API Key 后继续。
 
-### Step 1.3: ASC 创建订阅商品（Playwright）
+### Step 1.3: ASC 创建订阅商品
 
-```
-1. browser_navigate → https://appstoreconnect.apple.com/apps/<AppID>/distribution/subscriptions
-2. browser_snapshot → 确认在 Subscriptions 页面
-3. 创建 Subscription Group:
-   - browser_click → Create Subscription Group
-   - browser_type → 组名（如 "WePray Pro"）
-   - browser_click → Create
-4. 逐个创建订阅商品:
-   - browser_click → Create Subscription
-   - browser_type → Reference Name + Product ID
-   - browser_click → Create
-   - 配置价格 + 试用期
-5. browser_snapshot → 确认所有商品创建完成
-```
+> **当前状态：** 订阅商品创建涉及多步 API 调用（创建 Subscription Group → 创建 Subscription → 设置本地化 → 配置定价），`ae asc` 尚未实现 subscription 命令组。暂通过 ASC Web UI 操作。
+
+**操作步骤（ASC Web UI）：**
+
+1. 打开 `https://appstoreconnect.apple.com/apps/<AppID>/distribution/subscriptions`
+2. 创建 Subscription Group（如 "WePray Pro"）
+3. 逐个创建订阅商品：填写 Reference Name + Product ID → 配置价格 + 试用期
+4. 确认所有商品状态为 "Ready to Submit"
 
 **ASC 订阅商品状态必须为 "Ready to Submit" 或 "Approved" 才能在 Sandbox 测试。**
+
+> **后续：** `ae asc subscription create-group` + `ae asc subscription create` 命令开发后，此步将自动化（跟踪 ae-platform #IIOOTZ）。
 
 ### Step 1.4: 杭州团队协助项
 
