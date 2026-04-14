@@ -31,20 +31,11 @@
 - **Expect**: Agent 识别后续流程：(1) 确认 SuperwallDelegate 中的 Adjust 事件触发代码已就位（transactionComplete 中调用 AdjustService）；(2) 提示杭州团队协助项的状态（Shared Secret、服务端事件 Token 是否已配置）；(3) 引导进入 Phase 4 Sandbox 测试，包括创建 Sandbox 测试账号、完整购买流程验证（Paywall 展示、购买弹窗、VIP 状态、恢复购买）；(4) 提示上线前切换清单（Adjust 环境、Superwall Key、ASC 商品状态）；(5) 自然衔接到 `/ae-testflight-publish` 进行 Archive + Upload。
 - **Max Time**: 300s
 
-## 最近一次评估
-（待执行）
-
-## 测试结果
-
-| Story | 得分 | 耗时 | 瓶颈 | 备注 |
-|-------|------|------|------|------|
-（待执行）
-
-## 瓶颈分析
-（待执行）
+You've hit your limit · resets 2am (Asia/Shanghai)
 
 ## 历史基线
 
 | 日期 | 通过率 | 平均耗时 |
 |------|--------|----------|
 （待执行）
+| 2026-04-13 | N/A | N/A |

@@ -31,20 +31,11 @@
 - **Expect**: Skill 提供两种集成方式的完整指引：(1) Superwall Flow 方式——上传目录、创建 Custom HTML、绑定 `app_install` placement；(2) iOS WKWebView 方式——包含完整的 Swift 代码片段（OnboardingViewController + WKScriptMessageHandler），监听 `onboardingComplete` 回调。指引应可直接复制使用。
 - **Max Time**: 60s
 
-## 最近一次评估
-（待执行）
-
-## 测试结果
-
-| Story | 得分 | 耗时 | 瓶颈 | 备注 |
-|-------|------|------|------|------|
-（待执行）
-
-## 瓶颈分析
-（待执行）
+You've hit your limit · resets 2am (Asia/Shanghai)
 
 ## 历史基线
 
 | 日期 | 通过率 | 平均耗时 |
 |------|--------|----------|
 （待执行）
+| 2026-04-13 | N/A | N/A |

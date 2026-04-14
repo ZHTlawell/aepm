@@ -63,48 +63,11 @@
   7. 整个流程使用 ae git CLI，不使用 curl 或直接调用 ae-git.py
 - **Max Time**: 300s
 
-## 最近一次评估
-（待执行）
-
-## 测试结果
-
-| Story | 得分 | 耗时 | 瓶颈 | 备注 |
-|-------|------|------|------|------|
-（待执行）
-
-## 瓶颈分析
-（待执行）
+You've hit your limit · resets 2am (Asia/Shanghai)
 
 ## 历史基线
 
 | 日期 | 通过率 | 平均耗时 |
 |------|--------|----------|
 （待执行）
-
-## 质量审计
-
-### 审计日期
-2026-04-13
-
-### 审计结果
-
-| 检查项 | 状态 | 说明 |
-|--------|------|------|
-| SKILL.md 完整性 | ✅ | 触发条件明确；Step 1-6 流程完整（收集→查重→格式化→确认→提交→验证）；有 issue body 模板；有用户确认点（Step 4）；有硬规则和 Anti-Patterns；有 Troubleshooting 表 |
-| 依赖可达性 | ✅ | ae CLI 已安装（/Users/kenchy/.ae/bin/ae）；GITEE_TOKEN 声明在 api_keys 中；无脚本依赖，所有操作通过 ae git 命令完成 |
-| 权限声明 | ⚠️ | frontmatter 缺少 `permissions.allow` 字段。实际使用了 `Bash(ae git:*)` 命令，应显式声明权限。对比 ae-web-browse 和 ae-podcast-learn 都有权限声明 |
-| 注册一致性 | ✅ | templates/go/CLAUDE.md 第 24 行注册为"向 AE Team 提交 bug 或需求（`/ae-submit-bug` / `/ae-submit-requirement`）"；templates/pm/CLAUDE.md 第 142 行注册为"提 Bug | `/ae-submit-bug`"。共享 skill 在两个角色模板中均正确注册，名称一致 |
-| 逻辑健壮性 | ✅ | 查重保护避免重复 issue；验证标准必填兜底了"修好后怎么验证"；提交后有 list 验证；笼统描述有追问机制；多 bug 强制逐个处理。401 报错有 Troubleshooting 指引 |
-
-### 发现的问题
-
-#### P0（阻断）
-- 无
-
-#### P1（影响体验）
-- frontmatter 缺少 `permissions.allow` 字段。ae git Bash 调用在 `ae link` 合并权限时可能不会被自动授权
-
-#### P2（可改进）
-- Step 2 查重使用 `ae git issues list --state open` 获取所有 open issue，然后靠 agent 文本匹配判断相似度。当 issue 数量多时可能遗漏或误判。建议补充按关键词搜索的策略（如果 ae git 支持）
-- Step 5 中目标仓库路由需要读取 `~/.ae/<role>/CLAUDE.md`，但没有说明如何判断当前是 go 还是 pm 角色。SKILL.md 应补充角色判断逻辑（如检查哪个 CLAUDE.md 存在/当前 workspace 关联的角色）
-- 标题格式 `[BUG] 产品名 — 问题简述` 中的"产品名"没有枚举合法值，可能导致命名不一致
+| 2026-04-13 | N/A | N/A |

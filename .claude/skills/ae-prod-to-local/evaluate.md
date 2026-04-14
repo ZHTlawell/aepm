@@ -31,20 +31,11 @@
 - **Expect**: Skill 在完成后引导中提示三个选项：(1) `/ae-demo-to-speckit` 并说明 dependency-map.md 和 constraints-draft.md 是 speckit 的输入；(2) 手动过代码深入理解；(3) 发送 team-request.md 解决剩余阻塞项。constraints-draft.md 中 A 类约束应以 speckit 可消费的格式编写（分 iOS/后端，标注约束 key 如 `ios-auth`、`be-deploy`）。
 - **Max Time**: 60s
 
-## 最近一次评估
-（待执行）
-
-## 测试结果
-
-| Story | 得分 | 耗时 | 瓶颈 | 备注 |
-|-------|------|------|------|------|
-（待执行）
-
-## 瓶颈分析
-（待执行）
+You've hit your limit · resets 2am (Asia/Shanghai)
 
 ## 历史基线
 
 | 日期 | 通过率 | 平均耗时 |
 |------|--------|----------|
 （待执行）
+| 2026-04-13 | N/A | N/A |

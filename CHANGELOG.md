@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.38.0 (2026-04-14) — Phase 6 App Store 提审 + README 端到端流水线重写 `#II8UYE`
+
+### 新功能
+- **`/ae-app-review-check`** — App Store 审核自检 skill（#IIREUW）
+  - 对照 Guideline 2.1/2.3/3.1/4.3/5.1 扫描项目
+  - Apple AI 自动审核已知规则检测（归因 SDK 误判、Firebase Auth demo account）
+  - 输出结构化报告（fail/warn/pass）+ Review Notes 建议
+- **`/ae-asc-submit`** — App Store 提审 skill（#IIREV0）
+  - 从 speckit 自动提取元数据（名称/描述/关键词/分类）
+  - 截图获取与验证（模拟器/真机/已有截图）
+  - Review Notes 自动生成
+  - 通过 fastlane deliver 上传元数据和截图
+  - PM 确认后提交审核
+
+### 更新
+- **README** — 按 Phase 0-7 端到端流水线重写（#IIREUQ）
+  - 从 `demo→speckit→dev→verify` 扩展到完整 8 Phase 上架流程
+  - 每个 Phase 列出对应 skill、输入输出、示例命令
+  - 标注 Phase 6 建设中状态
+- **CLAUDE.md** — 能力表新增 ae-app-review-check 和 ae-asc-submit
+
 ## v0.37.1 (2026-04-13) — ae update 自动发现未追踪的旧项目 `#IIOV9S`
 
 ### 修复

@@ -160,6 +160,7 @@ _register_link_global_skills() {
 
     [[ -d "$skills_dir" ]] || return 0
 
+    # --- 1. additionalDirectories (file access permissions) ---
     local settings_file="$HOME/.claude/settings.json"
     mkdir -p "$HOME/.claude"
 
@@ -191,6 +192,41 @@ PYEOF
 
     if [[ "$result" == "added" ]]; then
         ok "  已注册 ae-$role skills 到 Claude Code 全局设置"
+    fi
+
+    # --- 2. Global skill discovery via ~/.claude/skills/ ---
+    _register_global_skills "$role"
+}
+
+# Symlink ae-<role> skills into ~/.claude/skills/ so they are discoverable
+# from any working directory via /ae-xxx slash commands.
+_register_global_skills() {
+    local role="$1"
+    local skills_src="$AE_HOME/$role/.claude/skills"
+    local global_skills="$HOME/.claude/skills"
+
+    mkdir -p "$global_skills"
+
+    local linked=0
+    for skill_dir in "$skills_src/"*/; do
+        [[ -f "$skill_dir/SKILL.md" ]] || continue
+        local name
+        name=$(basename "$skill_dir")
+        local target="$global_skills/$name"
+
+        # Skip if already correctly linked
+        if [[ -L "$target" ]] && [[ "$(readlink "$target")" == "$skill_dir" ]]; then
+            continue
+        fi
+
+        # Remove stale link or directory, create fresh symlink
+        rm -rf "$target"
+        ln -sf "$skill_dir" "$target"
+        ((linked++))
+    done
+
+    if [[ $linked -gt 0 ]]; then
+        ok "  已注册 ${linked} 个 ae-$role skill 到全局 ~/.claude/skills/"
     fi
 }
 

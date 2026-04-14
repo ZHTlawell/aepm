@@ -31,20 +31,11 @@
 - **Expect**: Agent 按 Phase 6 流程操作：(1) 更新 templates/pm/CHANGELOG.md 顶部新增版本条目（含版本号、日期、issue 编号、改动描述）；(2) 同步更新 templates/pm/README.md 中的版本号；(3) git add + commit + push；(4) 执行 `bash scripts/publish.sh pm`，publish.sh 应能成功构建并通过版本号一致性校验；(5) 通过 `ae git issues comment` 在 issue 上发 comment 包含版本号、改动摘要、验证结果、更新命令。
 - **Max Time**: 240s
 
-## 最近一次评估
-（待执行）
-
-## 测试结果
-
-| Story | 得分 | 耗时 | 瓶颈 | 备注 |
-|-------|------|------|------|------|
-（待执行）
-
-## 瓶颈分析
-（待执行）
+You've hit your limit · resets 2am (Asia/Shanghai)
 
 ## 历史基线
 
 | 日期 | 通过率 | 平均耗时 |
 |------|--------|----------|
 （待执行）
+| 2026-04-13 | N/A | N/A |

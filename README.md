@@ -1,106 +1,147 @@
 # AE PM Agent
 
-> 让 PM 通过 vibe coding 产出可直接上线的产品原型。
+> 让 PM 通过 vibe coding 产出可直接上架的 iOS App。
 
 ## 这是什么
 
 AE PM Agent 是一套 **AI 编程助手的指令和能力包**，安装后你的 AI 编码工具（Claude Code / Codex / Cursor 等）就具备了产品经理专属的工作流支持。
 
-它解决的核心问题是：**PM 用 vibe coding 做出的 demo 原型，往往因为技术选型不规范，导致后续无法高效转化为可上线的成品。**
+它解决的核心问题是：**PM 用 vibe coding 做出的 demo 原型，与真正能上架 App Store 之间存在大量工程化环节。** AE PM Agent 把从 demo 到上架的完整路径拆成 8 个 Phase，每个 Phase 对应一组 Skill，走完即可提审。
 
-AE PM Agent 通过两个机制解决这个问题：
-
-1. **技术选型约束** — 在 vibe coding 阶段就确保 demo 符合工程规范（如必须用 SwiftUI Native，禁止 WebView 包装）
-2. **标准化工作流 (Skills)** — 把 demo→成品的每一步都做成可复用的能力
-
-## 核心流程
+## 端到端流水线
 
 ```
-PM vibe coding demo 原型（在约束下）
-        │
-        ▼
-  /ae-demo-to-speckit  ← 自动提取标准规格书
-        │
-        ▼
-  Speckit (6 模块)    ← 产品定位/场景/架构/设计/数据/API
-        │
-        ▼
-  Dev Agent 生成成品   ← 调用 ae-dev 生成 iOS + 后端
-        │
-        ▼
-  /ae-verify-app       ← E2E 对比 demo vs 成品，自动归因差异
-        │
-        ▼
-  可上线的产品
+Phase 0  Vibe Coding Demo ─── PM 用 AI 工具产出 demo（受技术选型约束）
+   │
+Phase 1  Demo → Speckit ───── 提取标准规格书 / 逆向已上架 App
+   │
+Phase 2  Speckit → 成品 ───── ae-dev 生成 iOS + 后端，E2E 对比验证
+   │
+Phase 3  发布准备 ──────────── 预检 + 埋点 + 支付 + Onboarding + Paywall
+   │
+Phase 4  TestFlight 分发 ──── 签名 → Archive → Upload → 测试组
+   │
+Phase 5  验证 & 修复 ──────── 真机验证 + 埋点验证 + 购买验证 + Bug 修复
+   │
+Phase 6  App Store 提审 ──── 审核自检 + ASC 配置 + Submit  ← 🆕 建设中
+   │
+Phase 7  运营迭代 ──────────── 去版权化 + 原型转 Figma + A/B 测试
 ```
 
-## 各步骤操作说明
+## 各 Phase 详细说明
 
-### Step 1: Vibe Coding Demo
+### Phase 0: Vibe Coding Demo
 
 用 AI 编码工具（Antigravity / Claude Code / Cursor）做出 demo 原型。ae-pm 的技术选型约束会确保 demo 符合工程规范。
 
-### Step 2: Demo → Speckit
+**输出：** 可运行的 demo 项目
 
-在 demo 项目中执行：
+### Phase 1: Demo → Speckit
+
+| Skill | 说明 |
+|-------|------|
+| `/ae-demo-to-speckit` | 从 demo 源码自动提取 6 模块标准规格书 |
+| `/ae-app-to-speckit` | 从已上架 App 逆向提取 speckit（需 iPhone + USB + WDA） |
 
 ```bash
-# 在 Claude Code 中
 /ae-demo-to-speckit
 ```
 
-产出 `speckit/` 目录，包含 6 个标准模块文件。
+**输出：** `speckit/` 目录（产品定位/场景/架构/设计/数据/API）
 
-### Step 3: Speckit → 成品（调用 ae-dev）
+### Phase 2: Speckit → 成品
 
-**这一步需要切换到 Dev Agent 的工作环境。** 具体做法：
-
-```bash
-# 1. 创建成品项目目录
-mkdir -p ~/Projects/ShoeLens-prod
-cd ~/Projects/ShoeLens-prod
-
-# 2. 链接 ae-dev（如未链接过）
-ae link dev .
-# 或手动：
-#   mkdir -p .claude/skills
-#   ln -sf ~/.ae/dev/.claude/skills/* .claude/skills/
-#   echo '请同时遵守 ~/.ae/dev/CLAUDE.md 中的技术选型和生成流程。' >> CLAUDE.md
-
-# 3. 打开 Claude Code，告诉它 speckit 位置
-claude
-# 然后说：从 ~/Projects/ShoeLens/speckit/ 生成项目
-```
-
-或者用 `ae` CLI 一步完成：
+**这一步需要切换到 ae-dev 环境。**
 
 ```bash
-ae dev speckit-receive ~/Projects/ShoeLens/speckit/
+# 方式一：ae CLI（推荐）
+ae dev speckit-receive ~/Projects/MyApp/speckit/
+
+# 方式二：手动
+cd ~/Projects/MyApp-prod && ae link dev . && claude
 ```
 
-Dev Agent 会自动执行：验证 speckit → 生成 OpenAPI 契约 → 生成 Spring Boot 后端 → 生成 SwiftUI iOS → 编译验证。
+Dev Agent 自动执行：验证 speckit → 生成 OpenAPI 契约 → 生成 Spring Boot 后端 → 生成 SwiftUI iOS → 编译验证。
 
-### Step 4: 验证
+验证阶段：
 
-回到 demo 项目，E2E 对比：
+| Skill | 说明 |
+|-------|------|
+| `/ae-verify-app` | E2E 对比 demo vs 成品，自动归因差异 |
+| `/ae-file-bugs` | 从 verify 报告批量生成 issue 并提交 |
+
+**输出：** 功能完整的 iOS + 后端项目
+
+### Phase 3: 发布准备 (Publish-Ready)
+
+| Skill | 说明 |
+|-------|------|
+| `/ae-preflight` | 预检扫描 — API Key 泄漏/Icon/Privacy/签名/资源尺寸 |
+| `/ae-analytics-setup` | Firebase Analytics + Adjust SDK 双轨埋点 |
+| `/ae-superwall-setup` | Superwall 支付集成（账号 + ASC 订阅 + SDK + StoreKit 2） |
+| `/ae-onboarding-design` | 生成 Onboarding 幻灯片（HTML/CSS/JS，Superwall/WebView） |
+| `/ae-paywall-design` | 生成 Paywall 付费墙（HTML 或 Native StoreKit 2） |
 
 ```bash
-/ae-verify-app
+/ae-preflight          # 先扫描，修完所有 blocker
+/ae-analytics-setup    # 接埋点
+/ae-superwall-setup    # 接支付
 ```
 
-## 已有能力
+**输出：** 代码满足上架标准
 
-| Skill | 命令 | 说明 |
+### Phase 4: TestFlight 分发
+
+| Skill | 说明 |
+|-------|------|
+| `/ae-testflight-publish` | 签名 → Archive → Upload → TestFlight 测试组分发 |
+
+```bash
+/ae-testflight-publish
+```
+
+真机自动化环境（如需要）通过 ae-go 提供：`/ae-mobile-setup` + `/ae-mobile-agent`
+
+**输出：** TestFlight 可测 Build
+
+### Phase 5: 验证 & 修复
+
+| 验证项 | 方法 |
+|--------|------|
+| 功能验证 | 真机安装 TestFlight Build，核心流程走通 |
+| 埋点验证 | GA4 Realtime + Adjust Sandbox 确认数据到达 |
+| 购买验证 | StoreKit Sandbox 购买流程完整 |
+| Bug 修复 | `/ae-report-fix` 回流修复方案 |
+
+**输出：** 全链路验证通过
+
+### Phase 6: App Store 提审 `建设中`
+
+| Skill | 说明 | 状态 |
 |-------|------|------|
-| Demo 转 Speckit | `/ae-demo-to-speckit` | 从 demo 源码自动提取 6 模块标准规格书 |
-| App 差异验证 | `/ae-verify-app` | E2E 对比两个 app 的功能差异，自动归因到提取/生成/约束环节 |
-| 提交需求 | `/ae-submit-requirement` | 向 AE Team 提交新能力需求（必须是可复用机制） |
-| 提交 Bug | `/ae-submit-bug` 或 `ae pm submit-bug` | 提交 bug 报告到 ae-pm repo |
-| 批量提 Bug | `/ae-file-bugs` 或 `ae pm file-bugs` | 从 verify 报告自动生成 issue 并批量提交 |
-| Onboarding 页面生成 | `/ae-onboarding-design` | 生成产品 Onboarding 幻灯片（HTML/CSS/JS，Superwall/WebView） |
-| Paywall 页面生成 | `/ae-paywall-design` | 生成 Paywall 付费墙（HTML 或 Native StoreKit 2） |
-| Superwall 集成 | `/ae-superwall-setup` | Superwall 账号配置、SDK 集成、Placement 注册引导 |
-| 查收更新 | 直接告诉 agent | 查看 CHANGELOG 了解最新版本更新 |
+| `/ae-app-review-check` | 对照 Apple Review Guidelines + AI 审核规则自检 | 🔨 待建 |
+| `/ae-asc-submit` | ASC 截图/描述/关键词/Privacy URL → Submit for Review | 🔨 待建 |
+
+**输出：** 审核通过上线
+
+### Phase 7: 运营迭代
+
+| Skill | 说明 |
+|-------|------|
+| `/ae-image-decopyrighter` | 图片 AI 重绘去版权化（Gemini Imagen 4.0） |
+| `/ae-demo-to-figma` | 将 demo 项目 UI 导入 Figma 设计稿 |
+
+## 通用能力（不属于特定 Phase）
+
+| Skill | 说明 |
+|-------|------|
+| `/ae-submit-bug` | 提交 bug 报告到 Gitee |
+| `/ae-submit-requirement` | 提交可复用能力需求 |
+| `/ae-report-fix` | 本地修复成功后回流方案给 AE Team |
+| `/ae-lark-feishu` | 飞书消息搜索/读取/发送 + 会议妙记/逐字稿 |
+| `/ae-prod-to-local` | 将线上项目转为本地可编译运行的配置 |
+| `/ae-skill-creator` | 标准化 skill 构建流程（六段标准 + 审计模式） |
+| 查收更新 | 直接告诉 agent，查看 CHANGELOG 了解最新版本 |
 
 ## 技术选型约束
 
@@ -279,7 +320,7 @@ git pull origin main
 
 查看 [CHANGELOG.md](CHANGELOG.md) 了解完整更新记录。
 
-当前版本：**v0.37.1**
+当前版本：**v0.38.0**
 
 ## 由谁维护
 

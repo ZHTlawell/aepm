@@ -68,48 +68,11 @@
   7. 全程使用 ae git CLI，不使用 curl 或直接调用 python3 ae-git.py
 - **Max Time**: 120s
 
-## 最近一次评估
-（待执行）
-
-## 测试结果
-
-| Story | 得分 | 耗时 | 瓶颈 | 备注 |
-|-------|------|------|------|------|
-（待执行）
-
-## 瓶颈分析
-（待执行）
+You've hit your limit · resets 2am (Asia/Shanghai)
 
 ## 历史基线
 
 | 日期 | 通过率 | 平均耗时 |
 |------|--------|----------|
 （待执行）
-
-## 质量审计
-
-### 审计日期
-2026-04-13
-
-### 审计结果
-
-| 检查项 | 状态 | 说明 |
-|--------|------|------|
-| SKILL.md 完整性 | ✅ | 触发条件明确；Step 1-6 流程完整（理解意图→查重→格式化→确认→提交→验证）；有 issue body 模板（5 段式）；有用户确认点；有硬规则和 Anti-Patterns；有 Troubleshooting |
-| 依赖可达性 | ✅ | ae CLI 已安装；GITEE_TOKEN 声明在 api_keys 中；无脚本依赖 |
-| 权限声明 | ⚠️ | frontmatter 缺少 `permissions.allow` 字段。与 ae-submit-bug 同样的问题，实际使用了 ae git Bash 命令但未声明权限 |
-| 注册一致性 | ✅ | templates/go/CLAUDE.md 第 24 行注册为"向 AE Team 提交 bug 或需求（`/ae-submit-bug` / `/ae-submit-requirement`）"；templates/pm/CLAUDE.md 第 141 行注册为"提需求 | `/ae-submit-requirement`"。共享 skill 在两个角色模板中均正确注册 |
-| 逻辑健壮性 | ✅ | 查重保护；验证标准必填（至少 2 个场景）；提交后 list 验证；模糊需求有追问 + agent 草拟场景机制；硬规则"不替用户做技术判断"防止越界 |
-
-### 发现的问题
-
-#### P0（阻断）
-- 无
-
-#### P1（影响体验）
-- frontmatter 缺少 `permissions.allow` 字段。与 ae-submit-bug 相同问题
-
-#### P2（可改进）
-- 与 ae-submit-bug 高度同构（Step 2-6 几乎一致），可考虑抽取共享的查重→确认→提交→验证流程为通用模块，减少维护成本
-- Step 1d 要求"至少 2 个可执行的验证场景"，但 ae-submit-bug 只要求"验证标准必填"（无数量要求）。两个 skill 的验证标准严格度不一致，建议统一
-- Troubleshooting 中"目标仓库不确定 → 默认当前角色的主仓库"与 ae-submit-bug 的"读取 `~/.ae/<role>/CLAUDE.md` 的 Issue 路由表"表述方式不同，建议统一措辞
+| 2026-04-13 | N/A | N/A |

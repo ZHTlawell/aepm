@@ -153,6 +153,8 @@ CLI 会自动加载 credentials、调用 Gitee API、返回 issue 链接。
 | 发布前预检 | `/ae-preflight` — iOS 一体化生产就绪扫描（签名/Icon/隐私/API Key 泄漏/资源尺寸） | 可用 |
 | 线上项目本地化 | `/ae-prod-to-local` — 分析线上项目结构，生成可本地编译运行的配置 | 可用 |
 | Demo 转 Figma | `/ae-demo-to-figma` — 将 demo 项目的 UI 导入 Figma 设计稿 | 可用（需 Figma MCP） |
+| 审核自检 | `/ae-app-review-check` — 对照 Apple Review Guidelines + AI 审核规则自检 | 可用 |
+| App Store 提审 | `/ae-asc-submit` — ASC 元数据配置 + 截图上传 + Review Notes + 提交审核 | 可用（部分功能依赖 fastlane） |
 | 查收更新 | 自动检查新版本（每 24h）+ 查看 CHANGELOG.md 了解更新内容 | 可用 |
 
 ### 调用 Dev Agent 生成成品

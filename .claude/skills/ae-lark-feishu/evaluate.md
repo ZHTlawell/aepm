@@ -65,50 +65,11 @@
   7. 使用 `--format pretty` 展示给用户，需要提取详情时才用 `--format json`
 - **Max Time**: 60s
 
-## 最近一次评估
-（待执行）
-
-## 测试结果
-
-| Story | 得分 | 耗时 | 瓶颈 | 备注 |
-|-------|------|------|------|------|
-（待执行）
-
-## 瓶颈分析
-（待执行）
+You've hit your limit · resets 2am (Asia/Shanghai)
 
 ## 历史基线
 
 | 日期 | 通过率 | 平均耗时 |
 |------|--------|----------|
 （待执行）
-
-## 质量审计
-
-### 审计日期
-2026-04-13
-
-### 审计结果
-
-| 检查项 | 状态 | 说明 |
-|--------|------|------|
-| SKILL.md 完整性 | ✅ | 触发条件明确（飞书/Lark 相关关键词）；有 4 步前置条件检查流程（安装→认证→登录→连通性测试）；8 个核心能力分别有详细命令示例；有 2 个完整工作流示例；有 5 条重要规则；有输出格式指引（pretty vs json） |
-| 依赖可达性 | ✅ | lark-cli 已安装（/usr/local/bin/lark-cli）；安装方式 `npm install -g @larksuite/cli` 合理；Node.js 为前置依赖但 macOS 通常已有 |
-| 权限声明 | ⚠️ | frontmatter 缺少 `permissions.allow` 字段。实际大量使用 Bash 命令（lark-cli 各种子命令），应声明 `Bash(lark-cli:*)` 权限 |
-| 注册一致性 | ✅ | templates/go/CLAUDE.md 第 15 行注册为"飞书消息读写、搜索、会议纪要获取（`/ae-lark-feishu`）"；templates/pm/CLAUDE.md 第 146 行注册为"飞书消息与会议 | `/ae-lark-feishu`"。共享 skill 在两个角色模板中均正确注册 |
-| 逻辑健壮性 | ✅ | lark-cli 未安装有引导安装流程；token 过期有重新登录引导；有连通性验证步骤；发送消息前有必须确认规则；身份区分（user 读/bot 写）明确。前置检查失败时不执行后续操作 |
-
-### 发现的问题
-
-#### P0（阻断）
-- 无
-
-#### P1（影响体验）
-- frontmatter 缺少 `permissions.allow` 字段。lark-cli 的 Bash 调用在 `ae link` 合并权限时不会被自动授权，用户可能需要手动批准每次调用
-
-#### P2（可改进）
-- SKILL.md 结构偏"参考手册"（命令列表），缺少 Phase 划分。建议增加简要的流程概览：前置检查 → 理解用户意图 → 选择能力 → 执行 → 展示结果
-- 核心能力第 6 项"发送消息"中提到"bot 身份"但命令示例中没有 `--as bot` 参数。SKILL.md 描述说需要 bot 身份，但实际命令未体现，可能导致执行失败或身份混淆
-- smoke_test 使用 `lark-cli --version` 但 SKILL.md Step 1 使用 `lark-cli --help | head -1` 验证安装，两者不一致。建议统一
-- 会议妙记功能依赖用户有飞书视频会议权限和妙记功能开通。SKILL.md 未提及此前置条件，如果用户企业未开通妙记，`lark-cli vc +notes` 会失败但无降级提示
-- 前置条件检查的 Step 4 连通性测试使用 `--query "test"` 搜索群聊，如果用户没有名称含"test"的群会返回空结果，可能被误判为连通性失败。建议改为不带 query 的列表命令
+| 2026-04-13 | N/A | N/A |

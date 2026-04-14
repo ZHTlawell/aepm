@@ -31,20 +31,11 @@
 - **Expect**: Skill 在 Phase 7 写入 `publish-state.yaml`（status: done，scanned_at 日期，blockers/warnings 列表），并在报告 NEXT STEPS 中明确引导用户：签名阻塞 → `/ae-testflight-publish`；资产缺失 → `/ae-store-assets`；埋点缺失 → `/ae-analytics-setup`；编译通过 → 直接进入 `/ae-testflight-publish` Phase 3-4。体现 skill 之间的流程衔接。
 - **Max Time**: 60s
 
-## 最近一次评估
-（待执行）
-
-## 测试结果
-
-| Story | 得分 | 耗时 | 瓶颈 | 备注 |
-|-------|------|------|------|------|
-（待执行）
-
-## 瓶颈分析
-（待执行）
+You've hit your limit · resets 2am (Asia/Shanghai)
 
 ## 历史基线
 
 | 日期 | 通过率 | 平均耗时 |
 |------|--------|----------|
 （待执行）
+| 2026-04-13 | N/A | N/A |

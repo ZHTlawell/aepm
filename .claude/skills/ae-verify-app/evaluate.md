@@ -31,20 +31,11 @@
 - **Expect**: Agent 在验证完成后（coverage < 100%）主动提示用户可用 `/ae-file-bugs`；如果用户确认，读取 diff report JSON 中所有 status 为 missing 或 different 的 case，每个 case 生成一个 issue，issue 内容包含：case ID、差异描述、归因分析、对应的截图路径、speckit 来源引用。使用 `ae git issues create` 提交。如果 coverage = 100%，只提示验证通过，不引导 file-bugs。
 - **Max Time**: 300s
 
-## 最近一次评估
-（待执行）
-
-## 测试结果
-
-| Story | 得分 | 耗时 | 瓶颈 | 备注 |
-|-------|------|------|------|------|
-（待执行）
-
-## 瓶颈分析
-（待执行）
+You've hit your limit · resets 2am (Asia/Shanghai)
 
 ## 历史基线
 
 | 日期 | 通过率 | 平均耗时 |
 |------|--------|----------|
 （待执行）
+| 2026-04-13 | N/A | N/A |

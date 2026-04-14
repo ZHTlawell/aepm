@@ -31,20 +31,11 @@
 - **Expect**: Skill 验证生成的 script.js 包含三个回调函数：`paywallPurchase(productId)`、`paywallDismiss()`、`paywallRestore()`，每个回调通过 `window.webkit.messageHandlers` 与 iOS 端通信。提供 Superwall 集成步骤（上传 Dashboard、创建 Custom HTML、绑定 placement）和 iOS WKWebView 集成的 Swift 代码片段（PaywallViewController + 三个 messageHandler）。
 - **Max Time**: 60s
 
-## 最近一次评估
-（待执行）
-
-## 测试结果
-
-| Story | 得分 | 耗时 | 瓶颈 | 备注 |
-|-------|------|------|------|------|
-（待执行）
-
-## 瓶颈分析
-（待执行）
+You've hit your limit · resets 2am (Asia/Shanghai)
 
 ## 历史基线
 
 | 日期 | 通过率 | 平均耗时 |
 |------|--------|----------|
 （待执行）
+| 2026-04-13 | N/A | N/A |

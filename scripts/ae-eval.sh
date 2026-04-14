@@ -60,12 +60,14 @@ ROLE="$1"
 TARGET="$2"
 DRY_RUN=false
 FORCE_GENERATE=false
+JUDGE_ONLY=false
 
 shift 2
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --dry-run) DRY_RUN=true ;;
         --generate) FORCE_GENERATE=true ;;
+        --judge-only) JUDGE_ONLY=true ;;
         *) err "未知参数: $1"; usage; exit 1 ;;
     esac
     shift
@@ -85,19 +87,42 @@ check_connection() {
     ok "Mac Mini 连接正常"
 }
 
+# --- 解析 skill 实际路径（支持 role 专属和共享 skill）---
+resolve_skill_dir() {
+    local skill_name="$1"
+    if [[ -f "$REPO_ROOT/skills/$ROLE/$skill_name/SKILL.md" ]]; then
+        echo "$REPO_ROOT/skills/$ROLE/$skill_name"
+    elif [[ -f "$REPO_ROOT/skills/$skill_name/SKILL.md" ]]; then
+        echo "$REPO_ROOT/skills/$skill_name"
+    else
+        echo ""
+    fi
+}
+
 # --- 收集要测试的 skill 列表 ---
 collect_skills() {
     local skills=()
     if [[ "$TARGET" == "--all" ]]; then
+        # Role-specific skills
         while IFS= read -r d; do
             local name=$(basename "$d")
-            if [[ -f "$REPO_ROOT/skills/$ROLE/$name/SKILL.md" ]]; then
+            if [[ -f "$d/SKILL.md" ]]; then
                 skills+=("$name")
             fi
-        done < <(find "$REPO_ROOT/skills/$ROLE" -mindepth 1 -maxdepth 1 -type d | sort)
+        done < <(find "$REPO_ROOT/skills/$ROLE" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort)
+        # Shared skills (directly under skills/)
+        while IFS= read -r d; do
+            local name=$(basename "$d")
+            [[ "$name" == "pm" || "$name" == "go" || "$name" == "dev" ]] && continue
+            if [[ -f "$d/SKILL.md" ]]; then
+                skills+=("$name")
+            fi
+        done < <(find "$REPO_ROOT/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort)
     else
-        if [[ ! -f "$REPO_ROOT/skills/$ROLE/$TARGET/SKILL.md" ]]; then
-            err "Skill 不存在: skills/$ROLE/$TARGET/SKILL.md"
+        local resolved
+        resolved=$(resolve_skill_dir "$TARGET")
+        if [[ -z "$resolved" ]]; then
+            err "Skill 不存在: skills/$ROLE/$TARGET/SKILL.md 或 skills/$TARGET/SKILL.md"
             exit 1
         fi
         skills+=("$TARGET")
@@ -108,7 +133,8 @@ collect_skills() {
 # --- 同步 skill 文件到 Mac Mini ---
 sync_skill() {
     local skill_name="$1"
-    local skill_dir="$REPO_ROOT/skills/$ROLE/$skill_name"
+    local skill_dir
+    skill_dir=$(resolve_skill_dir "$skill_name")
     local remote_dir="/tmp/ae-eval/$ROLE/$skill_name"
 
     ssh $SSH_OPTS $SSH_HOST "mkdir -p $remote_dir"
@@ -237,12 +263,10 @@ for idx, name, prompt, expect, max_time in stories:
 
     start = time.time()
     try:
-        skill_home = os.path.expanduser('~/.ae/${ROLE}')
         result = subprocess.run(
             ['claude', '-p', prompt, '--max-turns', '10'],
             capture_output=True, text=True,
             timeout=max(max_time * 2, 120),  # 给 2 倍超时
-            cwd=skill_home,
             env={**os.environ, 'PATH': '/opt/homebrew/bin:' + os.environ.get('PATH', '')}
         )
         elapsed = time.time() - start
@@ -399,12 +423,13 @@ PYEOF
 fetch_evaluate() {
     local skill_name="$1"
     local remote_dir="/tmp/ae-eval/$ROLE/$skill_name"
-    local local_dir="$REPO_ROOT/skills/$ROLE/$skill_name"
+    local local_dir
+    local_dir=$(resolve_skill_dir "$skill_name")
 
     scp -o Port=$SSH_PORT -o IdentityFile=$SSH_KEY -o IdentitiesOnly=yes \
         "$SSH_HOST:$remote_dir/evaluate.md" "$local_dir/evaluate.md" 2>/dev/null
 
-    ok "$skill_name: evaluate.md 已写回 skills/$ROLE/$skill_name/evaluate.md"
+    ok "$skill_name: evaluate.md 已写回 $local_dir/evaluate.md"
 }
 
 # ==================== 主流程 ====================
@@ -420,6 +445,14 @@ for skill in "${SKILLS[@]}"; do
 
     # 同步文件到 Mac Mini
     sync_skill "$skill"
+
+    if [[ "$JUDGE_ONLY" == "true" ]]; then
+        # 跳过生成和执行，直接用已有的 results JSON 跑 Judge
+        sync_skill "$skill"
+        judge_results "$skill"
+        fetch_evaluate "$skill"
+        continue
+    fi
 
     # Phase 1: 生成 stories
     generate_stories "$skill"
