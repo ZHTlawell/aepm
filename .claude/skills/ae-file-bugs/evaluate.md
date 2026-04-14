@@ -64,9 +64,34 @@
 
 You've hit your limit · resets 2am (Asia/Shanghai)
 
+## 最近一次评估
+- **日期**: 2026-04-14
+- **环境**: Mac Mini (macOS 26.2 arm64)
+- **总体通过率**: 1/5 (20%)
+- **平均耗时**: 48.3s
+
+## 测试结果
+
+| Story | 得分 | 耗时 | 瓶颈 | 备注 |
+|-------|------|------|------|------|
+| 基础 Happy Path | 1/5 | 38.2s | 测试环境无 diff report 测试数据 | 错误处理正确（提示先跑 verify-app），但 Steps 2-6 核心流程（解析/草稿/确认/提交/汇总）零覆盖 |
+| 选择性提交 + 跳过 | 1/5 | 61.1s | 测试环境无 diff report 测试数据 | 同上，"跳过 3,7" 选择性提交逻辑完全未验证 |
+| diff report 不存在 | 3/5 | 33.6s | — | 按优先级查找 ✅、提示跑 verify-app ✅、未创建本地文件 ✅；JSON 格式错误和"全 pass"场景未测到 |
+| 标题前缀和正文质量 | 1/5 | 38.3s | 测试环境无 diff report 测试数据 | 前缀映射（SPECKIT-GAP/GEN-BUG/CONSTRAINT-GAP/BUG）、正文模板完整性、验收标准质量均未验证 |
+| 合并相似 case | 0/5 | 70.1s | 速率限制导致完全失败 | 输出为"You've hit your limit"，skill 未执行任何逻辑 |
+
+## 瓶颈分析
+- **致命问题：测试环境缺少 fixture 数据。** 5 个 story 中有 4 个需要 diff report JSON 文件才能触发核心流程，但测试环境仅包含 `SKILL.md` 和 `evaluate.md`，导致 80% 的 story 在 Step 1 就终止。建议在测试 harness 中预置 `verify/reports/diff-iter1.json` 和 `diff-iter2.json` 等 fixture 文件，包含 different/missing_in_prod/pass/not_tested/navigation_error 各种 status 及 extraction/generation/constraint/null 各种 attribution。
+- **速率限制未做容错。** Story 5 因 rate limit 直接返回错误文本，skill 应在 SKILL.md 中定义遇到 API 限流时的降级策略（如本地保存草稿、稍后重试），或测试框架应在限流时标记为 inconclusive 而非 fail。
+- **错误路径覆盖不足。** Story 3 是唯一能在当前环境跑通的 story，但其期望中 JSON 格式错误和"全 pass 无需提 bug"两个分支也未被覆盖，需要额外 fixture 文件支持。
+
+## 结论
+Skill 的错误处理路径（文件不存在→引导用户）表现合格，但核心功能（解析 diff→生成草稿→确认→批量提交→汇总）因测试环境缺少 fixture 数据而完全未验证，当前评估无法反映 skill 真实能力；**最高优先级是补充测试 fixture，重跑 Story 1/2/4/5 后再做有效评估。**
+
 ## 历史基线
 
 | 日期 | 通过率 | 平均耗时 |
 |------|--------|----------|
 （待执行）
 | 2026-04-13 | N/A | N/A |
+| 2026-04-14 | 1/5 (20%) | 48.3s |

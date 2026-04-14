@@ -336,6 +336,8 @@ speckit 文档中引用截图时**必须使用 HTML img 标签限制显示宽度
 - 需要实际拍摄文档的步骤（扫描、OCR 等），让 PM 手动操作，Agent 负责截图和记录
 - 手机锁屏后截图会变黑屏，每次操作前先确认屏幕状态
 - **需要上传照片测试时**，先推送测试图片到设备相册：`ios push-photo test.jpg --udid=<udid>`（需 go-ios 支持），或告知 PM 手动将测试图片存到相册
+- **Swipe 安全距离**：所有 swipe 的起始 x 坐标必须 ≥ 屏幕宽度 1/3（至少 130pt），建议用屏幕中心。起始 x < ~80pt 会触发 iOS 系统「边缘滑动返回」手势，App 直接退出到上一级甚至回到主屏幕
+- **App relaunch 后必须截图确认状态**：不要假设回到退出前的页面。常见变化：促销弹窗、评价请求、what's new、session 过期、interstitial 广告。先截图判断当前状态再继续操作
 
 **Agent-PM 交互协议**（遇到需要人工操作的步骤时）：
 
@@ -364,6 +366,9 @@ iOS bottom sheet 的关闭按钮通常是 `XCUIElementTypeOther`，无 name/labe
 3. 计算中心点坐标：center_x = x + width/2, center_y = y + height/2
 4. mobile_click_on_screen_at_coordinates(center_x, center_y)
 5. mobile_take_screenshot → 确认点击成功
+6. **如果截图未变化（tap 无响应）→ 先检查是否有系统弹窗**：
+   curl -s http://localhost:8100/session/{sid}/alert/text
+   如果有弹窗 → 用 Alert API 处理（见下方「iOS 系统弹窗处理」）
 
 如果元素树不完整（Flutter/RN/WebView App）：
 1. mobile_take_screenshot → 获取当前画面
@@ -371,9 +376,32 @@ iOS bottom sheet 的关闭按钮通常是 `XCUIElementTypeOther`，无 name/labe
    注意：OCR 返回的是像素坐标，需 ÷3 转换为逻辑点坐标
 3. 用 OCR 文字坐标点击目标
 4. mobile_take_screenshot → 确认点击成功
+
+⚠️ **Webview 自定义控件限制**：Webview 内的 `<select>` 下拉框、
+`<input type="range">` 滑块、自定义 JS 按钮等控件，WDA 的 touch 事件
+**不会传递给 Webview 内部的 JS 事件处理器**。OCR 能找到元素位置，但
+tap/swipe/W3C Actions 全部无效。**第一次交互失败后直接请 PM 手动操作，
+不要反复尝试不同的 WDA 交互方式**（WDA tap、W3C Actions、element click、
+swipe drag、element value 设值均已验证无效）。
 ```
 
 **绝对不要凭视觉猜坐标。** 每次点击都必须先获取元素/OCR 坐标，再计算中心点。
+
+**iOS 系统弹窗处理**（ATT / 权限请求 / 系统 Alert）：
+
+iOS 系统级弹窗（App Tracking Transparency、权限请求等）是 overlay，拦截所有 touch 事件。**用坐标 tap 完全无效**，必须用 WDA Alert API：
+
+```bash
+# 1. 检测弹窗
+curl -s http://localhost:8100/session/{sid}/alert/text
+# 2. 获取按钮列表
+curl -s http://localhost:8100/session/{sid}/wda/alert/buttons
+# 3. 点击指定按钮（如"允许"/"Allow"/"不允许"）
+curl -s -X POST -d '{"action":"accept","buttonLabel":"允许"}' \
+  http://localhost:8100/session/{sid}/alert/accept
+```
+
+**规则**：如果 tap 后截图未变化，第一反应是检查系统 alert，不要反复重试坐标 tap。
 
 #### Phase 2a: 广度遍历（分层，确保 100% 功能覆盖）
 
@@ -615,6 +643,11 @@ python3 ~/.ae/pm/scripts/screenshot-save.py screenshots/{name}
 | 盲操作连续多步不验证 | 操作可能偏离预期但不自知 | **每次操作后必须 take_screenshot 看到内容**，确认成功后再继续 |
 | 通知/弹窗干扰 | 遮挡界面，误触 | 前置条件要求 PM 开启免打扰模式 |
 | 广度覆盖不足（只遍历 Tab 不深入） | 大量功能无截图，下游缺参照 | Phase 2a 分三层（Tab→子入口→功能目录），Phase 2d 强制 checkpoint |
+| iOS 系统弹窗（ATT/权限）拦截 touch | 坐标 tap 完全无效，反复重试浪费时间 | tap 无响应时先检查 `GET .../alert/text`，用 WDA Alert API 处理（见标准 tap 模板） |
+| iOS 左边缘 swipe 触发系统返回 | App 退出到上一级或主屏幕，需重新导航 | 所有 swipe 起始 x ≥ 屏幕宽度 1/3（至少 130pt），用屏幕中心最安全 |
+| Webview 自定义控件对 WDA 不透明 | `<select>`/`<input range>`/JS 按钮无法自动化 | 第一次交互失败后直接请 PM 手动操作，不要反复尝试不同 WDA 方式 |
+| App relaunch 后 UI 状态不一致 | 促销弹窗/interstitial/session 过期打乱流程 | relaunch 后必须截图确认状态，不假设回到退出前页面 |
+| WDA W3C Actions API 偶发 INFINITY 崩溃 | `point.x != INFINITY` 错误，整个 action chain 失败 | fallback 到简单 WDA endpoint（`/wda/tap`、swipe），不要连续重试 W3C Actions |
 
 ## 复用说明
 

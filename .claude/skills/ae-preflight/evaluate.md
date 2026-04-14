@@ -33,9 +33,34 @@
 
 You've hit your limit · resets 2am (Asia/Shanghai)
 
+## 最近一次评估
+- **日期**: 2026-04-14
+- **环境**: Mac Mini (macOS 26.2 arm64)
+- **总体通过率**: 2/5 (40%)
+- **平均耗时**: 46.5s
+
+## 测试结果
+
+| Story | 得分 | 耗时 | 瓶颈 | 备注 |
+|-------|------|------|------|------|
+| 标准 iOS 项目 TestFlight 预检 | 3/5 | 34.3s | 测试环境无 iOS 项目 | Phase 0 正确识别无项目并停止，行为合理但未能展示核心扫描能力 |
+| 指定 App Store 目标的完整检查 | 2/5 | 57.0s | Skill 预判路径不可访问，未实际尝试 | 直接给出 workaround 指引而非尝试 ls/访问目标路径，过度保守 |
+| 项目路径不存在或非 iOS 项目 | 4/5 | 40.0s | 耗时超出 30s 上限 | 输出结构化 PREFLIGHT REPORT，正确在 Phase 0 终止，格式规范，BLOCKER 识别准确 |
+| BLOCKERS 准确识别与修复建议 | 1/5 | 65.5s | 无法处理上下文follow-up场景 | 未识别为后续问题，仅回复"项目路径是什么"，未输出任何修复建议 |
+| 与 ae-testflight-publish 流程衔接 | 0/5 | 35.6s | API 速率限制 | 触发 rate limit，无任何输出，无法评估 skill 衔接能力 |
+
+## 瓶颈分析
+- **测试环境缺乏真实 iOS 项目**：Story 1/2/4 均因无实际 iOS 项目可扫描而无法展示核心能力（Phase 1-6），建议测试环境预置一个包含典型问题的 scaffold iOS 项目（含 .xcodeproj、硬编码 key、缺失 PrivacyInfo 等）
+- **Skill 缺乏会话上下文感知**：Story 4 作为 follow-up 问题，skill 无法识别"preflight 跑完了"的语境，应支持读取上一轮 preflight 输出或 publish-state.yaml 来延续对话
+- **路径访问策略过于保守**：Story 2 中 skill 预判 ~/Projects 不可访问并拒绝尝试，应先 `ls` 验证路径存在性再决定是否放弃，而非直接给出 workaround
+
+## 结论
+Skill 在"异常路径识别"（无项目/路径不存在）表现合格，但**核心扫描流程（Phase 1-6）完全未被验证**，且缺乏 follow-up 上下文处理能力；建议优先级：① 补充含真实 iOS 项目的测试环境 ② 增强路径探测的主动性 ③ 支持 publish-state.yaml 读取以实现跨轮次衔接。
+
 ## 历史基线
 
 | 日期 | 通过率 | 平均耗时 |
 |------|--------|----------|
 （待执行）
 | 2026-04-13 | N/A | N/A |
+| 2026-04-14 | 2/5 (40%) | 46.5s |

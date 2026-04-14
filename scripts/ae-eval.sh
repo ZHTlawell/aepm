@@ -264,7 +264,7 @@ for idx, name, prompt, expect, max_time in stories:
     start = time.time()
     try:
         result = subprocess.run(
-            ['claude', '-p', prompt, '--max-turns', '10'],
+            ['claude', '-p', prompt, '--max-turns', '15'],
             capture_output=True, text=True,
             timeout=max(max_time * 2, 120),  # 给 2 倍超时
             env={**os.environ, 'PATH': '/opt/homebrew/bin:' + os.environ.get('PATH', '')}

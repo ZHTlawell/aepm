@@ -33,9 +33,34 @@
 
 You've hit your limit · resets 2am (Asia/Shanghai)
 
+## 最近一次评估
+- **日期**: 2026-04-14
+- **环境**: Mac Mini (macOS 26.2 arm64)
+- **总体通过率**: 0/5 (0%)
+- **平均耗时**: 46.9s
+
+## 测试结果
+
+| Story | 得分 | 耗时 | 瓶颈 | 备注 |
+|-------|------|------|------|------|
+| 单 App Baseline 验证 | 0/5 | 78.9s | max turns (10) 耗尽，无任何交付物 | 未产出 verify-cases.yaml 或 diff report |
+| 双 App 对比模式 | 0/5 | 70.4s | max turns (10) 耗尽，无任何交付物 | 未进入双 app 对比逻辑 |
+| WebView Hybrid 降级 | 0/5 | 42.5s | max turns (10) 耗尽，无任何交付物 | 未验证 AXe 降级路径 |
+| 覆盖率与 Level 分类 | 0/5 | 38.2s | API rate limit 触发 | 前 3 个 story 消耗配额，本 story 未开始执行 |
+| ae-file-bugs 集成 | 0/5 | 4.5s | API rate limit 触发 | 完全未执行 |
+
+## 瓶颈分析
+- **Turn 预算与 skill 复杂度严重不匹配**：verify-app 的核心循环（Step 2）每个 test case 至少需要 3-4 turns（截图→Vision 看图→AXe tap→再截图验证），5 个 case 就需要 15-20 turns，加上 Step 1 提取用例、Step 1.5 预检、Step 4 生成报告，总共需要 25-30 turns。当前 max turns=10 远远不够，建议将 turn 上限提升至 40-50，或将 skill 拆分为可分段执行的子流程（如 `verify-extract` → `verify-execute` → `verify-report`）。
+- **API 配额管理缺失**：Story 1-3 连续执行后耗尽 API 配额，导致 Story 4-5 直接失败。建议在 smoke test 阶段增加配额预检，或在 skill 内部加入 rate limit 感知逻辑（检测到 429 时暂停并提示用户）。
+- **无渐进式输出**：当前 skill 是全有或全无——要么走完全流程产出完整 report，要么 turns 耗尽什么都没有。应设计渐进式交付：即使中途中断，也将已完成的 verify-cases.yaml 和部分执行结果写入磁盘，下次可断点续跑。
+
+## 结论
+skill 当前处于**不可用**状态，5 个 story 全部失败且无任何有效输出。根因是 turn 预算（10）与 skill 所需交互轮次（25-30）之间存在 2.5-3 倍缺口。**最高优先级**：提升 turn 上限或重构为分段执行模式；次优先级：增加断点续跑和渐进式输出能力。
+
 ## 历史基线
 
 | 日期 | 通过率 | 平均耗时 |
 |------|--------|----------|
 （待执行）
 | 2026-04-13 | N/A | N/A |
+| 2026-04-14 | 0/5 (0%) | 46.9s |

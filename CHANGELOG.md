@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.38.1 (2026-04-14) — ae-app-to-speckit 补充 5 个 iOS WDA 真机探索通用陷阱 `#IIS1I0`
+
+### 更新
+- **ae-app-to-speckit** — 补充 5 个 iOS WDA 真机探索的通用陷阱文档（来自 Freeletics 实战）
+  - 标准 tap 模板增加系统弹窗（ATT/权限）检测 + WDA Alert API 处理流程
+  - Phase 2 操作规则新增 swipe 安全距离（起始 x ≥ 屏幕宽度 1/3）
+  - Phase 2 操作规则新增 App relaunch 后必须截图确认状态
+  - Webview 自定义控件限制警告（`<select>`/`<input range>`/JS 按钮对 WDA 不透明）
+  - 技术风险表新增 5 条：系统弹窗拦截、边缘 swipe 返回、Webview 不透明、relaunch 状态不一致、W3C Actions INFINITY 崩溃
+
 ## v0.38.0 (2026-04-14) — Phase 6 App Store 提审 + README 端到端流水线重写 `#II8UYE`
 
 ### 新功能

@@ -73,9 +73,34 @@
 
 You've hit your limit · resets 2am (Asia/Shanghai)
 
+## 最近一次评估
+- **日期**: 2026-04-14
+- **环境**: Mac Mini (macOS 26.2 arm64)
+- **总体通过率**: 0/5 (0%)
+- **平均耗时**: 50.3s
+
+## 测试结果
+
+| Story | 得分 | 耗时 | 瓶颈 | 备注 |
+|-------|------|------|------|------|
+| 基础 Happy Path | 0/5 | 78.5s | 权限配置未自动生效 | 卡在写入权限提示，Phase 0 未启动，全流程零产出 |
+| 付费墙增量补测 | 0/5 | 79.6s | max turns (10) 耗尽 | 未能读取已有 state 并恢复，循环耗尽轮次 |
+| WDA 断开降级 | 0/5 | 45.4s | max turns (10) 耗尽 | 未触发 wda-start.sh 重连或 wda-cli.py 降级路径 |
+| checklist 覆盖率 | 0/5 | 43.8s | API rate limit | 触发速率限制，skill 无任何容错/重试逻辑 |
+| 集成 mobile-setup | 0/5 | 4.2s | API rate limit | 4.2s 即终止，完全未进入 skill 逻辑 |
+
+## 瓶颈分析
+- **权限声明未被 harness 正确消费（Story 1）**：SKILL.md 已声明 `Write({workdir}/speckit/**)` 权限，但运行时仍要求用户手动授权。说明 permissions 字段要么未被加载，要么 skill 内部写入路径与声明不匹配。这是最高优先级问题——权限不通则整个 skill 无法自动化。
+- **max turns 上限过低 + 缺乏进度管理（Story 2/3）**：10 轮 turn limit 对于需要多步环境检查 + WDA 重连 + 状态恢复的场景远远不够。skill 内部也没有在前几轮做有效聚合（例如一次性完成 Phase 0 全部步骤），导致轮次浪费在碎片化调用上。建议：a) 测试 harness 给予至少 30-50 turns；b) skill prompt 中强调单轮合并多步操作。
+- **无 rate limit 容错（Story 4/5）**：遇到 API 速率限制后直接终止，无 backoff 重试或暂停等待机制。对于本身就是长流程的 skill，应在 prompt 或 harness 层面加入限流感知和优雅降级（如保存当前进度到 exploration-state.json 后退出，下次可恢复）。
+
+## 结论
+Skill 当前处于**不可用状态**——5 个 story 全部零产出，核心流程从未被触发。最高优先级：修复权限声明与运行时的对接（Story 1 是 smoke test，必须先通过）；其次提升 turn limit 并优化单轮步骤密度；最后补充 rate limit 容错和断点续传能力。
+
 ## 历史基线
 
 | 日期 | 通过率 | 平均耗时 |
 |------|--------|----------|
 （待执行）
 | 2026-04-13 | N/A | N/A |
+| 2026-04-14 | 0/5 (0%) | 50.3s |
