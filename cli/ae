@@ -72,6 +72,12 @@ ${BOLD}COMMANDS${NC}
         bundle-id list/register            Bundle ID 管理
         testflight list-builds/create-group/add-tester/set-compliance
 
+    ${BOLD}sensors${NC} <subcommand>  神策数据查询工具
+        sql <SQL>                          执行自定义 SQL
+        events [--top N]                   列出事件及数量
+        count [--days N]                   查询事件总数
+        fields [--event NAME]              列出字段
+
     ${BOLD}link${NC} <role> [dir]    在项目中启用 ae-pm / ae-dev / ae-go
     ${BOLD}feedback${NC}             管理使用反馈（查看/上传/清除）
     ${BOLD}manifest${NC} <sub> <role> 生成/查看能力清单（generate | show）
@@ -154,6 +160,14 @@ main() {
                 exit 1
             fi
             python3 "$ae_asc" "$@"
+            ;;
+        sensors)
+            local ae_sensors="$(dirname "$AE_CLI_DIR")/scripts/sensors-query.py"
+            if [[ ! -f "$ae_sensors" ]]; then
+                err "sensors-query.py 未找到: $ae_sensors"
+                exit 1
+            fi
+            python3 "$ae_sensors" "$@"
             ;;
         link)
             source_lib "link"
