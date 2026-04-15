@@ -3,7 +3,8 @@
 
 Usage:
     python3 wda-cli.py screenshot [--save PATH]     # Take screenshot
-    python3 wda-cli.py tap X Y                       # Tap at coordinates
+    python3 wda-cli.py tap X Y                       # Tap at logical point
+    python3 wda-cli.py tap X Y --pixel                # Tap at pixel coords (auto ÷ scale)
     python3 wda-cli.py launch BUNDLE_ID              # Launch app
     python3 wda-cli.py source [--format xml|json]    # Get element tree
     python3 wda-cli.py swipe X1 Y1 X2 Y2 [--duration 0.5]  # Swipe
@@ -25,6 +26,47 @@ import urllib.error
 
 
 WDA_URL = "http://localhost:8100"
+
+# Cache scale factor per session to avoid repeated WDA calls
+_scale_cache = {}
+
+
+def get_scale_factor(url_base=None):
+    """Detect pixel/logical scale factor from WDA (screenshot width ÷ window width)."""
+    base = url_base or WDA_URL
+    if base in _scale_cache:
+        return _scale_cache[base]
+    try:
+        # Get screenshot pixel width from PNG header
+        req = urllib.request.Request(f"{base}/screenshot",
+                                    headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+        img_bytes = base64.b64decode(data["value"])
+        pixel_w = int.from_bytes(img_bytes[16:20], 'big')
+
+        # Get logical window size
+        req2 = urllib.request.Request(f"{base}/window/size",
+                                     headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req2, timeout=5) as resp:
+            win = json.loads(resp.read())
+        logical_w = win.get("value", {}).get("width", 0)
+
+        if logical_w > 0:
+            scale = round(pixel_w / logical_w)
+            _scale_cache[base] = scale
+            return scale
+    except Exception as e:
+        print(f"Warning: scale detection failed ({e}), using default @3x",
+              file=sys.stderr)
+    _scale_cache[base] = 3
+    return 3  # default @3x for modern iPhones
+
+
+def pixel_to_logical(x, y, url_base=None):
+    """Convert pixel coordinates to logical points by dividing by scale factor."""
+    scale = get_scale_factor(url_base)
+    return int(round(x / scale)), int(round(y / scale))
 
 
 def wda_request(path, method="GET", body=None, url_base=None):
@@ -101,6 +143,11 @@ def cmd_screenshot(args):
 
 def cmd_tap(args):
     sid = get_session_id(args.url)
+    x, y = int(args.x), int(args.y)
+    if getattr(args, 'pixel', False):
+        x, y = pixel_to_logical(args.x, args.y, args.url)
+        scale = get_scale_factor(args.url)
+        print(f"pixel→logical: ({int(args.x)},{int(args.y)}) ÷ {scale}x → ({x},{y})")
     # W3C Actions API (WDA 11.x+)
     actions = {
         "actions": [{
@@ -108,7 +155,7 @@ def cmd_tap(args):
             "id": "finger1",
             "parameters": {"pointerType": "touch"},
             "actions": [
-                {"type": "pointerMove", "duration": 0, "x": int(args.x), "y": int(args.y)},
+                {"type": "pointerMove", "duration": 0, "x": x, "y": y},
                 {"type": "pointerDown", "button": 0},
                 {"type": "pause", "duration": 50},
                 {"type": "pointerUp", "button": 0},
@@ -117,11 +164,18 @@ def cmd_tap(args):
     }
     wda_request(f"/session/{sid}/actions", method="POST",
                 body=actions, url_base=args.url)
-    print(f"Tapped ({args.x}, {args.y})")
+    print(f"Tapped ({x}, {y})")
 
 
 def cmd_swipe(args):
     sid = get_session_id(args.url)
+    x1, y1 = int(args.x1), int(args.y1)
+    x2, y2 = int(args.x2), int(args.y2)
+    if getattr(args, 'pixel', False):
+        x1, y1 = pixel_to_logical(args.x1, args.y1, args.url)
+        x2, y2 = pixel_to_logical(args.x2, args.y2, args.url)
+        scale = get_scale_factor(args.url)
+        print(f"pixel→logical: ÷ {scale}x → ({x1},{y1})→({x2},{y2})")
     # W3C Actions API (WDA 11.x+)
     dur_ms = int(args.duration * 1000)
     actions = {
@@ -130,16 +184,16 @@ def cmd_swipe(args):
             "id": "finger1",
             "parameters": {"pointerType": "touch"},
             "actions": [
-                {"type": "pointerMove", "duration": 0, "x": int(args.x1), "y": int(args.y1)},
+                {"type": "pointerMove", "duration": 0, "x": x1, "y": y1},
                 {"type": "pointerDown", "button": 0},
-                {"type": "pointerMove", "duration": dur_ms, "x": int(args.x2), "y": int(args.y2)},
+                {"type": "pointerMove", "duration": dur_ms, "x": x2, "y": y2},
                 {"type": "pointerUp", "button": 0},
             ]
         }]
     }
     wda_request(f"/session/{sid}/actions", method="POST",
                 body=actions, url_base=args.url)
-    print(f"Swiped ({args.x1},{args.y1}) → ({args.x2},{args.y2})")
+    print(f"Swiped ({x1},{y1}) → ({x2},{y2})")
 
 
 def cmd_launch(args):
@@ -194,6 +248,8 @@ def main():
     p_tap = sub.add_parser("tap", help="Tap at coordinates")
     p_tap.add_argument("x", type=float)
     p_tap.add_argument("y", type=float)
+    p_tap.add_argument("--pixel", action="store_true",
+                       help="Treat x,y as pixel coords; auto ÷ scale → logical points")
 
     p_swipe = sub.add_parser("swipe", help="Swipe gesture")
     p_swipe.add_argument("x1", type=float)
@@ -201,6 +257,8 @@ def main():
     p_swipe.add_argument("x2", type=float)
     p_swipe.add_argument("y2", type=float)
     p_swipe.add_argument("--duration", type=float, default=0.5)
+    p_swipe.add_argument("--pixel", action="store_true",
+                         help="Treat coords as pixel; auto ÷ scale → logical points")
 
     p_launch = sub.add_parser("launch", help="Launch app")
     p_launch.add_argument("bundle_id")

@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.38.2 (2026-04-15) — wda-cli.py 支持 VLM Grounding 像素坐标自动缩放 `#IIS3R0`
+
+### 更新
+- **wda-cli.py** — `tap` / `swipe` 新增 `--pixel` 标志，自动检测 Retina scale factor 并将截图像素坐标转换为 WDA 逻辑点坐标，解决 VLM Grounding 输出坐标直传 WDA 点击无效的问题
+
 ## v0.38.1 (2026-04-14) — ae-app-to-speckit 补充 5 个 iOS WDA 真机探索通用陷阱 `#IIS1I0`
 
 ### 更新
