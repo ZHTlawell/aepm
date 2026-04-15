@@ -139,7 +139,73 @@ def parse_region(region_str):
     return {"x": parts[0], "y": parts[1], "width": parts[2], "height": parts[3]}
 
 
-def process_screenshot(image_path, pii_keywords, fixed_regions=None, dry_run=False):
+def detect_notification_regions(texts, img_w, img_h):
+    """Detect iOS notification banner regions in screenshot.
+
+    Heuristic: notification banners appear as text blocks in the top ~15% of the
+    screen. We look for OCR text in that zone whose content matches common
+    notification patterns (short messages, contact names, app names like
+    Messages/FaceTime/WhatsApp, timestamps like "now"/"刚刚").
+
+    Returns list of bbox dicts covering the notification area.
+    """
+    if not texts or img_h == 0:
+        return []
+
+    # Notification banners typically appear in the top ~15% of the screen
+    # On a 2556px-tall screenshot (@3x iPhone 15 Pro), that's ~383px
+    notification_zone_max_y = int(img_h * 0.15)
+
+    # Common notification indicator patterns (case-insensitive)
+    notification_patterns = [
+        r"^now$", r"^刚刚$", r"^[\d]+[分秒]钟?前$", r"^\d+m ago$",
+        r"messages?", r"imessage", r"facetime", r"whatsapp", r"telegram",
+        r"微信", r"短信", r"电话", r"来电",
+        r"notification", r"通知",
+        # TestFlight-style system alerts
+        r"testflight", r"app store",
+    ]
+    notification_re = re.compile("|".join(notification_patterns), re.IGNORECASE)
+
+    # Collect all text blocks in the notification zone
+    zone_texts = [
+        t for t in texts
+        if t["bbox"]["y"] < notification_zone_max_y
+        and t["bbox"]["y"] + t["bbox"]["height"] < notification_zone_max_y + 50
+    ]
+
+    if not zone_texts:
+        return []
+
+    # Check if any text in the zone matches notification patterns
+    has_notification_indicator = any(
+        notification_re.search(t["text"]) for t in zone_texts
+    )
+
+    if not has_notification_indicator:
+        return []
+
+    # Found a notification — mask the entire notification banner region
+    # Calculate bounding box covering all notification-zone text blocks
+    min_x = min(t["bbox"]["x"] for t in zone_texts)
+    min_y = min(t["bbox"]["y"] for t in zone_texts)
+    max_x = max(t["bbox"]["x"] + t["bbox"]["width"] for t in zone_texts)
+    max_y = max(t["bbox"]["y"] + t["bbox"]["height"] for t in zone_texts)
+
+    # Expand to cover the full notification banner (edge-to-edge width, extra padding)
+    pad = 20
+    banner_bbox = {
+        "x": 0,
+        "y": max(0, min_y - pad),
+        "width": img_w,
+        "height": min(img_h, max_y + pad) - max(0, min_y - pad),
+    }
+
+    return [banner_bbox]
+
+
+def process_screenshot(image_path, pii_keywords, fixed_regions=None,
+                       dry_run=False, mask_notifications=False):
     """Process a single screenshot. Returns list of masked items."""
     from PIL import Image
 
@@ -158,6 +224,17 @@ def process_screenshot(image_path, pii_keywords, fixed_regions=None, dry_run=Fal
                 "matched_keywords": matches,
                 "bbox": t["bbox"],
                 "type": "pii_text",
+            })
+
+    # Detect and mask notification banners
+    if mask_notifications:
+        notif_regions = detect_notification_regions(texts, img_w, img_h)
+        for region in notif_regions:
+            masked_items.append({
+                "text": "(notification banner)",
+                "matched_keywords": [],
+                "bbox": region,
+                "type": "notification",
             })
 
     # Add fixed regions
@@ -190,14 +267,16 @@ def main():
                         help="Comma-separated PII keywords (e.g., '李根剑,根剑,lgj')")
     parser.add_argument("--avatar-region", metavar="x,y,w,h", action="append",
                         help="Fixed region to always mask (pixel coords, repeatable)")
+    parser.add_argument("--mask-notifications", action="store_true",
+                        help="Detect and mask iOS notification banners in screenshots")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would be masked without modifying files")
     parser.add_argument("--json", action="store_true",
                         help="Output report as JSON")
     args = parser.parse_args()
 
-    if not args.pii_config and not args.pii:
-        parser.error("At least one of --pii-config or --pii is required")
+    if not args.pii_config and not args.pii and not args.mask_notifications:
+        parser.error("At least one of --pii-config, --pii, or --mask-notifications is required")
 
     if not os.path.isdir(args.screenshot_dir):
         parser.error(f"Not a directory: {args.screenshot_dir}")
@@ -234,7 +313,8 @@ def main():
 
     for png in png_files:
         path = os.path.join(args.screenshot_dir, png)
-        masked_items = process_screenshot(path, pii_keywords, fixed_regions, args.dry_run)
+        masked_items = process_screenshot(path, pii_keywords, fixed_regions,
+                                          args.dry_run, args.mask_notifications)
 
         if masked_items:
             report["screenshots_with_pii"] += 1
@@ -271,12 +351,13 @@ def main():
             for d in report["details"]:
                 print(f"\n  {d['file']} ({d['masked_count']} regions):")
                 for item in d["items"]:
+                    b = item["bbox"]
                     if item["type"] == "fixed_region":
-                        b = item["bbox"]
                         print(f"    [fixed] ({b['x']},{b['y']}) {b['width']}x{b['height']}")
+                    elif item["type"] == "notification":
+                        print(f"    [notification] ({b['x']},{b['y']}) {b['width']}x{b['height']}")
                     else:
                         print(f"    \"{item['text']}\" → matched: {item['matched']}")
-                        b = item["bbox"]
                         print(f"      @ ({b['x']},{b['y']}) {b['width']}x{b['height']}")
         else:
             print("\nNo PII detected in any screenshot. ✓")

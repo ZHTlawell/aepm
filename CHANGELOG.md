@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.39.0 (2026-04-15) — 截图自动关闭通知弹窗 + 通知横幅脱敏 `#IIYF6O`
+
+### 新功能
+- **screenshot-save.py** — 截图前自动关闭系统弹窗 + 上滑关闭通知横幅（`dismiss_notifications`），默认开启，`--no-dismiss` 可跳过
+- **privacy-mask.py** — 新增 `--mask-notifications` 模式，基于 OCR 启发式检测 iOS 通知横幅（Messages/FaceTime/微信等关键词 + 屏幕顶部区域）并自动马赛克
+- **ae-app-to-speckit SKILL.md** — DND 从"建议"升级为前置条件必须项；Phase 2e 脱敏命令默认加 `--mask-notifications`
+
 ## v0.38.2 (2026-04-15) — wda-cli.py 支持 VLM Grounding 像素坐标自动缩放 `#IIS3R0`
 
 ### 更新

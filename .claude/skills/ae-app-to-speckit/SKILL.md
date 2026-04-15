@@ -73,7 +73,7 @@ smoke_test:
 |------|------|
 | iPhone 真机自动化环境 | **必须先完成 `/ae-mobile-setup`**（go-ios + WDA + mobile-mcp 全套） |
 | 目标 App 已安装 | 从 App Store 下载到真机 |
-| **免打扰模式** | **建议 PM 开启 iPhone 免打扰（专注模式），避免通知遮挡界面干扰操作和截图** |
+| **免打扰模式** | **必须：PM 开启 iPhone 免打扰（专注模式）。通知弹窗含他人 PII，截图入库前必须杜绝。screenshot-save.py 会自动尝试关闭弹窗，但 DND 是根本防线** |
 
 ### Phase 0: 环境就绪检查与启动（每次会话必须执行）
 
@@ -507,24 +507,29 @@ python3 ~/.ae/pm/scripts/coverage-stats.py speckit/feature-checklist.md \
 截图中可能包含用户真实姓名、头像、设备名、用户 ID 等个人信息。**截图会被提交到 git 仓库，必须在进入 Phase 3 之前完成脱敏。**
 
 ```
-1. 确认 exploration-state.json 中有 pii_patterns（Phase 0.7 收���的）
+1. 确认 exploration-state.json 中有 pii_patterns（Phase 0.7 收集的）
    如果没有 → 此时向 PM 补充收集
-2. 运行脱敏脚本：
+2. 运行脱敏脚本（含通知横幅检测）：
    python3 ~/.ae/pm/scripts/privacy-mask.py speckit/screenshots/ \
      --pii-config speckit/exploration-state.json \
+     --mask-notifications \
      --dry-run
-3. 审核报告 → 确认检测结果合理
+3. 审核报告 → 确认检测结果合理（注意 [notification] 类型的检测项）
 4. 去掉 --dry-run 执行实际脱敏：
    python3 ~/.ae/pm/scripts/privacy-mask.py speckit/screenshots/ \
-     --pii-config speckit/exploration-state.json
+     --pii-config speckit/exploration-state.json \
+     --mask-notifications
 5. 如有固定位置的头像（如每个页面右上角），追加 --avatar-region：
    python3 ~/.ae/pm/scripts/privacy-mask.py speckit/screenshots/ \
      --pii-config speckit/exploration-state.json \
+     --mask-notifications \
      --avatar-region 330,44,60,60
 6. 快速浏览脱敏后的截图确认无遗漏
 ```
 
-**常见泄露点**：设置/个人资料页（姓名+头像+ID）、蓝牙设备名（含姓名）、页面角落头像、笔记/内容区域。
+> **注意**：`--mask-notifications` 基于 OCR 启发式检测通知横幅（Messages/FaceTime/微信等关键词 + 屏幕顶部区域），作为 DND 的安全网。screenshot-save.py 截图前也会自动尝试关闭弹窗（`--auto-dismiss`），双保险。
+
+**常见泄露点**：设置/个人资料页（姓名+头像+ID）、蓝牙设备名（含姓名）、页面角落头像、笔记/内容区域、**系统通知横幅（含联系人姓名+聊天内容+邮箱）**。
 
 **探索终止条件**：
 - Phase 2d checkpoint 通过
@@ -641,7 +646,7 @@ python3 ~/.ae/pm/scripts/screenshot-save.py screenshots/{name}
 | 手机自动锁屏 | 截图变黑、操作失败 | 每次操作前先 take_screenshot 确认屏幕亮着；锁屏后请 PM 解锁 |
 | WDA 进程断开（会话切换/超时） | 所有 MCP tool 失效 | 重新执行 Phase 0（tunnel + xcodebuild + forward + verify），不依赖旧 session ID |
 | 盲操作连续多步不验证 | 操作可能偏离预期但不自知 | **每次操作后必须 take_screenshot 看到内容**，确认成功后再继续 |
-| 通知/弹窗干扰 | 遮挡界面，误触 | 前置条件要求 PM 开启免打扰模式 |
+| 通知/弹窗干扰 | 遮挡界面，误触，泄露他人 PII | 前置条件**必须**开启免打扰；screenshot-save.py 自动 dismiss；Phase 2e 加 `--mask-notifications` 兜底 |
 | 广度覆盖不足（只遍历 Tab 不深入） | 大量功能无截图，下游缺参照 | Phase 2a 分三层（Tab→子入口→功能目录），Phase 2d 强制 checkpoint |
 | iOS 系统弹窗（ATT/权限）拦截 touch | 坐标 tap 完全无效，反复重试浪费时间 | tap 无响应时先检查 `GET .../alert/text`，用 WDA Alert API 处理（见标准 tap 模板） |
 | iOS 左边缘 swipe 触发系统返回 | App 退出到上一级或主屏幕，需重新导航 | 所有 swipe 起始 x ≥ 屏幕宽度 1/3（至少 130pt），用屏幕中心最安全 |

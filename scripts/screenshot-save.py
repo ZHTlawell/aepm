@@ -8,6 +8,9 @@ Usage:
     # Only screenshot, no element tree
     python3 screenshot-save.py screenshots/2a-F01-scan-entry --no-xml
 
+    # Skip notification dismiss (not recommended)
+    python3 screenshot-save.py screenshots/test --no-dismiss
+
     # Custom WDA URL
     python3 screenshot-save.py screenshots/test --wda-url http://localhost:8200
 
@@ -26,6 +29,73 @@ import json
 import base64
 import os
 import urllib.request
+import urllib.error
+
+
+def _wda_request(path, method="GET", body=None, wda_url="http://localhost:8100"):
+    """Make a WDA HTTP request, return parsed JSON or None on failure."""
+    full_url = f"{wda_url}{path}"
+    data = json.dumps(body).encode() if body else None
+    req = urllib.request.Request(
+        full_url, data=data, method=method,
+        headers={"Content-Type": "application/json"} if data else {},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read())
+    except Exception:
+        return None
+
+
+def _get_session_id(wda_url="http://localhost:8100"):
+    """Get existing WDA session ID or create one."""
+    data = _wda_request("/status", wda_url=wda_url)
+    if not data:
+        return ""
+    sid = data.get("sessionId") or ""
+    if not sid:
+        val = data.get("value", {})
+        sid = val.get("sessionId", "") if isinstance(val, dict) else ""
+    if sid:
+        return sid
+    resp = _wda_request("/session", method="POST",
+                        body={"capabilities": {}}, wda_url=wda_url)
+    return (resp or {}).get("sessionId", "")
+
+
+def dismiss_notifications(wda_url="http://localhost:8100"):
+    """Dismiss system alerts and notification banners before taking a screenshot.
+
+    1. Try WDA alert dismiss API (handles UIAlertController dialogs)
+    2. Swipe up from top to dismiss any notification banner
+    """
+    sid = _get_session_id(wda_url)
+    if not sid:
+        return
+
+    # Step 1: Dismiss any system alert (e.g., permission dialogs)
+    _wda_request(f"/session/{sid}/alert/dismiss", method="POST",
+                 body={}, wda_url=wda_url)
+
+    # Step 2: Swipe down-to-up on the notification banner area (top ~80 logical pts)
+    # This dismisses iOS notification banners that slide in from the top
+    import time
+    actions = {
+        "actions": [{
+            "type": "pointer",
+            "id": "finger1",
+            "parameters": {"pointerType": "touch"},
+            "actions": [
+                {"type": "pointerMove", "duration": 0, "x": 200, "y": 30},
+                {"type": "pointerDown", "button": 0},
+                {"type": "pointerMove", "duration": 200, "x": 200, "y": 0},
+                {"type": "pointerUp", "button": 0},
+            ]
+        }]
+    }
+    _wda_request(f"/session/{sid}/actions", method="POST",
+                 body=actions, wda_url=wda_url)
+    time.sleep(0.5)  # Wait for animation to complete
 
 
 def save_screenshot(base_path, wda_url="http://localhost:8100", max_retries=3):
@@ -87,8 +157,14 @@ def main():
     parser = argparse.ArgumentParser(description="Save WDA screenshot + element tree")
     parser.add_argument("base_path", help="Output base path (without extension), e.g. screenshots/2a-F01-scan")
     parser.add_argument("--no-xml", action="store_true", help="Skip element tree XML")
+    parser.add_argument("--no-dismiss", action="store_true",
+                        help="Skip auto-dismiss of notifications/alerts before screenshot")
     parser.add_argument("--wda-url", default="http://localhost:8100", help="WDA base URL")
     args = parser.parse_args()
+
+    # Dismiss notifications/alerts before screenshot (default: on)
+    if not args.no_dismiss:
+        dismiss_notifications(args.wda_url)
 
     # Save screenshot
     png_path = save_screenshot(args.base_path, args.wda_url)
