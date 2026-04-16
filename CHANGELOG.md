@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.41.0 (2026-04-16) — app-to-speckit 补充页面跳转采集 + 静态资源清单 `#IJ2OZ7` `#IJ2OZX`
+
+### 新功能
+- **页面跳转关系采集** (`#IJ2OZ7`) — Phase 2a/2b 探索过程中实时记录 transitions（from/to/trigger/nav_type），exploration-state.json 新增 `transitions` 数组；Module 02 从 transitions 生成 Mermaid 导航图 + 结构化表格，替代原来的空承诺
+- **静态资源清单** (`#IJ2OZX`) — Phase 2a/2b 探索过程中识别并记录页面内的静态资源（插画/图标/角色/纹理/动画/徽章），exploration-state.json 新增 `asset_inventory` 数组；Module 04 设计规范新增资源清单表（ID/类型/描述/参考截图/数量/生成建议），衔接下游 ae-asset-gen
+
 ## v0.40.0 (2026-04-16) — ae-lark-feishu 新增 Markdown 报告上传飞书文档 `#IIYHAA`
 
 ### 新功能

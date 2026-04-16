@@ -284,6 +284,14 @@ speckit 文档中引用截图时**必须使用 HTML img 标签限制显示宽度
   "payment_strategy": "free_only | paid_weekly | paid_confirmed",
   "mcp_available": true,
   "bundle_id": "com.example.app",
+  "asset_inventory": [
+    {"id": "A01", "type": "illustration", "description": "树种插画", "ref_screenshot": "2b-flow01-step03.png", "quantity": "5态×6种", "gen_hint": "AI 生图，需种间风格一致"}
+  ],
+  "transitions": [
+    {"from": "Home", "to": "FocusSession", "trigger": "点击开始专注", "nav_type": "fullScreenCover"},
+    {"from": "FocusSession", "to": "Result", "trigger": "专注完成", "nav_type": "replace"},
+    {"from": "Home", "to": "TreePicker", "trigger": "点击树种选择", "nav_type": "sheet"}
+  ],
   "notes": "工具箱-扫描类已完成，格式转换类进行中"
 }
 ```
@@ -458,6 +466,38 @@ feature-checklist 不是静态文档。Phase 2 探索过程中，每次看到截
 
 **source="discovered" 表示该功能不是来自 App Store 或帮助页的枚举，而是 agent 在探索中通过推理发现的。** 这类功能容易被遗漏，但往往是 App 的差异化卖点。
 
+**静态资源识别（Phase 2a/2b 全程执行）**：
+
+探索过程中，每次看到截图时同步识别页面中的静态资源（插画、图标、动画、纹理、角色形象等）。在 `exploration-state.json` 中维护 `asset_inventory` 数组：
+
+```json
+"asset_inventory": [
+  {"id": "A01", "type": "illustration", "description": "树种插画（种子→成熟→枯萎）", "ref_screenshot": "2b-flow01-step03.png", "quantity": "5态×6种", "gen_hint": "AI 生图，需种间风格一致"},
+  {"id": "A02", "type": "icon", "description": "底部 Tab 图标", "ref_screenshot": "2a-home-tabs.png", "quantity": "5个×2态", "gen_hint": "SF Symbols 风格，线条+填充两态"}
+]
+```
+
+资源类型枚举：`illustration`（插画）、`icon`（图标）、`character`（角色/吉祥物）、`texture`（纹理/背景）、`animation`（动画/Lottie）、`badge`（徽章/成就）、`photo`（实拍素材）
+
+**不需要逐个截图裁剪**——只需记录"在哪张截图上看到了什么资源"。裁剪和生成是下游 `ae-asset-gen` 的职责。
+
+**页面跳转记录（Phase 2a/2b 全程执行）**：
+
+每次操作导致页面跳转时，除了截图，额外记录一条 transition 到 `exploration-state.json` 的 `transitions` 数组：
+
+```json
+{"from": "来源页面", "to": "目标页面", "trigger": "触发操作描述", "nav_type": "push|sheet|fullScreenCover|replace|tab"}
+```
+
+`nav_type` 判断方法：
+- `push`：新页面从右滑入，左上角有返回箭头
+- `sheet`：新页面从底部弹出，可手势下滑关闭，上方有拖拽条
+- `fullScreenCover`：全屏覆盖，无手势关闭，必须用按钮退出
+- `replace`：当前页面内容原地替换（无动画或淡入淡出）
+- `tab`：底部 Tab 切换
+
+**不要等到 Phase 3 再回忆跳转关系——操作时实时记录，准确率远高于事后推断。**
+
 **Level 2 结束后**：对照 feature-checklist，确认每个功能至少有一张入口截图。未覆盖的功能立即补截图。
 
 #### Phase 2b: 核心流程深度走通（每步截图）
@@ -570,7 +610,20 @@ python3 ~/.ae/pm/scripts/screenshot-save.py screenshots/{name}
 **Module 02 — 用户场景**（置信度：高）
 - 页面清单 → 从 screenshots 目录直接列出，每行引用截图（`confirmed`）
 - 用户流程 → 从 Phase 2b 端到端流程直接转换为场景叙事，**每步必须引用至少一张截图**（`confirmed`）
-- 导航图 → 从 transitions 生成（`confirmed`）
+- 导航图 → 从 `exploration-state.json` 的 `transitions` 数组生成，输出两种格式：
+  1. **Mermaid flowchart**（嵌入 Module 02，Gitee/GitHub 可直接渲染）：
+     ```mermaid
+     graph LR
+       Home -->|点击开始专注<br/>fullScreenCover| FocusSession
+       FocusSession -->|专注完成<br/>replace| Result
+       Result -->|点击完成<br/>dismiss| Home
+       Home -->|点击树种选择<br/>sheet| TreePicker
+     ```
+  2. **结构化表格**（供下游 dev agent 解析）：
+     | From | To | Trigger | Nav Type |
+     |------|----|---------|----------|
+     | Home | FocusSession | 点击开始专注 | fullScreenCover |
+     如果 transitions 数组为空（Phase 2 未记录），标注 `[NEEDS INPUT]` 并在 review-checklist 中提醒 PM 补充
 - Toast/弹窗 → 从探索过程中实际遇到的弹窗记录，引用截图（`confirmed`）
 - 未端到端走通但有入口截图的功能 → 标注 `[extracted]`，引用入口截图
 
@@ -581,6 +634,15 @@ python3 ~/.ae/pm/scripts/screenshot-save.py screenshots/{name}
 - 字体 → 从截图推断大小层级，标注来源（`[extracted]`）
 - 间距/圆角 → 从截图推断，标注来源（`[extracted]`）
 - 组件模式 → 从截图识别，引用对应截图（`[extracted]`）
+- **静态资源清单** → 从 `exploration-state.json` 的 `asset_inventory` 生成结构化表格：
+
+  | ID | 类型 | 描述 | 参考截图 | 数量 | 生成建议 |
+  |----|------|------|---------|------|---------|
+  | A01 | illustration | 树种插画（种子→成熟→枯萎） | 2b-flow01-step03.png | 5态×6种 | AI 生图，需种间风格一致 |
+  | A02 | icon | 底部 Tab 图标 | 2a-home-tabs.png | 5个×2态 | SF Symbols 风格 |
+
+  每行必须引用参考截图。如果 `asset_inventory` 为空（工具类 App 视觉依赖低），在 Module 04 标注"本产品无显著静态资源依赖"。
+  资源清单是下游素材生成（`ae-asset-gen`）的输入，缺少此清单 = 开发者只能用灰色占位框
 
 ### Phase 4: PM Review 清单
 
