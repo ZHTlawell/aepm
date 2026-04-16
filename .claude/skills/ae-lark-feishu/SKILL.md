@@ -1,13 +1,16 @@
 ---
 name: ae-lark-feishu
-description: "飞书/Lark 消息读取、搜索、发送、会议妙记/逐字稿 — 当用户提到飞书、Lark、群消息、聊天记录、会议纪要、妙记时触发"
+description: "飞书/Lark 消息读取、搜索、发送、会议妙记/逐字稿、Markdown 报告上传飞书文档 — 当用户提到飞书、Lark、群消息、聊天记录、会议纪要、妙记、上传报告到飞书时触发"
 dependencies:
   mcp: []
   cli:
     - name: lark-cli
       verify: "lark-cli --version"
   api_keys: []
-  scripts: []
+  scripts:
+    - name: lark-doc-upload.py
+      path: scripts/lark-doc-upload.py
+      description: "Markdown + 本地图片 → 精美排版飞书文档（Grid 分栏并排、原图上传、显示尺寸控制）"
 smoke_test:
   command: "lark-cli --version"
   expected_exit: 0
@@ -20,7 +23,7 @@ smoke_test:
 
 ## 触发条件
 
-当用户提到飞书、Lark、群消息、聊天记录、会议纪要、妙记、逐字稿，或要求读取/搜索/发送飞书消息时触发。
+当用户提到飞书、Lark、群消息、聊天记录、会议纪要、妙记、逐字稿，或要求读取/搜索/发送飞书消息，或要求上传报告/文档到飞书时触发。
 
 ## 前置条件检查与自动安装
 
@@ -268,6 +271,53 @@ lark-cli im +messages-mget --message-ids "om_xxx,om_yyy" --format pretty
 lark-cli im +threads-messages-list --message-id om_xxx --format pretty
 ```
 
+### 9. 上传 Markdown 报告到飞书文档
+
+将含本地图片的 Markdown 报告上传为精美排版的飞书文档。支持 Grid 分栏并排截图、原图上传（点击放大）、自动设置显示尺寸。
+
+#### 前置条件
+
+- `lark-cli >= 1.0.1`（文本渲染）
+- `pip3 install requests Pillow`（图片上传 + 尺寸检测）
+- 环境变量 `LARK_APP_ID` + `LARK_APP_SECRET`（飞书开放平台 → 应用 → 凭证与基础信息）
+
+如果未设置环境变量，脚本会自动从 `~/.lark-cli/config.json` 读取 app_id，并提示输入 app_secret。
+
+#### 用法
+
+```bash
+# 基本用法
+python3 ~/.ae/pm/scripts/lark-doc-upload.py report.md
+
+# 指定标题
+python3 ~/.ae/pm/scripts/lark-doc-upload.py report.md --title "报告标题"
+
+# 追加到已有文档
+python3 ~/.ae/pm/scripts/lark-doc-upload.py report.md --update <doc_id>
+
+# 预览解析结果（不上传）
+python3 ~/.ae/pm/scripts/lark-doc-upload.py report.md --dry-run
+```
+
+#### Markdown 图片语法支持
+
+| 语法 | 处理方式 |
+|------|---------|
+| `<img src="path/to/image.png" width="160">` | 单图上传，width 属性控制显示宽度比例 |
+| 同一行多个 `<img>` | Grid 分栏并排（最多 5 列），每张独立可点击放大 |
+| `![alt](path/to/image.png)` | 同上 |
+| 表格内的图片 | 替换为 `[文件名]` 文字（飞书表格不支持嵌入图片） |
+| `http://` URL 图片 | 保留在文本中，飞书自动处理 |
+
+#### 工作流示例
+
+用户说"把这份分析报告上传到飞书"时：
+
+1. 确认 Markdown 文件路径和图片目录
+2. `--dry-run` 预览解析结果，确认段落和图片分布
+3. 执行上传，展示飞书文档链接
+4. 用户确认排版效果
+
 ## 重要规则
 
 1. **发送消息前必须确认** — 发送/回复消息会被其他人看到，必须先让用户确认内容
@@ -275,3 +325,4 @@ lark-cli im +threads-messages-list --message-id om_xxx --format pretty
 3. **图片必须下载后查看** — 消息列表只显示 file_key 引用，需下载到本地后用 Read 工具查看
 4. **注意身份区分** — 读取消息用 user 身份（默认），发送消息用 bot 身份
 5. **时间格式** — ISO 8601 带时区：`2026-03-31T00:00:00+08:00`
+6. **上传报告前先 dry-run** — 避免上传错误文件或图片路径不对

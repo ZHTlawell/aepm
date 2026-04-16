@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.40.0 (2026-04-16) — ae-lark-feishu 新增 Markdown 报告上传飞书文档 `#IIYHAA`
+
+### 新功能
+- **lark-doc-upload.py** — Markdown + 本地图片一键上传为精美排版飞书文档
+  - **Grid 分栏并排**：同行多张图片使用飞书原生 Grid 布局（block type 24+25），真正并排显示，每张独立可点击放大
+  - **原图上传**：保留完整分辨率，通过 PATCH API 设置合理的显示尺寸（单图 ≈ 140px 宽）
+  - **Markdown 渲染**：文本通过 lark-cli stdin 传入，标题/表格/粗体/列表/代码块正确渲染
+  - **双 token 架构**：app_access_token 操作 Block API + 图片上传，lark-cli user token 渲染 Markdown
+  - **表格内图片**：自动替换为 `[文件名]` 文字（飞书表格不支持嵌入图片）
+- **ae-lark-feishu SKILL.md** — 新增 Phase 9「上传 Markdown 报告到飞书文档」，含前置条件、用法、图片语法支持说明
+
 ## v0.39.0 (2026-04-15) — 截图自动关闭通知弹窗 + 通知横幅脱敏 `#IIYF6O`
 
 ### 新功能
