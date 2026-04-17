@@ -367,6 +367,11 @@ Phase 2a Level 2 每 batch / Phase 2b 每条 flow 默认由 **子 agent（`subag
 4. 识别到静态资源（插画/图标）→ 记一条到 `exploration-state.json.asset_inventory`
 5. 记录页面跳转 → 追加一条到 `exploration-state.json.transitions`
 6. 遇到 alert/付费墙/登录墙 → 标记 ⛔ 或 🔒，不纠缠，继续下一入口
+7. **App 健康度检测**（#IJ87FB）：某入口 tap-element 连续 2 次页面不符合预期时，按「App 健康度检测与失败归因决策树」执行：
+   - `wda-cli.py active-app --json` → bundle 变化 = crashed
+   - `wda-cli.py page-hash` 连续采样 → hash 不变 = frozen
+   - 记录到 `exploration-state.json.app_health_events`
+   - 摘要中以 `[app_health_event: {type} at F{id}]` 显式标注
 
 ## 落盘动作（全部完成再返回）
 - `phase-summaries.md` 追加 `## CP3 — Phase 2a Level 2 Batch {n}（子入口 {start}-{end}）` 段落
@@ -405,6 +410,7 @@ Batch {n} 完成（F{start}-F{end}）
 2. 每步结论立刻写 `screenshot_to_feature`
 3. 遇到需要物理输入（拍照/上传/输入手机号）→ 返回摘要并在摘要中标注 `[需 PM 物理操作]`，main agent 会接管
 4. 走到终点或 PAYWALL → 停止，进入 CP4 落盘
+5. **App 健康度检测**（#IJ87FB）：某步 tap-element 连续 2 次页面不符合预期 → 按「App 健康度检测与失败归因决策树」执行，crash/freeze 事件记录到 `exploration-state.json.app_health_events`，摘要中以 `[app_health_event: {type} at step{k}]` 显式标注，main agent 决定是否暂停
 
 ## 落盘动作
 - `phase-summaries.md` 追加 `## CP4 — Phase 2b Flow {n}: {flow_name}` 段落
@@ -528,9 +534,30 @@ Fallback 时 main agent 自己执行该 batch（老 v0.45.0 inline 方式），�
     "next_batch": "CP3-batch3",
     "images_in_current_batch": 5
   },
+  "app_health_events": [
+    {
+      "timestamp": "2026-04-17T17:30:22+08:00",
+      "phase": "2a",
+      "step": "F07-scan-entry",
+      "type": "crashed",
+      "detected_by": "active-app",
+      "expected_bundle": "com.example.app",
+      "actual_bundle": "com.apple.springboard",
+      "last_screenshot": "2a-F07-scan-entry-pre-crash.png",
+      "recovery": "relaunched",
+      "resumed_step": "F07-scan-entry-retry"
+    }
+  ],
   "notes": "工具箱-扫描类已完成，格式转换类进行中"
 }
 ```
+
+**`app_health_events` 语义**：
+- `type`: `crashed` (前台 bundle 变化) | `frozen` (page-hash 连续 N 次不变)
+- `detected_by`: `active-app` | `page-hash`
+- `recovery`: `relaunched` (wda-cli.py launch) | `terminated+relaunched` (先 terminate 再 launch) | `paused_for_pm` (阈值触发暂停)
+- `last_screenshot`: crash/freeze 前最后一张截图名，供事后排查
+- Phase 3 生成 Module 04 时若 `app_health_events.length >= 3` → 报告顶部加「⚠ 探索期间 App 发生 N 次健康事件，可能部分功能未覆盖」警示块
 
 **恢复流程**（每次会话开始时 **或 autoCompact / PM 手动 /compact 后** 执行）：
 
@@ -670,6 +697,59 @@ curl -s -X POST -d '{"action":"accept","buttonLabel":"允许"}' \
 ```
 
 **规则**：如果 tap 后截图未变化，第一反应是检查系统 alert，不要反复重试坐标 tap。
+
+### App 健康度检测与失败归因决策树（#IJ87FB）
+
+**核心矛盾**：操作后「页面不变 / 回到主屏」时，agent 默认把一切归因到「我操作错了」→ 陷入换元素 + 微调坐标 + 加 sleep 的重试循环。实际上 App 本身可能已经卡死（主线程阻塞）或闪退（被系统拉回主屏）。
+
+**归因决策树**（每次 `tap-element` / `alert-safe-tap` 后页面与预期不符时按此走）：
+
+```
+第 1 次异常（单次失败）
+  → 怀疑自己：查 alert、换元素定位（--by label → --by xpath）、微调等待时间
+  → **不**触发健康度检测（避免首次就误判浪费诊断成本）
+
+第 2 次仍异常 → 切换假设，执行 App 健康度检测：
+
+  1) python3 wda-cli.py active-app --json
+     ├─ bundleId != 目标 bundle_id → app_crashed
+     │    动作：
+     │      - 记录到 exploration-state.json.app_health_events
+     │      - python3 wda-cli.py launch <target_bundle_id>
+     │      - screenshot-save.py 保存崩溃前后的截图作证据
+     │      - phase-summaries.md 标 "⚠ app_health_event: crashed at F{id}"
+     │      - 该入口标记需复查，不继续当前失败重试
+     │
+     └─ bundleId == 目标 bundle_id → 进入 (2) freeze 检测
+
+  2) 连续采样 page-hash：
+     h1=$(wda-cli.py page-hash)
+     # sleep 2
+     h2=$(wda-cli.py page-hash)
+     ├─ h1 == h2 且本次 tap 后 h2 == 上次 tap 前的 hash → app_frozen
+     │    动作：
+     │      - 记录 app_health_events (type=frozen)
+     │      - python3 wda-cli.py terminate <bundle_id>
+     │      - python3 wda-cli.py launch <bundle_id>
+     │      - relaunch 后截图 → 回到该功能入口重试 1 次
+     │      - 仍失败 → 该入口标 `reason: app_unstable`，继续下一入口
+     │
+     └─ h1 != h2 → 页面有变化但不符合预期，回到「怀疑自己」分支
+                    （换元素定位或交由 PM 判断）
+```
+
+**阈值暂停**：同一个 Phase 累计 `app_health_events.length >= 3` → **暂停探索**，向 PM 报告：
+
+> ⚠ 探索期间 App 在 [F05, F07, F12] 附近发生 3 次健康事件（2 次 crash / 1 次 freeze），可能是 App 侧 bug。请决定：
+> 1. 继续探索（标记这些入口为 `app_unstable`）
+> 2. 跳过这些入口
+> 3. 终止探索，提交 bug 给开发团队
+
+**关键纪律**：
+- **不要装作没发生**：crash / freeze 后该步截图 + 元素树必须留档，`phase-summaries.md` 明确标 `⚠ app_health_event` 而非继续叙述
+- **诊断成本约束**：每次归因只做一次 `active-app` + 一对 `page-hash` 采样（约 3 次 WDA 调用），**不要**在确定是健康问题前反复采样
+- **与 alert 检查的优先级**：`tap-element` 内置 alert 前置检查（Step 0），健康度检测是在 alert 排除后的第二道防线，不重复做
+- **subagent 场景**：Phase 2a/2b subagent 遇到健康事件时，摘要中明确返回 `[app_health_event: {type} at F{id}]`，main agent 决定是否派新 subagent 或暂停
 
 #### Phase 2a: 广度遍历（分层，确保 100% 功能覆盖）
 
@@ -1007,6 +1087,20 @@ python3 ~/.ae/pm/scripts/screenshot-save.py screenshots/{name}
   每行必须引用参考截图。如果 `asset_inventory` 为空（工具类 App 视觉依赖低），在 Module 04 标注"本产品无显著静态资源依赖"。
   资源清单是下游素材生成（`ae-asset-gen`）的输入，缺少此清单 = 开发者只能用灰色占位框
 
+- **App 健康度警示（#IJ87FB）**：生成 Module 04 时若 `exploration-state.json.app_health_events.length >= 3`，在报告顶部加如下警示块（在颜色/字体/组件分析之前）：
+
+  ```markdown
+  > ⚠ **探索期间 App 健康警告**
+  >
+  > 本次探索过程中 App 发生 {N} 次健康事件（crash: {X} 次 / freeze: {Y} 次），
+  > 涉及入口：{列出 F{id} 列表}
+  >
+  > 下列功能的设计规范推断可能因此不完整或有偏差：{列出受影响功能}。
+  > 建议开发前先向原 App 团队确认这些功能的预期行为。
+  ```
+
+  `app_health_events` 为空或 `< 3` 条时不加此块。
+
 ### Phase 4: PM Review 清单
 
 生成 `review-checklist.md`，必须包含：
@@ -1086,6 +1180,7 @@ python3 ~/.ae/pm/scripts/screenshot-save.py screenshots/{name}
 | **状态栏 tap 滚顶在真机上不稳定**（#IJ85I0） | tap (200, 0/5/10) 在多个 App 完全无响应（自定义 nav bar 拦截系统手势） | 封装 `wda-cli.py scroll-to-top`：先尝试 status-bar tap（best-effort），再 swipe-down × N 默认回退。SKILL.md 不再把 status bar 作为"优先"方案 |
 | **alert 检测写在 tap 失败分支导致弯路**（#IJ85I0） | 历史模板"if 截图无变化再查 alert"——agent 默认先 tap 再回头查，浪费 1-2 张截图 | 把 alert 检查前置到 Step 0；`tap-element` / `alert-safe-tap` 在 CLI 层自动前置检查，有 alert 则退出码 2 |
 | **持久化状态页面 relaunch 后污染叙事**（#IJ85I0） | Counter / 草稿页残留上一会话值，agent 继续操作产生错误演示（如 Counter 残留 1 → +3 → 显示 4） | 进入"可持久化状态"页面时必做幂等性检查；`exploration-state.json.dirty_state_pages` 记录已知污染页 + reset 动作，恢复时优先 reset |
+| **App 卡死/闪退被 agent 误判为自身错误**（#IJ87FB） | 被测 App 主线程阻塞或被系统重启，agent 把"页面不变/回到主屏"一律归因到"按钮坐标不对/元素未就绪"，换元素+微调+加 sleep 陷入重试循环，context 膨胀 5-10 倍 | **App 健康度检测 + 归因决策树**：单次失败怀疑自己，连续 2+ 次切换假设用 `wda-cli.py active-app`（bundle 变化 = crashed）+ `page-hash`（连续采样不变 = frozen）。记录 `exploration-state.json.app_health_events`；单 Phase ≥3 次事件触发暂停请 PM 介入 |
 
 ## 复用说明
 

@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.48.0 (2026-04-17) — ae-app-to-speckit 增加 App 健康度检测 [`#IJ87FB`](https://gitee.com/turningsyn/ae-pm/issues/IJ87FB)
+
+### 新功能
+
+- **wda-cli.py 新增 3 个原子能力**：
+  - `wda-cli.py active-app [--json]` — 返回当前前台 bundle id / pid / name（crash 检测用：bundle 变化 = App 被踢出前台）
+  - `wda-cli.py terminate BUNDLE_ID` — 强制 kill 指定 App（freeze 时配合 launch 做彻底重启）
+  - `wda-cli.py page-hash [--json] [--save PATH] [--rect-tolerance N]` — 页面**结构指纹**：取 `/source?format=json`，递归提取 `(type, name, label, value, bucketed_rect)` → sha1。rect 默认按 2px 桶化忽略动画 jitter，但捕获真实布局变化
+- **SKILL.md 新增「App 健康度检测 + 归因决策树」段落**：
+  - 核心规则：**单次失败怀疑自己，连续 2+ 次切换假设**
+  - crash 检测：`active-app` bundleId 不等于目标 → `app_crashed` → launch + 留档
+  - freeze 检测：连续两次 `page-hash` 不变 → `app_frozen` → terminate + launch + 重试 1 次
+  - 阈值暂停：单 Phase `app_health_events.length >= 3` → 暂停并请 PM 介入
+- **exploration-state.json 新增 `app_health_events` 字段**（含 timestamp / phase / step / type / detected_by / expected_bundle / actual_bundle / last_screenshot / recovery）
+- **subagent prompt 模板**（Phase 2a L2 batch 版 / Phase 2b flow 版）均加入健康度检测规则，摘要中用 `[app_health_event: {type} at F{id}]` 显式标注
+- **Phase 3 Module 04** 若 `app_health_events.length >= 3`，报告顶部自动加「⚠ 探索期间 App 健康警告」块，标注受影响功能
+- **技术风险表**新增一行：「App 卡死/闪退被 agent 误判为自身错误」
+
+### 解决痛点
+
+历史行为：操作后「页面不变 / 回到主屏」时 agent 默认归因到「按钮坐标不对/元素未就绪」→ 换元素 + 微调坐标 + 加 sleep 的重试循环 → context 膨胀 5-10 倍、探索叙事完全偏离。
+
+修复后：给 agent 清晰的 tradeoff 二分（自己错 vs App 挂了）+ 低成本诊断信号（2 次 WDA 调用）+ 阈值暂停请 PM 介入。
+
 ## v0.47.0 (2026-04-17) — WDA 工具链支持多 session 并行 [`#IJ86QM`](https://gitee.com/turningsyn/ae-pm/issues/IJ86QM)
 
 ### 新功能

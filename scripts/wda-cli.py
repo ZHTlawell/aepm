@@ -8,6 +8,9 @@ Usage:
     python3 wda-cli.py tap-element --by NAME --value V   # Tap by element (preferred — no coord guessing)
     python3 wda-cli.py alert-safe-tap X Y             # Check alert first, then tap (no-op if alert present)
     python3 wda-cli.py launch BUNDLE_ID              # Launch app
+    python3 wda-cli.py terminate BUNDLE_ID            # Kill app (for clean relaunch)
+    python3 wda-cli.py active-app                     # Get foreground bundle id (for crash detection)
+    python3 wda-cli.py page-hash                      # Structural fingerprint of current page (for freeze detection)
     python3 wda-cli.py source [--format xml|json]    # Get element tree
     python3 wda-cli.py swipe X1 Y1 X2 Y2 [--duration 0.5]  # Swipe
     python3 wda-cli.py scroll-to-top [--max-swipes 6] # Status-bar tap → fallback to swipe×N
@@ -397,6 +400,107 @@ def cmd_launch(args):
     print(f"Launched: {args.bundle_id}")
 
 
+def cmd_terminate(args):
+    """Forcibly kill an app by bundle id. Used before relaunch to clear frozen state."""
+    sid = get_session_id(args.url)
+    wda_request(f"/session/{sid}/wda/apps/terminate", method="POST",
+                body={"bundleId": args.bundle_id}, url_base=args.url)
+    print(f"Terminated: {args.bundle_id}")
+
+
+def cmd_active_app(args):
+    """Return the foreground app's bundle id + pid. Used to detect crashes.
+
+    If the expected target app has crashed, activeAppInfo will return a
+    different bundle (typically com.apple.springboard = home screen, or
+    another launcher).
+    """
+    data = wda_request("/wda/activeAppInfo", url_base=args.url)
+    val = data.get("value", {}) if isinstance(data.get("value"), dict) else {}
+    out = {
+        "bundleId": val.get("bundleId", ""),
+        "pid": val.get("pid", 0),
+        "name": val.get("name", ""),
+        "processArguments": val.get("processArguments", {}),
+    }
+    if args.json:
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+    else:
+        print(f"bundleId: {out['bundleId']}")
+        print(f"pid:      {out['pid']}")
+        print(f"name:     {out['name']}")
+
+
+def _normalize_element_for_hash(node, rect_tolerance=2):
+    """Extract (type, name, label, value, bucketed_rect) from element tree node.
+
+    Recursively collects a stable structural signature. Coordinates are
+    bucketed to `rect_tolerance` pixels to ignore sub-pixel animation
+    jitter while still catching real layout changes.
+    """
+    if not isinstance(node, dict):
+        return []
+    rect = node.get("rect", {}) or {}
+    # Bucket rect to ignore tiny animation / frame-rate jitter
+    def bucket(v):
+        try:
+            return int(int(v) / rect_tolerance) * rect_tolerance
+        except (TypeError, ValueError):
+            return 0
+    sig = (
+        node.get("type", ""),
+        node.get("name", "") or "",
+        node.get("label", "") or "",
+        node.get("value", "") if isinstance(node.get("value"), (str, int, float, bool)) else "",
+        bucket(rect.get("x", 0)), bucket(rect.get("y", 0)),
+        bucket(rect.get("width", 0)), bucket(rect.get("height", 0)),
+    )
+    out = [sig]
+    for child in node.get("children", []) or []:
+        out.extend(_normalize_element_for_hash(child, rect_tolerance))
+    return out
+
+
+def cmd_page_hash(args):
+    """Compute a structural fingerprint of the current page (for freeze detection).
+
+    Strategy: dump /source?format=json, recursively extract
+    (type, name, label, value, bucketed_rect) tuples, serialize, sha1.
+
+    Why not screenshot hash: animations / cursor blinks / frame-rate jitter
+    make pixel hashes unreliable (false negatives on "actually same page").
+    Element tree ignores pixel noise but catches real layout changes.
+
+    Usage in freeze detection:
+        h1=$(wda-cli.py page-hash)
+        # ... do an action ...
+        h2=$(wda-cli.py page-hash)
+        [ "$h1" = "$h2" ] && echo "page unchanged — possible freeze"
+    """
+    import hashlib
+    data = wda_request("/source?format=json", url_base=args.url)
+    val = data.get("value", {})
+    if isinstance(val, str):
+        try:
+            val = json.loads(val)
+        except Exception:
+            val = {}
+    sigs = _normalize_element_for_hash(val, rect_tolerance=args.rect_tolerance)
+    payload = json.dumps(sigs, ensure_ascii=False, sort_keys=False).encode()
+    digest = hashlib.sha1(payload).hexdigest()
+    if args.json:
+        print(json.dumps({
+            "hash": digest,
+            "element_count": len(sigs),
+            "rect_tolerance": args.rect_tolerance,
+        }, ensure_ascii=False))
+    else:
+        print(digest)
+    if args.save:
+        with open(args.save, "w", encoding="utf-8") as f:
+            f.write(payload.decode())
+
+
 def cmd_source(args):
     fmt = args.format or "xml"
     data = wda_request(f"/source?format={fmt}", url_base=args.url)
@@ -492,6 +596,24 @@ def main():
     p_launch = sub.add_parser("launch", help="Launch app")
     p_launch.add_argument("bundle_id")
 
+    p_term = sub.add_parser("terminate",
+                            help="Force-kill an app by bundle id (for clean relaunch after freeze/crash)")
+    p_term.add_argument("bundle_id")
+
+    p_active = sub.add_parser("active-app",
+                              help="Get foreground app's bundle id (for crash detection)")
+    p_active.add_argument("--json", action="store_true",
+                          help="Output as JSON (default: human-readable)")
+
+    p_hash = sub.add_parser("page-hash",
+                            help="Structural fingerprint of current page (for freeze detection)")
+    p_hash.add_argument("--json", action="store_true",
+                        help="Output as JSON (hash + element_count)")
+    p_hash.add_argument("--save", metavar="PATH",
+                        help="Save raw signature payload to file (for debugging)")
+    p_hash.add_argument("--rect-tolerance", type=int, default=2,
+                        help="Bucket rect coords to N pixels to ignore animation jitter (default: 2)")
+
     p_src = sub.add_parser("source", help="Get element tree")
     p_src.add_argument("--format", choices=["xml", "json"], default="xml")
     p_src.add_argument("--save", metavar="PATH", help="Save to file")
@@ -511,6 +633,9 @@ def main():
         "alert": cmd_alert,
         "scroll-to-top": cmd_scroll_to_top,
         "swipe": cmd_swipe, "launch": cmd_launch,
+        "terminate": cmd_terminate,
+        "active-app": cmd_active_app,
+        "page-hash": cmd_page_hash,
         "source": cmd_source, "apps": cmd_apps,
     }
     cmds[args.command](args)
