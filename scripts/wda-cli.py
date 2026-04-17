@@ -16,8 +16,12 @@ Usage:
     python3 wda-cli.py status                        # Check WDA status
     python3 wda-cli.py session                       # Get/create session
 
-    # Custom WDA URL
+    # Custom WDA URL (explicit flag — overrides $WDA_URL env var)
     python3 wda-cli.py --url http://localhost:8200 screenshot
+
+    # Or set env var (multi-session: each session exports its own port)
+    export WDA_URL=http://localhost:8101
+    python3 wda-cli.py screenshot
 """
 
 import sys
@@ -29,7 +33,9 @@ import urllib.request
 import urllib.error
 
 
-WDA_URL = "http://localhost:8100"
+# Read from $WDA_URL env var if set, else default to 8100.
+# Supports multi-session parallel operation: each session exports its own WDA_URL.
+WDA_URL = os.environ.get("WDA_URL", "http://localhost:8100")
 
 # Cache scale factor per session to avoid repeated WDA calls
 _scale_cache = {}

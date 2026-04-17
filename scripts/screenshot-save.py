@@ -11,8 +11,12 @@ Usage:
     # Skip notification dismiss (not recommended)
     python3 screenshot-save.py screenshots/test --no-dismiss
 
-    # Custom WDA URL
+    # Custom WDA URL (explicit flag — overrides $WDA_URL env var)
     python3 screenshot-save.py screenshots/test --wda-url http://localhost:8200
+
+    # Or set env var (multi-session parallel: each session its own port)
+    export WDA_URL=http://localhost:8101
+    python3 screenshot-save.py screenshots/test
 
 Output:
     screenshots/2a-F01-scan-entry.png   — screenshot image
@@ -32,7 +36,11 @@ import urllib.request
 import urllib.error
 
 
-def _wda_request(path, method="GET", body=None, wda_url="http://localhost:8100"):
+# Read from $WDA_URL env var if set, else default to 8100.
+DEFAULT_WDA_URL = os.environ.get("WDA_URL", "http://localhost:8100")
+
+
+def _wda_request(path, method="GET", body=None, wda_url=DEFAULT_WDA_URL):
     """Make a WDA HTTP request, return parsed JSON or None on failure."""
     full_url = f"{wda_url}{path}"
     data = json.dumps(body).encode() if body else None
@@ -47,7 +55,7 @@ def _wda_request(path, method="GET", body=None, wda_url="http://localhost:8100")
         return None
 
 
-def _get_session_id(wda_url="http://localhost:8100"):
+def _get_session_id(wda_url=DEFAULT_WDA_URL):
     """Get existing WDA session ID or create one."""
     data = _wda_request("/status", wda_url=wda_url)
     if not data:
@@ -63,7 +71,7 @@ def _get_session_id(wda_url="http://localhost:8100"):
     return (resp or {}).get("sessionId", "")
 
 
-def dismiss_notifications(wda_url="http://localhost:8100"):
+def dismiss_notifications(wda_url=DEFAULT_WDA_URL):
     """Dismiss system alerts and notification banners before taking a screenshot.
 
     1. Try WDA alert dismiss API (handles UIAlertController dialogs)
@@ -98,7 +106,7 @@ def dismiss_notifications(wda_url="http://localhost:8100"):
     time.sleep(0.5)  # Wait for animation to complete
 
 
-def save_screenshot(base_path, wda_url="http://localhost:8100", max_retries=3):
+def save_screenshot(base_path, wda_url=DEFAULT_WDA_URL, max_retries=3):
     """Fetch and save WDA screenshot with black screen retry."""
     url = f"{wda_url}/screenshot"
     MIN_VALID_SIZE = 80_000
@@ -134,7 +142,7 @@ def save_screenshot(base_path, wda_url="http://localhost:8100", max_retries=3):
     return png_path
 
 
-def save_element_tree(base_path, wda_url="http://localhost:8100"):
+def save_element_tree(base_path, wda_url=DEFAULT_WDA_URL):
     """Fetch and save WDA element tree as XML."""
     xml_path = f"{base_path}.xml"
     url = f"{wda_url}/source?format=xml"
@@ -159,7 +167,8 @@ def main():
     parser.add_argument("--no-xml", action="store_true", help="Skip element tree XML")
     parser.add_argument("--no-dismiss", action="store_true",
                         help="Skip auto-dismiss of notifications/alerts before screenshot")
-    parser.add_argument("--wda-url", default="http://localhost:8100", help="WDA base URL")
+    parser.add_argument("--wda-url", default=DEFAULT_WDA_URL,
+                        help="WDA base URL (default: $WDA_URL env var or http://localhost:8100)")
     args = parser.parse_args()
 
     # Dismiss notifications/alerts before screenshot (default: on)

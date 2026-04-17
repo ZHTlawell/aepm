@@ -20,6 +20,13 @@ Usage:
     # Specify scale factor manually (default: auto-detect, fallback @3x)
     python3 ocr-screenshot.py /path/to/screenshot.png --logical --scale 3
 
+    # Multi-session parallel: each session exports its own WDA_URL
+    export WDA_URL=http://localhost:8101
+    python3 ocr-screenshot.py --wda
+
+    # Or explicit flag (overrides $WDA_URL)
+    python3 ocr-screenshot.py --wda --wda-url http://localhost:8101
+
 Requires: pyobjc-framework-Vision, pyobjc-framework-Quartz
     pip3 install pyobjc-framework-Vision pyobjc-framework-Quartz
 """
@@ -32,14 +39,19 @@ import tempfile
 import os
 import urllib.request
 
-def fetch_wda_screenshot(save_path=None, max_retries=3):
+
+# Read from $WDA_URL env var if set, else default to 8100.
+DEFAULT_WDA_URL = os.environ.get("WDA_URL", "http://localhost:8100")
+
+
+def fetch_wda_screenshot(save_path=None, max_retries=3, wda_url=DEFAULT_WDA_URL):
     """Fetch screenshot from WDA API, return temp file path.
 
     WDA /screenshot on real devices intermittently returns black screens
     (~40KB for a 1178x2556 image). Real screenshots are typically >100KB.
     This function retries until a non-black screenshot is obtained.
     """
-    url = "http://localhost:8100/screenshot"
+    url = f"{wda_url}/screenshot"
     MIN_VALID_SIZE = 80_000  # black screen ~40KB, real content >100KB
 
     for attempt in range(1, max_retries + 1):
@@ -50,7 +62,7 @@ def fetch_wda_screenshot(save_path=None, max_retries=3):
         except Exception as e:
             if attempt == max_retries:
                 print(f"Error: WDA screenshot failed after {max_retries} attempts — {e}", file=sys.stderr)
-                print("Is WDA running? Check: curl -s http://localhost:8100/status", file=sys.stderr)
+                print(f"Is WDA running? Check: curl -s {wda_url}/status", file=sys.stderr)
                 sys.exit(1)
             import time; time.sleep(1)
             continue
@@ -75,17 +87,17 @@ def fetch_wda_screenshot(save_path=None, max_retries=3):
     return tmp.name
 
 
-def get_wda_scale_factor():
+def get_wda_scale_factor(wda_url=DEFAULT_WDA_URL):
     """Detect scale factor from WDA window size vs screenshot resolution."""
     try:
-        with urllib.request.urlopen("http://localhost:8100/screenshot", timeout=5) as resp:
+        with urllib.request.urlopen(f"{wda_url}/screenshot", timeout=5) as resp:
             data = json.loads(resp.read())
         img_bytes = base64.b64decode(data["value"])
         # Get pixel dimensions from PNG header (width at bytes 16-19)
         pixel_w = int.from_bytes(img_bytes[16:20], 'big')
 
         # Get logical window size from WDA
-        with urllib.request.urlopen("http://localhost:8100/window/size", timeout=5) as resp:
+        with urllib.request.urlopen(f"{wda_url}/window/size", timeout=5) as resp:
             win = json.loads(resp.read())
         logical_w = win.get("value", {}).get("width", 0)
 
@@ -188,7 +200,10 @@ def ocr_image(image_path, output_json=False, logical=False, scale=None):
 def main():
     parser = argparse.ArgumentParser(description="OCR screenshot using Apple Vision")
     parser.add_argument("image", nargs="?", help="Path to image file")
-    parser.add_argument("--wda", action="store_true", help="Grab screenshot from WDA (localhost:8100)")
+    parser.add_argument("--wda", action="store_true",
+                        help=f"Grab screenshot from WDA (default: {DEFAULT_WDA_URL})")
+    parser.add_argument("--wda-url", default=DEFAULT_WDA_URL,
+                        help="WDA base URL (default: $WDA_URL env var or http://localhost:8100)")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
     parser.add_argument("--save", metavar="PATH", help="Save WDA screenshot to file")
     parser.add_argument("--logical", action="store_true",
@@ -204,10 +219,10 @@ def main():
     # Auto-detect scale factor from WDA if --logical without explicit --scale
     scale = args.scale
     if args.logical and not scale and args.wda:
-        scale = get_wda_scale_factor()
+        scale = get_wda_scale_factor(args.wda_url)
 
     if args.wda:
-        image_path = fetch_wda_screenshot(save_path=args.save)
+        image_path = fetch_wda_screenshot(save_path=args.save, wda_url=args.wda_url)
         cleanup = True
     else:
         image_path = args.image

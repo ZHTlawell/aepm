@@ -2,9 +2,15 @@
 # wda-start.sh — 一键启动 WDA 环境（tunnel + xcodebuild + forward + verify）
 #
 # Usage:
-#   bash wda-start.sh                  # 自动检测设备
-#   bash wda-start.sh --udid XXXX      # 指定设备 UDID
-#   bash wda-start.sh --check-only     # 只检查不启动
+#   bash wda-start.sh                          # 自动检测设备，端口 8100
+#   bash wda-start.sh --udid XXXX              # 指定设备 UDID
+#   bash wda-start.sh --udid XXXX --port 8101  # 第二台设备用不同端口（多 session 并行）
+#   bash wda-start.sh --check-only             # 只检查不启动
+#
+# 多 session 并行规则:
+#   - pkill 按 UDID 精确匹配，不影响其他 session 的 WDA/forward
+#   - userspace tunnel 若已存在则复用（不 kill 重启，避免影响并行设备）
+#   - 日志文件按端口隔离: /tmp/wda-xcodebuild-${PORT}.log
 #
 # 需要: go-ios (https://github.com/danielpaulus/go-ios)
 
@@ -29,10 +35,14 @@ CHECK_ONLY=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --udid) UDID="$2"; shift 2 ;;
+        --port) WDA_PORT="$2"; shift 2 ;;
         --check-only) CHECK_ONLY=true; shift ;;
         *) err "Unknown arg: $1"; exit 1 ;;
     esac
 done
+
+# Per-port xcodebuild log to avoid stomping across parallel sessions
+XCB_LOG="/tmp/wda-xcodebuild-${WDA_PORT}.log"
 
 # Step 1: Check device
 log "Step 1: 检查设备连接..."
@@ -134,19 +144,23 @@ if $CHECK_ONLY; then
 fi
 
 # Step 3: Start userspace tunnel (iOS 17+)
+# Userspace tunnel is per-machine (serves all connected devices via pymobiledevice3).
+# Reuse if already running — killing it would break any other session's WDA.
 log "Step 3: 启动 userspace tunnel..."
-# Kill existing tunnel if any
-pkill -f "ios tunnel" 2>/dev/null || true
-sleep 1
-
-ios tunnel start --userspace &>/dev/null &
-TUNNEL_PID=$!
-sleep 2
-
-if ! kill -0 "$TUNNEL_PID" 2>/dev/null; then
-    warn "tunnel 进程已退出（可能 iOS < 17 不需要 tunnel）"
+EXISTING_TUNNEL_PID=$(pgrep -f "ios tunnel" | head -1 || true)
+if [[ -n "$EXISTING_TUNNEL_PID" ]]; then
+    log "tunnel 已在运行 (PID: $EXISTING_TUNNEL_PID) — 复用，不重启"
+    TUNNEL_PID="$EXISTING_TUNNEL_PID"
 else
-    log "tunnel 已启动 (PID: $TUNNEL_PID)"
+    ios tunnel start --userspace &>/dev/null &
+    TUNNEL_PID=$!
+    sleep 2
+
+    if ! kill -0 "$TUNNEL_PID" 2>/dev/null; then
+        warn "tunnel 进程已退出（可能 iOS < 17 不需要 tunnel）"
+    else
+        log "tunnel 已启动 (PID: $TUNNEL_PID)"
+    fi
 fi
 
 # Step 3.5: Auto-mount Developer Disk Image (iOS 17+)
@@ -164,8 +178,9 @@ fi
 
 # Step 4: Start WDA
 log "Step 4: 启动 WDA..."
-# Kill existing WDA
-pkill -f "xcodebuild.*WebDriverAgentRunner" 2>/dev/null || true
+# Kill only THIS device's WDA (match on UDID in -destination arg).
+# Other sessions' WDA processes (different UDID) are untouched.
+pkill -f "xcodebuild.*WebDriverAgentRunner.*${UDID}" 2>/dev/null || true
 sleep 1
 
 # Find WebDriverAgent project
@@ -232,7 +247,9 @@ fi
 
 # --- Helper: start port forward ---
 start_forward() {
-    pkill -f "ios forward.*${WDA_PORT}" 2>/dev/null || true
+    # Kill only this UDID+port forward. Matching on both port AND udid avoids
+    # stomping on another session using a different port or different device.
+    pkill -f "ios forward ${WDA_PORT} ${WDA_PORT} --udid=${UDID}" 2>/dev/null || true
     # Wait until port is actually freed (up to 5s)
     for i in $(seq 1 10); do
         if ! lsof -i :${WDA_PORT} -sTCP:LISTEN &>/dev/null; then
@@ -287,8 +304,8 @@ sys.exit(1)
 # --- Helper: dump diagnostics ---
 dump_diagnostics() {
     err "--- 错误日志 (最后 30 行) ---"
-    tail -30 /tmp/wda-xcodebuild.log >&2 2>/dev/null || true
-    err "--- 完整日志: cat /tmp/wda-xcodebuild.log ---"
+    tail -30 "$XCB_LOG" >&2 2>/dev/null || true
+    err "--- 完整日志: cat $XCB_LOG ---"
     if [[ -n "$IOS_MAJOR" && "$IOS_MAJOR" -ge 26 ]]; then
         err ""
         err "=== iOS $IOS_VERSION 诊断建议 ==="
@@ -299,7 +316,7 @@ dump_diagnostics() {
         err "5. 跟踪上游: https://github.com/appium/WebDriverAgent/issues"
         err ""
         err "请将以下信息反馈给 AE Team:"
-        err "  cat /tmp/wda-xcodebuild.log | tail -50"
+        err "  cat $XCB_LOG | tail -50"
         err "  xcodebuild -version"
         err "  ios version"
     fi
@@ -307,7 +324,7 @@ dump_diagnostics() {
 
 # ===== Attempt 1: test-without-building =====
 log "尝试 test-without-building..."
-xcodebuild test-without-building "${XC_ARGS[@]}" &>/tmp/wda-xcodebuild.log &
+xcodebuild test-without-building "${XC_ARGS[@]}" &>"$XCB_LOG" &
 WDA_PID=$!
 
 # Quick check: if process died immediately
@@ -317,16 +334,19 @@ if ! kill -0 "$WDA_PID" 2>/dev/null; then
     warn "test-without-building 立即失败 (exit code: $XC_EXIT)"
 else
     # Process alive — start forward and verify
-    log "Step 5: 端口转发..."
+    log "Step 5: 端口转发 (port=${WDA_PORT})..."
     start_forward
-    log "Step 6: 验证 WDA..."
+    log "Step 6: 验证 WDA (http://localhost:${WDA_PORT})..."
     if verify_wda 3 3; then
         log "${GREEN}WDA 环境就绪 ✓${NC}"
         echo ""
         echo -e "${BOLD}进程信息:${NC}"
         [[ -n "${TUNNEL_PID:-}" ]] && echo "  tunnel:  PID $TUNNEL_PID"
-        echo "  WDA:     PID $WDA_PID"
-        echo "  forward: PID $FORWARD_PID"
+        echo "  WDA:     PID $WDA_PID (udid=$UDID)"
+        echo "  forward: PID $FORWARD_PID (localhost:${WDA_PORT} → device:${WDA_PORT})"
+        echo ""
+        echo -e "${BOLD}配套脚本如何使用此端口:${NC}"
+        echo "  export WDA_URL=http://localhost:${WDA_PORT}"
         echo ""
         exit 0
     fi
@@ -335,17 +355,17 @@ fi
 
 # ===== Attempt 2: test (full build) =====
 warn "检查 xcodebuild 日志..."
-if grep -q "exit code 74\|exited with code 74" /tmp/wda-xcodebuild.log 2>/dev/null; then
+if grep -q "exit code 74\|exited with code 74" "$XCB_LOG" 2>/dev/null; then
     warn "检测到 exit code 74 (test runner 启动即崩溃)"
 fi
 
-# Kill previous attempt (xcodebuild + stale forward)
-pkill -f "xcodebuild.*WebDriverAgentRunner" 2>/dev/null || true
-pkill -f "ios forward.*${WDA_PORT}" 2>/dev/null || true
+# Kill previous attempt (xcodebuild + stale forward) — scoped to this UDID/port
+pkill -f "xcodebuild.*WebDriverAgentRunner.*${UDID}" 2>/dev/null || true
+pkill -f "ios forward ${WDA_PORT} ${WDA_PORT} --udid=${UDID}" 2>/dev/null || true
 sleep 1
 
 log "回退到 xcodebuild test（含完整 build）..."
-xcodebuild test "${XC_ARGS[@]}" &>/tmp/wda-xcodebuild.log &
+xcodebuild test "${XC_ARGS[@]}" &>"$XCB_LOG" &
 WDA_PID=$!
 log "xcodebuild test 启动中 (PID: $WDA_PID)..."
 
@@ -358,16 +378,19 @@ if ! kill -0 "$WDA_PID" 2>/dev/null; then
     exit 1
 fi
 
-log "Step 5: 端口转发..."
+log "Step 5: 端口转发 (port=${WDA_PORT})..."
 start_forward
-log "Step 6: 验证 WDA..."
+log "Step 6: 验证 WDA (http://localhost:${WDA_PORT})..."
 if verify_wda 4 8; then
     log "${GREEN}WDA 环境就绪 ✓${NC}"
     echo ""
     echo -e "${BOLD}进程信息:${NC}"
     [[ -n "${TUNNEL_PID:-}" ]] && echo "  tunnel:  PID $TUNNEL_PID"
-    echo "  WDA:     PID $WDA_PID"
-    echo "  forward: PID $FORWARD_PID"
+    echo "  WDA:     PID $WDA_PID (udid=$UDID)"
+    echo "  forward: PID $FORWARD_PID (localhost:${WDA_PORT} → device:${WDA_PORT})"
+    echo ""
+    echo -e "${BOLD}配套脚本如何使用此端口:${NC}"
+    echo "  export WDA_URL=http://localhost:${WDA_PORT}"
     echo ""
     exit 0
 fi

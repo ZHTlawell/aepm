@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.47.0 (2026-04-17) — WDA 工具链支持多 session 并行 [`#IJ86QM`](https://gitee.com/turningsyn/ae-pm/issues/IJ86QM)
+
+### 新功能
+
+- **wda-start.sh** — 新增 `--port PORT` 参数，支持多 session 各自占用不同 WDA 端口
+- **多 session 隔离**：
+  - `pkill` 精确按 UDID 匹配（`xcodebuild.*WebDriverAgentRunner.*$UDID` / `ios forward $PORT $PORT --udid=$UDID`），不再误杀其他 session 的 WDA/forward
+  - `ios tunnel` 已存在则复用（tunnel 是 per-machine 共享资源）
+  - xcodebuild 日志按端口隔离 `/tmp/wda-xcodebuild-${PORT}.log`
+- **wda-cli.py / screenshot-save.py / ocr-screenshot.py** — 统一读取 `WDA_URL` 环境变量（默认 `http://localhost:8100`），支持多 session 各自 `export WDA_URL=http://localhost:8101`
+- **ocr-screenshot.py** 新增 `--wda-url` 显式参数（覆盖环境变量）
+
+### 使用场景
+
+```bash
+# Session A (iPhone XS)
+bash wda-start.sh --udid 00008020-... --port 8100
+export WDA_URL=http://localhost:8100
+
+# Session B (iPhone 15) — 并行，不打断 A
+bash wda-start.sh --udid 00008120-... --port 8101
+export WDA_URL=http://localhost:8101
+```
+
+### 放弃 scope（PM 确认 2026-04-17）
+
+issue 原 P2-P4（exploration-state.json 多 device 字段 / SKILL.md 多设备流程 / 跨设备对照报告）全部放弃 — 不同设备 = 不同 session，不需要单 session 内管理多设备状态。
+
 ## v0.46.0 (2026-04-17) — ae-app-to-speckit 子 agent 隔离执行（CP3/CP4 由 subagent 托管） [`#IJ864Z`](https://gitee.com/turningsyn/ae-pm/issues/IJ864Z)
 
 ### 新功能
