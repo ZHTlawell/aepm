@@ -306,7 +306,9 @@ Run /compact to remove old images from context, or start a new session.
 | CP6 | Phase 2d 覆盖率 checkpoint 通过后 | — |
 | CP7 | Phase 2e 脱敏完成后 | — |
 
-**关键原则**：**预算上限 = 8 张截图 / batch**。接近上限时主动收口写摘要，不要跨越。依赖 `autoCompact: true` 在 context 压力大时自动压缩，skill 侧不阻塞。
+**关键原则**：**预算上限 = 8 张截图 / batch**。接近上限时主动收口写摘要，不要跨越。
+
+**v0.46.0 起**（#IJ864Z）：CP3（Phase 2a Level 2）和 CP4（Phase 2b flow）默认由 **subagent 执行**，即每 batch 的 8 张截图只进子 agent context，main agent context 只吃 ≤200 字摘要。CP1/CP2/CP5/CP6/CP7 仍由 main agent 直接执行（截图数少，batch 隔离成本不划算）。`autoCompact: true` 作为最后兜底。
 
 **autonomous 模式 CP 日志格式**（默认，向 PM 输出一行）：
 
@@ -332,6 +334,107 @@ Run /compact to remove old images from context, or start a new session.
 ```
 
 **为什么 autonomous 是默认**：1M context + `autoCompact: true` 下，CP1/2/5/6/7 这类单 batch 远未触顶，强制 `continue` 纯浪费 PM 时间。CP3/CP4 累计 8 张截图时，autoCompact 会在真正压力来临时自动处理，skill 不需要预先停顿。持久化摘要保证即使被 autoCompact 清掉历史，恢复仍然无损。
+
+### 子 agent 隔离执行架构（#IJ864Z v0.46.0）
+
+Phase 2a Level 2 每 batch / Phase 2b 每条 flow 默认由 **子 agent（`subagent_type=general-purpose`）独立执行**，main agent 只接收 ≤200 字摘要。
+
+**为什么**：截图仍然线性进 context，但**只进子 agent 的 context**。子 agent 结束即销毁，它吃的 8 张截图 + 元素树对 main agent 完全不可见。main agent 的 context 增长从"N batch × 8 图"降为"N batch × 200 字摘要"，本质消除了图累积。
+
+**同时配合核心原则 #8 的落盘纪律**：子 agent 每看一张图必须立即写 `screenshot_to_feature` / `phase-summaries.md`，写完再回报摘要。这样即使子 agent context 满或异常退出，磁盘结论已存盘，main agent 接管补救。
+
+**子 agent prompt 模板**（Phase 2a Level 2 batch 版）：
+
+```
+你是 ae-app-to-speckit skill 的子 agent，负责一个 batch 的子入口探索。
+
+## 上下文
+- workdir: {workdir 绝对路径}
+- 目标 App: {name} (bundle_id: {bundle_id})
+- 本 batch 要探索的子入口（{k} 个）：
+  - F01 扫描文档（入口 Tab：工具箱）
+  - F02 OCR 识别（入口 Tab：工具箱）
+  - ... [8 个最多]
+- feature-checklist 路径: {workdir}/speckit/feature-checklist.md
+- exploration-state.json 路径: {workdir}/speckit/exploration-state.json
+- phase-summaries.md 路径: {workdir}/speckit/phase-summaries.md
+
+## 执行规则（必须遵守）
+1. 每个子入口：`wda-cli.py tap-element` 进入 → `screenshot-save.py 2a-F{id}-{desc}` 存盘 →
+   返回上一级（iOS 手势 swipe from left-edge 或 tap 返回按钮）
+2. 每张 Read 过的截图**立刻**把一句话结论写到 `exploration-state.json.screenshot_to_feature`
+3. 发现未列入的功能（Feature Discovery by Reasoning）→ 新增一行到 feature-checklist，source="discovered"
+4. 识别到静态资源（插画/图标）→ 记一条到 `exploration-state.json.asset_inventory`
+5. 记录页面跳转 → 追加一条到 `exploration-state.json.transitions`
+6. 遇到 alert/付费墙/登录墙 → 标记 ⛔ 或 🔒，不纠缠，继续下一入口
+
+## 落盘动作（全部完成再返回）
+- `phase-summaries.md` 追加 `## CP3 — Phase 2a Level 2 Batch {n}（子入口 {start}-{end}）` 段落
+- `exploration-state.json` 更新：
+  - `screenshot_to_feature` 追加映射
+  - `checkpoints.last_written = "CP3-batch{n}"`
+  - `checkpoints.batches_completed` 追加
+  - `feature_coverage.covered` 递增
+- feature-checklist.md 对应行 ⬜ → ✅
+
+## 返回格式（严格 ≤200 字）
+Batch {n} 完成（F{start}-F{end}）
+- F{id}: 一句话结论（入口位置 + 关键元素）
+- F{id}: ...
+截图 {k} 张已存盘，发现 discovered: [列表或"无"]
+状态：phase-summaries.md + exploration-state.json + feature-checklist.md 已更新
+⛔/🔒: 若有，列出被标记的 ID
+
+**禁止**在回复里贴文件内容、复述截图细节、解释过程——main agent 只需要摘要。
+```
+
+**子 agent prompt 模板**（Phase 2b flow 版）：
+
+```
+你是 ae-app-to-speckit skill 的子 agent，负责一条核心流程的端到端走通。
+
+## 上下文
+- workdir: {workdir 绝对路径}
+- 流程：{flow_name}（feature: F{id}, priority: core）
+- 入口：{entry 描述，如 "工具箱 → F01 扫描"}
+- 预期终点：{end 描述，如 "OCR 结果页显示识别文字"}
+- 状态文件路径同上（feature-checklist / exploration-state.json / phase-summaries.md）
+
+## 执行规则
+1. 每一步：`wda-cli.py tap-element` → `screenshot-save.py 2b-flow{n}-step{k}-{desc}` 存盘
+2. 每步结论立刻写 `screenshot_to_feature`
+3. 遇到需要物理输入（拍照/上传/输入手机号）→ 返回摘要并在摘要中标注 `[需 PM 物理操作]`，main agent 会接管
+4. 走到终点或 PAYWALL → 停止，进入 CP4 落盘
+
+## 落盘动作
+- `phase-summaries.md` 追加 `## CP4 — Phase 2b Flow {n}: {flow_name}` 段落
+  每步一行：步骤名 + 截图文件名 + 关键观察
+- `feature-checklist.md` 对应功能覆盖状态 ✅ → 🔄
+- `exploration-state.json` 更新 `checkpoints` + `completed_flows`
+
+## 返回格式（严格 ≤200 字）
+Flow {n} {flow_name} 完成（{步数}步）
+- Step 1: 一句话
+- ...
+- Step N: 终点/PAYWALL
+状态：phase-summaries.md + feature-checklist + exploration-state.json 已更新
+[需 PM 物理操作]: 若有，列出步骤
+```
+
+**Main agent 职责**（spawn 后）：
+1. 用 `Agent(subagent_type=general-purpose, prompt=<上述模板填充>)` 调用
+2. 接收摘要，写一行 CP 日志：`[CP3-batch{n}] {摘要首行}，继续 batch{n+1}`
+3. **不 Read** 子 agent 写入的截图
+4. 更新自己的 working memory（batch_counter++）然后进入下一个 batch
+
+**Fallback 条件**（subagent 失败时降级 inline 执行）：
+- subagent 调用异常 / 超时 / 返回空
+- subagent 返回摘要明确说"状态文件更新失败"
+- 连续 2 次 subagent 调用失败
+
+Fallback 时 main agent 自己执行该 batch（老 v0.45.0 inline 方式），在 `exploration-state.json.notes` 记录"batch{n} fallback 到 inline"。
+
+**恢复兼容**：状态文件结构不变，v0.45.0 产生的 speckit 目录可以无缝被 v0.46.0 恢复流程接续，反之亦然。
 
 ### 中断恢复机制
 
@@ -597,33 +700,63 @@ Step 6 (CP2): 全部 Tab 遍历完成后，Checkpoint：
 
 **截图精简规则**：如果一个页面是重复样式的长列表（如 50+ 风格/模板/滤镜），不需要逐屏截图。只截首尾两屏 + 在 feature-checklist 备注中记录总数量（如 "52 种风格"）。
 
-**Level 2 — 子入口遍历**（**batch 化执行，每 8 个入口强制 Checkpoint**）：
+**Level 2 — 子入口遍历**（**默认 subagent 分发，每 8 个入口为 1 个 subagent 任务**）：
+
+从 v0.46.0（#IJ864Z）起，Level 2 默认用 subagent 隔离执行——main agent 不直接 tap/截图，而是把每 batch 8 个子入口打包给 subagent，只接收 ≤200 字摘要。见「子 agent 隔离执行架构」章节的 prompt 模板。
 
 ```
-Step 6: 对每个 Tab 内的子功能卡片/入口，分 batch 执行：
+Step 6: 对每个 Tab 内的子功能卡片/入口，按 batch 分发给 subagent：
 
-    batch_counter = 0
-    for each sub_entry in tab:
-        mobile_click → mobile_take_screenshot → 保存截图
-        记录该功能的入口页面样式
-        更新 feature-checklist.md 覆盖状态
-        返回上级
-        batch_counter += 1
+    collect all sub_entries across tabs → 按 tab 和 8 个一组切片 → List[batch]
 
-        if batch_counter >= 8:
-            # 到达 batch 上限，执行 CP3 Checkpoint
-            1. 把本 batch 发现的功能结构化写入 phase-summaries.md
-               追加一段 "## CP3 — Phase 2a Level 2 Batch {n}（子入口 {start}-{end}）"
-            2. 更新 exploration-state.json：
-               checkpoints.last_written = "CP3-batch{n}"
-               checkpoints.batches_completed 追加
-               checkpoints.next_batch = "CP3-batch{n+1}"
-            3. autonomous（默认）：输出 `[CP3-batch{n}] 完成子入口 {start}-{end}，继续 batch{n+1}`，直接进入下一 batch
-               interactive：输出 Checkpoint 消息（格式见 Context 管理章节），等待 PM 回复 "continue"
-            batch_counter = 0
+    for n, batch in enumerate(batches):
+        # 1. 构造 subagent prompt（用"Phase 2a Level 2 batch 版"模板填充）
+        prompt = fill_template(
+            workdir=<绝对路径>,
+            bundle_id=<from exploration-state.json>,
+            sub_entries=batch,
+            batch_n=n+1,
+        )
+
+        # 2. 调用 subagent
+        summary = Agent(
+            subagent_type="general-purpose",
+            description=f"Phase 2a L2 batch{n+1}",
+            prompt=prompt,
+        )
+
+        # 3. Main agent 只写一行 CP 日志（不 Read 截图）
+        print(f"[CP3-batch{n+1}] {summary.第一行}，继续 batch{n+2}")
+
+        # 4. 验证磁盘状态（不读截图，只 grep）
+        assert 子 agent 已在 phase-summaries.md 追加 "CP3-batch{n+1}" 段
+        assert exploration-state.json.checkpoints.last_written == f"CP3-batch{n+1}"
+        若断言失败 → fallback 到 inline 模式重做本 batch
+
+        # 5. interactive 模式才阻塞等 "continue"；autonomous 直接进入下一 batch
 ```
 
-**为什么必须 batch 化**：Phase 2a Level 2 通常有 20-40 个子入口，对应 20-40 张 1125×2436 截图。不 batch 化会在一个 phase 内直接累积到 dimension limit（#IJ809A 的根因）。batch=8 留出安全余量，即使中间有少量额外截图（系统弹窗、误入页面等）也不会立刻爆。
+**Fallback（subagent 异常时降级 inline）**：
+
+```
+for sub_entry in batch:
+    wda-cli.py tap-element --by name --value "<entry label>"
+    screenshot-save.py <name>
+    立刻更新 screenshot_to_feature
+    返回上级
+# 完成后按老 v0.45.0 方式写 CP3 段落
+```
+
+Fallback 触发条件：
+- Agent 调用返回空 / 异常
+- 摘要中明确包含"状态文件更新失败" / "WDA 断连" 等关键字
+- 磁盘状态断言失败（phase-summaries.md / exploration-state.json 未更新）
+
+连续 2 次 subagent fallback → 提示 PM 检查 WDA 环境，之后整个 Phase 2a Level 2 退回 inline 模式，`exploration-state.json.notes` 标记原因。
+
+**为什么 subagent 是默认**：截图单张 ~700-1500 tokens，batch=8 即 8-12K tokens 纯图像占用。**inline 执行时这些图全进 main agent context；subagent 执行时只进 subagent 的临时 context，随其销毁一起蒸发。** 一次 20-40 子入口的 Phase 2a Level 2，main agent context 从"20-40 × 8-12K tokens"降到"3-5 × ≤200 字"。
+
+**为什么 batch=8 仍然保留**：subagent 内部还是会吃图，如果单次 batch > 8 图，subagent 自己可能触发 dimension limit。batch=8 保障子 agent 也安全。
 
 **注意**：App 内功能目录已在 Phase 1.5 提前完成，此处不再重复。如遇到引导弹窗/功能推广，截图并更新 feature-checklist。
 
@@ -685,28 +818,46 @@ feature-checklist 不是静态文档。Phase 2 探索过程中，每次看到截
 
 **Level 2 结束后**：对照 feature-checklist，确认每个功能至少有一张入口截图。未覆盖的功能立即补截图。
 
-#### Phase 2b: 核心流程深度走通（每步截图，**每条流程独立 Checkpoint**）
+#### Phase 2b: 核心流程深度走通（**每条流程默认 subagent 执行**）
 
-从 feature-checklist 中 priority=core 的功能，挑选 3-5 条核心用户流程，端到端走通：
+从 feature-checklist 中 priority=core 的功能，挑选 3-5 条核心用户流程，每条由 subagent 端到端走通：
 
 ```
-for each core_flow:
-    1. 从入口开始操作
-    2. 每一步：操作 → take_screenshot（确认）→ 保存截图 → 记录步骤
-    3. 遇到需要真实输入的步骤（拍照/扫描）→ 告知 PM 操作
-    4. 走到流程终点或遇到 PAYWALL → 记录并截图
-    5. 返回起点
+for n, flow in enumerate(core_flows):
+    prompt = fill_template(  # "Phase 2b flow 版" 模板
+        workdir=<绝对路径>,
+        flow_name=flow.name,
+        feature_id=flow.feature_id,
+        entry=flow.entry_description,
+        expected_end=flow.expected_end,
+        flow_n=n+1,
+    )
 
-    6. (CP4) 本条流程 Checkpoint：
-       a. 追加 "## CP4 — Phase 2b Flow {n}: {流程名}" 到 phase-summaries.md
-          内容：流程步骤列表（每步一行：步骤名 + 截图文件名 + 关键观察）
-       b. 更新 feature-checklist：对应功能覆盖状态 → 🔄
-       c. 更新 exploration-state.json.checkpoints + completed_flows
-       d. autonomous（默认）：输出 `[CP4] Flow {n} {流程名} 完成（{步数}步），进入下一条流程`，直接继续
-          interactive：输出 CP4 Checkpoint 消息给 PM，等待 "continue"
+    summary = Agent(
+        subagent_type="general-purpose",
+        description=f"Phase 2b flow{n+1} {flow.name}",
+        prompt=prompt,
+    )
+
+    # Main agent 只写一行 CP4 日志
+    print(f"[CP4] Flow {n+1} {flow.name} 完成，进入下一条流程")
+
+    # 检查摘要是否含 [需 PM 物理操作] 标记
+    if "[需 PM 物理操作]" in summary:
+        # 子 agent 走到需要拍照/扫描/付款的步骤时已停下
+        提示 PM 接管该步骤，完成后 main agent 单步补截图 + 补写 phase-summaries.md
+        # 不再整条 flow 重跑
+
+    # 验证磁盘状态
+    assert phase-summaries.md 含 "CP4 — Phase 2b Flow {n+1}"
+    assert feature-checklist 对应行 ✅ → 🔄
 ```
 
-**为什么每条流程独立 Checkpoint**：一条端到端流程通常 5-8 步，每步一张截图，单条流程就可能接近 batch 上限。如果把 3-5 条流程在一个 batch 内连跑，必然超标。每条流程独立收口 = 每条流程后都有安全的 /compact 机会。
+**Fallback（subagent 异常时）**：同 Phase 2a Level 2 的 fallback 规则——降级为 main agent inline 走一遍老 v0.45.0 流程。
+
+**为什么每条 flow 独立 subagent**：单条流程 5-8 步 = 5-8 张截图，恰好接近单 batch 上限。每条 flow 一个 subagent = 每条 flow 后 main agent context 完全干净（只留 200 字摘要），下一条 flow 的子 agent 又是全新 context。3-5 条 flow 的 Phase 2b，main agent 最多累积 ~1000 字文本摘要，截图完全不进 main context。
+
+**物理操作节点**（拍照/上传/登录）依然由 PM 接管，但子 agent 会在摘要中显式标注 `[需 PM 物理操作]`，main agent 看到后提示 PM，而不是整条 flow 回退 inline。
 
 #### Phase 2c: 边界探索（**结束后 CP5 Checkpoint**）
 
@@ -930,6 +1081,7 @@ python3 ~/.ae/pm/scripts/screenshot-save.py screenshots/{name}
 | **截图累积触发 many-image 2000px 上限**（#IJ809A） | 10-15 张截图后出现 "dimension limit" 错误，skill 中断需人工 `/compact` | **batch 化 + Checkpoint**：Phase 2a Level 2 每 8 个子入口、Phase 2b 每条流程、Phase 2c/2d/2e 各自一个 Checkpoint。每 Checkpoint 必写 `phase-summaries.md` 持久化摘要；依赖 `autoCompact: true` 自动压缩。恢复时只读纯文本摘要，不批量 Read 历史截图 |
 | **每 CP 强制等 PM `continue` 阻断自动化**（#IJ84WI） | 单次扫描 10+ 次手动 `continue`，严重降低可用性；混淆了图片维度约束与 token 上限 | **默认 autonomous 模式**：CP 写摘要+更新状态后直接继续；仅在「物理操作节点」（PII 收集/付费决策/拍照/付费墙/登录墙）暂停请 PM 接管。CP7 从 v0.45.0 起也不再建议 /compact，依赖 autoCompact。`--interactive` 保留老行为回退 |
 | **autoCompact 触发时截图结论丢失**（#IJ864Z） | Agent 读了截图但结论只在 "LLM 记忆"，autoCompact 清掉图后结论也丢，feature-checklist 说已覆盖但无可追溯结论 → 返工 | 核心原则 #8 硬规则：每张 Read 过的截图**在下次 tool call 前**必须把结论写到 `exploration-state.json.screenshot_to_feature` 或 `phase-summaries.md`；之后不再 Read 同一张图 |
+| **Phase 2a L2/2b 截图线性累积 main context**（#IJ864Z v0.46.0） | inline 执行时 20-40 张子入口截图 + 3-5 条 flow × 5-8 步截图全进 main agent context，即使有 batch+CP 机制也是 "间隔压缩不消除" | **subagent 隔离执行**：CP3 每 batch / CP4 每条 flow 由 `Agent(subagent_type=general-purpose)` 独立跑，子 agent 吃截图、落盘、返回 ≤200 字摘要后销毁。main agent context 从"N × 8 图"降为"N × 200 字"。失败时 fallback 到 inline（保留老路径） |
 | **文档约束在长会话下失效 / 裸坐标 tap 复现**（#IJ85I0） | 长会话后 agent 跳过元素树直接拍坐标，历史已在 SKILL.md 写明的 tap 模板被忽略 | **机制性约束取代文档约束**：强制走 `wda-cli.py tap-element --by ... --value ...`，该命令内置 alert 前置 + 找不到元素 fail-fast（退出码 3），物理上阻断裸坐标 tap 路径 |
 | **状态栏 tap 滚顶在真机上不稳定**（#IJ85I0） | tap (200, 0/5/10) 在多个 App 完全无响应（自定义 nav bar 拦截系统手势） | 封装 `wda-cli.py scroll-to-top`：先尝试 status-bar tap（best-effort），再 swipe-down × N 默认回退。SKILL.md 不再把 status bar 作为"优先"方案 |
 | **alert 检测写在 tap 失败分支导致弯路**（#IJ85I0） | 历史模板"if 截图无变化再查 alert"——agent 默认先 tap 再回头查，浪费 1-2 张截图 | 把 alert 检查前置到 Step 0；`tap-element` / `alert-safe-tap` 在 CLI 层自动前置检查，有 alert 则退出码 2 |

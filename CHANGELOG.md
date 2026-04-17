@@ -1,5 +1,44 @@
 # Changelog
 
+## v0.46.0 (2026-04-17) — ae-app-to-speckit 子 agent 隔离执行（CP3/CP4 由 subagent 托管） [`#IJ864Z`](https://gitee.com/turningsyn/ae-pm/issues/IJ864Z)
+
+### 新功能
+
+- **P1 — Phase 2a Level 2 / Phase 2b 默认用 subagent 执行**（[`#IJ864Z`](https://gitee.com/turningsyn/ae-pm/issues/IJ864Z)）
+  - CP3 每 batch（8 个子入口）/ CP4 每条 flow 由 `Agent(subagent_type=general-purpose)` 独立跑
+  - 子 agent 吃截图 + 元素树 + 更新状态文件，结束时返回 **≤200 字摘要** 给 main agent
+  - main agent context 增长：20-40 张子入口截图 → 3-5 段 ≤200 字摘要（降幅约 98%）
+  - 子 agent 销毁时它吃的全部图像蒸发，main agent 从不接触这些图
+- **Fallback 机制保留 inline 路径**：subagent 调用异常 / 磁盘状态断言失败 / 连续 2 次失败 → 降级为 v0.45.0 inline 执行方式，`exploration-state.json.notes` 记录原因
+- **SKILL.md 新增章节**：
+  - 「子 agent 隔离执行架构」— 包含 Phase 2a L2 batch 版 + Phase 2b flow 版两个 prompt 模板
+  - 物理操作节点融入 subagent 流程：子 agent 遇到拍照/上传/登录时在摘要标 `[需 PM 物理操作]`，main agent 接管补写，不重跑整条 flow
+- **技术风险表**新增 subagent 线性累积对策条目
+
+### 架构意义
+
+v0.44.1 → v0.45.0 → v0.46.0 三连：
+- **v0.44.1**：机制性约束（`tap-element` CLI 禁止裸坐标）
+- **v0.45.0**：截图结论即时落盘 + 取消 CP7 停顿
+- **v0.46.0**：subagent 隔离 Phase 2a L2 / 2b 的 context 增长
+
+组合效果：skill 从"每次 tap 都累积 context，到 CP7 需要 PM 介入 /compact"变成"main agent 全程看摘要、subagent 吞吐截图、autoCompact 兜底、全程无 PM context 管理停顿"。
+
+### 验证
+
+- **Sanity test**（不依赖 WDA）：spawn 一个 general-purpose 子 agent 模拟 batch 1（F01-F03），子 agent 成功 Write 3 张截图占位 + 追加 phase-summaries.md + JSON merge exploration-state.json + 返回 ~150 字摘要
+- **真机 E2E**：延后到首次 LoopCraft 或下一次实战运行时观察——改动面大但有 fallback 兜底
+- SKILL.md YAML frontmatter 解析通过
+
+### 延后
+
+- **v0.47.0 — P3 screenshot 默认落盘**：统一 `wda-cli.py screenshot --save` 替代 `mobile_take_screenshot`
+
+### 关联
+
+- 主 issue: [`#IJ864Z`](https://gitee.com/turningsyn/ae-pm/issues/IJ864Z)（P1 完成后关闭）
+- 前置：v0.45.0 P0+P2（落盘纪律 + 取消 CP7 停顿）
+
 ## v0.45.0 (2026-04-17) — ae-app-to-speckit 全程自主推进（取消 CP7 停顿 + 截图结论即时落盘） [`#IJ864Z`](https://gitee.com/turningsyn/ae-pm/issues/IJ864Z)
 
 ### 新功能
