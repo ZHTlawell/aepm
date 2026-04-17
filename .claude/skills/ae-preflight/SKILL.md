@@ -9,6 +9,8 @@ permissions:
     - "Bash(sips *)"
     - "Bash(security find-identity:*)"
     - "Bash(grep *)"
+    - "Bash(bash ~/.ae/pm/scripts/preflight-swiftui-lint.sh:*)"
+    - "Bash(swift build:*)"
 dependencies:
   mcp: []
   cli:
@@ -223,6 +225,38 @@ grep -r "UILaunchScreen\|LaunchScreen" . --include="*.plist" --include="project.
 
 - 无配置 → 警告（SwiftUI 项目可用 Info.plist 配置）
 
+### Phase 4.5: SwiftUI 代码质量扫描
+
+使用 swift-syntax AST 扫描生成的 SwiftUI 代码，标记违反「iOS 上架硬约束」的模式。
+
+**规则来源**：`constraints/ios-publish-constraints.md`（单一真源，规则 ID 与 linter 报告一一对应）
+
+**当前覆盖的规则**：
+- `ios-pub-010` — 交互元素（Button / NavigationLink / onTapGesture 链）的触控区域 < 44pt
+- `ios-pub-011` — Button / onTapGesture 的 action 闭包为空或仅 `print(...)` 占位
+
+**执行方式**：
+
+```bash
+# 命令（SKILL 脚本位于 scripts/preflight-swiftui-lint.sh）
+bash ~/.ae/pm/scripts/preflight-swiftui-lint.sh <iOS 项目根目录>
+
+# JSON 输出（用于集成到主报告）
+bash ~/.ae/pm/scripts/preflight-swiftui-lint.sh <iOS 项目根目录> --json
+```
+
+**首次运行**：脚本会用 SwiftPM 拉取 swift-syntax 并编译 release 二进制（~30-60s，需要 Swift 5.9+ / Xcode 15+）。后续运行直接执行已编译二进制（< 1s 启动）。
+
+**归类到报告**：
+- 所有发现进 **WARNINGS**（不阻塞发布，但强烈建议修）
+- 不在 preflight 侧做自动修复（UI 布局调整有误伤风险，交给 PM 或 agent 手动修）
+- 发现写入 `publish-state.yaml` 的 `warnings` 字段，同时作为 `constraint_candidate` 回写给 ae-postflight（用于强化 PM 侧生成约束）
+
+**已知限制**：
+- 变量引用的 frame（如 `.frame(width: buttonSize)` 引用外部常量）**不追溯**常量定义，只匹配字面量数字。如果 PM 用常量定义尺寸，需自行保证常量值 ≥ 44
+- 「空 action」只识别字面空闭包和单个 `print(...)` 占位，不识别调用无 side-effect 的函数（如 `Button { noop() }` 不会被标记——agent 无法判断 noop 是否真的无副作用）
+- 不在 SwiftPM / Pods / 生成的代码（.build / DerivedData）中扫描
+
 ### Phase 5: 生成报告
 
 输出结构化报告：
@@ -332,6 +366,8 @@ preflight:
 | ios-pub-002 | AppIcon 必须有实际 PNG 图片 | appiconset 只有 Contents.json |
 | ios-pub-003 | 有网络请求必须有 PrivacyInfo.xcprivacy | URLSession 存在但无隐私清单 |
 | ios-pub-029 | 依赖境外 API（OpenAI、Gemini 等）的功能，base URL 必须可配置，不能硬编码域名 | WePray AI Chat 在中国网络不可直连，ChatService 需支持 Secrets.plist 配置 OPENAI_BASE_URL |
+| ios-pub-010 | 交互元素（Button/NavigationLink/onTapGesture 链）触控区域 ≥ 44pt | 空谷项目 15+ 处 36pt 按钮不符合 Apple HIG 最低标准 |
+| ios-pub-011 | Button / onTapGesture 的 action 闭包禁止为空或仅 `print(...)` 占位 | 空谷项目 7 处空响应按钮被用户反馈「点了没反应」 |
 
 ## 已知限制
 

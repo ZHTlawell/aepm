@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.43.0 (2026-04-17) — ae-preflight 新增 SwiftUI 代码质量扫描 + iOS 上架硬约束文档 [`#IJ7XIY`](https://gitee.com/turningsyn/ae-pm/issues/IJ7XIY) [`#IJ7XIS`](https://gitee.com/turningsyn/ae-pm/issues/IJ7XIS)
+
+### 新功能
+- **ae-preflight Phase 4.5 SwiftUI 代码质量扫描**（[`#IJ7XIY`](https://gitee.com/turningsyn/ae-pm/issues/IJ7XIY) + [`#IJ7XIS`](https://gitee.com/turningsyn/ae-pm/issues/IJ7XIS)）
+  - 基于 **swift-syntax AST** 解析（不是正则），精确识别 SwiftUI 交互模式与闭包结构
+  - `ios-pub-010` — 交互元素触控区域 < 44pt（Button / NavigationLink / onTapGesture 链上的 `.frame(width/height:)`）
+  - `ios-pub-011` — Button / onTapGesture 的 action 闭包为空或仅 `print(...)` 占位
+  - 支持人类可读报告 + `--json` 机器可读输出
+  - 首次运行自动编译（~30-60s），后续 < 1s 启动
+- **iOS 上架硬约束文档**（`templates/pm/constraints/ios-publish-constraints.md`）
+  - 代码级硬约束，含 10 条 Blocker + 5 条 Warning，每条带错误/正确 SwiftUI 示例
+  - 作为 linter 规则的**单一真源**，规则 ID `ios-pub-xxx` 贯穿约束文档 + SKILL.md + linter 报告
+  - PM vibe coding 时可直接作为上下文喂给 AI 编程工具
+
+### 架构
+- 新增 `scripts/preflight-swiftui-lint/`（SwiftPM 工具）+ `scripts/preflight-swiftui-lint.sh`（一键 wrapper，自动 build + 运行）
+- `build.sh` pm role 打包 SwiftPM 源码到 `dist/pm/scripts/preflight-swiftui-lint/`（排除 `.build/` 等产物）
+- ae-preflight SKILL.md 新增 permissions：`Bash(bash ~/.ae/pm/scripts/preflight-swiftui-lint.sh:*)` + `Bash(swift build:*)`
+
+## v0.42.0 (2026-04-17) — app-to-speckit context 管理 / Phase Checkpoint 机制 [`#IJ809A`](https://gitee.com/turningsyn/ae-pm/issues/IJ809A)
+
+### 新功能
+- **Phase Checkpoint 机制**（[`#IJ809A`](https://gitee.com/turningsyn/ae-pm/issues/IJ809A)）— 解决 WDA 截图 1125×2436 超过 Claude API many-image 2000px 上限、累积 10-15 张触发 context 溢出被迫中断的问题
+  - **Batch 化执行**：Phase 2a Level 2 每 8 个子入口 1 batch；Phase 2a Level 1 / 2b 每条流程 / 2c / 2d / 2e 各自独立 Checkpoint（CP1-CP7）
+  - **phase-summaries.md 状态文件**：每个 Checkpoint 必须追加结构化摘要到磁盘，成为 `/compact` 后重建 context 的权威来源——截图从 context 清除也不会丢失探索成果
+  - **Checkpoint 消息协议**：skill 在 batch 边界向 PM 输出标准消息（进度 / 截图累计 / /compact 建议），PM 回复 "continue" 后进入下一 batch；配合 `autoCompact: true` 可实现 30+ 页 App 无人值守跑完
+  - **恢复流程升级**：会话开始 / `/compact` 后的恢复通过读 phase-summaries.md + exploration-state.json + feature-checklist.md 三个纯文本文件重建工作记忆，**不重新 Read 历史截图**
+  - **exploration-state.json** 新增 `checkpoints` 对象追踪 batch 进度
+  - **技术风险表**补一条 "截图累积触发 many-image 2000px 上限" 及对策
+
 ## v0.41.0 (2026-04-16) — app-to-speckit 补充页面跳转采集 + 静态资源清单 `#IJ2OZ7` `#IJ2OZX`
 
 ### 新功能

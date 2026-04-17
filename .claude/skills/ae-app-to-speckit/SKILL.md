@@ -141,6 +141,7 @@ Step 0.9: 付费策略评估（Phase 1 完成后、Phase 2 开始前回来补充
 | -- | `review-checklist.md` | PM Review 清单 | -- |
 | -- | `screenshots/` | 每个页面 + 每步操作的截图证据 | -- |
 | -- | `exploration-state.json` | 探索进度状态（用于中断恢复） | -- |
+| -- | `phase-summaries.md` | 每个 batch checkpoint 的结构化摘要（`/compact` 后重建 context 的权威） | -- |
 
 **截图命名规范**：采用语义化命名 `{phase}-{功能ID}-{描述}.png`，确保文件名即内容。
 
@@ -238,13 +239,63 @@ speckit 文档中引用截图时**必须使用 HTML img 标签限制显示宽度
    - 新增 Phase 1 未发现的功能，source 标记为 "in_app"
    - 已有功能如果 App 内有更详细分类，更新描述
 6. 更新 exploration-state.json，标记 Phase 1.5 完成
+7. **(CP1) 执行 Phase 1.5 Checkpoint**：
+   - 创建 phase-summaries.md（如不存在），追加 "## CP1 — Phase 1.5 功能目录补充"
+   - 记录：新增功能 ID 列表 + 功能目录入口位置 + 截图文件名
+   - 更新 exploration-state.json.checkpoints
+   - 输出 CP1 Checkpoint 消息给 PM，等待 "continue" 进入 Phase 2a
 ```
 
 **完成后**：带着完整的 feature-checklist 进入 Phase 2，避免遍历中途大面积补功能。
 
+### Context 管理 / Phase Checkpoint 机制（#IJ809A）
+
+WDA 截图单张 1125×2436px，**超过 Claude API "many-image requests" 的 2000px 单边上限**，且单图 token 消耗极高。连续 10-15 张截图累积进 context，会出现：
+
+```
+An image in the conversation exceeds the dimension limit for many-image requests (2000px).
+Run /compact to remove old images from context, or start a new session.
+```
+
+**skill 无法自己触发 `/compact`**（这是 Claude Code 用户命令）。所以 skill 的 context 管理策略是：**把工作拆成 batch + 每 batch 结束写持久化摘要到磁盘 + 在 batch 边界显式提示 PM 可执行 `/compact`**。这样即使 context 被压缩，摘要仍然留在磁盘上，Phase 0 恢复流程能无损接续。
+
+**Batch 边界**（下列每一处完成后，必须写 `phase-summaries.md` 并向 PM 发出 Checkpoint 消息）：
+
+| Checkpoint | 位置 | 每 batch 截图预算 |
+|-----------|------|-------------------|
+| CP1 | Phase 1.5 完成后 | ~3 张功能目录截图 |
+| CP2 | Phase 2a Level 1 完成后（全部 Tab 遍历完） | 每 5 个 Tab 为 1 batch |
+| CP3 | Phase 2a Level 2 完成后（子入口遍历） | **每 8 个子入口为 1 batch，batch 间强制 checkpoint** |
+| CP4 | 每一条核心流程（Phase 2b）走通后 | 每条流程独立 checkpoint |
+| CP5 | Phase 2c 边界探索完成后 | ~5 张边界态截图 |
+| CP6 | Phase 2d 覆盖率 checkpoint 通过后 | — |
+| CP7 | Phase 2e 脱敏完成后 | — |
+
+**关键原则**：**预算上限 = 8 张截图 / batch**。接近上限时主动收口写摘要，不要跨越。
+
+**Checkpoint 消息模板**（每到 batch 边界，skill 向 PM 输出）：
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【Context Checkpoint — {CP编号}】{阶段名}
+
+✅ 本 batch 完成：{摘要 3-5 条}
+📸 累计截图：{n} 张（本 batch {k} 张）
+📁 已写入：phase-summaries.md §{CP编号}
+📋 feature-checklist 覆盖率：{m}/{total}
+
+⚠️ Context 管理建议：
+  如果当前 context 使用率已高，请执行 /compact 后输入 "continue"；
+  否则直接输入 "continue" 进入下一 batch。
+  （autoCompact=true 时 CLI 会自动压缩，可直接 continue）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+**为什么要让 PM 决定 /compact 时机**：skill 无法观测 context 使用率。PM 看到 Claude Code 右下角的 token meter 或 autoCompact 提示后，自己判断何时 /compact 最划算。batch 边界是"/compact 零成本"的位置——因为所有工作状态已经持久化到磁盘。
+
 ### 中断恢复机制
 
-整个探索过程可能耗时很长（30 分钟 ~ 数小时），且随时可能因锁屏、WDA 断开、会话超时等原因中断。通过三个状态文件实现断点恢复：
+整个探索过程可能耗时很长（30 分钟 ~ 数小时），且随时可能因锁屏、WDA 断开、会话超时、`/compact` 清理等原因中断。通过四个状态文件实现断点恢复：
 
 **状态文件 1 — `feature-checklist.md`**（进度条）
 
@@ -254,7 +305,38 @@ speckit 文档中引用截图时**必须使用 HTML img 标签限制显示宽度
 
 已保存的截图不需要重新截取。恢复时扫描目录即可知道哪些页面已有截图。
 
-**状态文件 3 — `exploration-state.json`**（当前阶段状态）
+**状态文件 3 — `phase-summaries.md`**（batch 级工作摘要，/compact 后重建 context）
+
+每个 Checkpoint 结束时 **必须追加**一段摘要。格式：
+
+```markdown
+# Phase Summaries
+
+## CP1 — Phase 1.5 功能目录补充
+- 帮助页发现 9 个 Phase 1 未列出的功能：F11-F19
+- 功能目录入口：设置 → 帮助中心
+- 截图：1.5-help-page-full.png, 1.5-help-scroll-1.png
+
+## CP2 — Phase 2a Level 1 Tab 遍历（5 tabs）
+- Tab1「首页」：最近文档列表 + 5 个快捷操作
+- Tab2「工具箱」：22 个工具卡片，3 个分类
+- Tab3「...」：...
+- 新发现功能：F23「夜间模式」（discovered，Tab3 右上角）
+- 截图：2a-home.png, 2a-toolbox.png, ...
+
+## CP3 — Phase 2a Level 2 Batch 1（子入口 1-8）
+- F01 扫描：入口在工具箱顶部，点击进入相机页
+- F02 OCR：入口在扫描结果页「识别文字」按钮
+- ...
+- 截图：2a-F01-entry.png, 2a-F02-entry.png, ...
+
+## CP3 — Phase 2a Level 2 Batch 2（子入口 9-16）
+- ...
+```
+
+**`phase-summaries.md` 是 /compact 后重建 context 的唯一权威**。恢复时 Claude 读这个文件即可知道每个 Phase 发现了什么，无需重看截图。
+
+**状态文件 4 — `exploration-state.json`**（当前阶段状态）
 
 ```json
 {
@@ -292,27 +374,39 @@ speckit 文档中引用截图时**必须使用 HTML img 标签限制显示宽度
     {"from": "FocusSession", "to": "Result", "trigger": "专注完成", "nav_type": "replace"},
     {"from": "Home", "to": "TreePicker", "trigger": "点击树种选择", "nav_type": "sheet"}
   ],
+  "checkpoints": {
+    "last_written": "CP3-batch2",
+    "summary_file": "phase-summaries.md",
+    "batches_completed": ["CP1", "CP2", "CP3-batch1", "CP3-batch2"],
+    "next_batch": "CP3-batch3",
+    "images_in_current_batch": 5
+  },
   "notes": "工具箱-扫描类已完成，格式转换类进行中"
 }
 ```
 
-**恢复流程**（每次会话开始时执行）：
+**恢复流程**（每次会话开始时 **或 /compact 后 PM 输入 "continue" 时** 执行）：
 
 ```
 1. 检查 speckit/ 目录是否已存在
 2. 如果存在：
    a. 执行 Phase 0 → 重新建立 WDA 连接（不依赖旧 session ID）
-   b. 读取 exploration-state.json → 确定上次停在哪个阶段
-   c. 读取 feature-checklist.md → 确定哪些功能还没覆盖
-   d. 扫描 screenshots/ → 确认已有截图
-   e. 检查 pending_paid_flows 是否非空：
+   b. 读取 exploration-state.json → 确定上次停在哪个阶段 + checkpoints.next_batch
+   c. **读取 phase-summaries.md → 重建"之前发现了什么"的工作记忆**
+      （这是 /compact 后最关键的一步：截图已从 context 清除，
+       但摘要文件保留了所有结构化发现，等价于把上下文从磁盘恢复回来）
+   d. 读取 feature-checklist.md → 确定哪些功能还没覆盖
+   e. 扫描 screenshots/ → 确认已有截图（仅记文件名列表，不 Read 截图内容）
+   f. 检查 pending_paid_flows 是否非空：
       - 非空 → 向 PM 确认："上次因付费墙跳过了 N 个功能，是否已购买会员？"
       - PM 已付费 → 进入【增量补测模式】（见下方）
       - PM 未付费 → 跳过付费功能，从中断点继续
-   f. 启动目标 App → 导航到中断位置或补测目标
-   g. 从中断点继续，不重复已完成的工作
+   g. 启动目标 App → 导航到中断位置或补测目标
+   h. 从 checkpoints.next_batch 继续，不重复已完成的工作
 3. 如果不存在 → 从 Phase 0 开始
 ```
+
+**/compact 后的恢复要诀**：**不要**重新 Read 历史截图去"找回记忆"——那会立刻把 context 再次打爆。只读 `phase-summaries.md` + `exploration-state.json` + `feature-checklist.md` 三个纯文本文件。如果某一步确实需要回看某张具体截图（如 Phase 3 生成 Module 04 需要提取颜色），按需单图 Read，不批量加载。
 
 **增量补测模式**（付费后回来继续）：
 
@@ -420,25 +514,51 @@ Step 1: mobile_launch_app → 启动目标 App
 Step 2: mobile_take_screenshot → 确认画面内容 → 保存截图
 Step 3: 如有 onboarding → 逐步完成，每步截图 + 记录
 Step 4: 到达 Home → mobile_list_elements_on_screen 识别所有 Tab/导航入口
-Step 5: 逐 Tab 截图：
+Step 5: 逐 Tab 截图（**完成所有 Tab 后执行 CP2 Checkpoint**）：
     for each tab:
         mobile_click → mobile_take_screenshot（确认到达）→ 保存截图
         mobile_list_elements_on_screen → 记录元素
         如有滚动内容 → swipe + 再次截图
         滚动回顶部：优先点击状态栏（屏幕最顶部 y=0 区域），如不生效则多次上滑
+
+Step 6 (CP2): 全部 Tab 遍历完成后，强制 Checkpoint：
+    1. 追加 "## CP2 — Phase 2a Level 1 Tab 遍历" 到 phase-summaries.md
+       内容：每个 Tab 的名称 + 页面主要元素 + 新发现的 discovered 功能
+    2. 更新 exploration-state.json.checkpoints
+    3. 输出 CP2 Checkpoint 消息给 PM，等待 "continue"
 ```
+
+**Tab 数量 > 5 时**：若 App 有 6+ 个 Tab（含更多/设置），按每 5 个为一 batch 拆分，避免单 batch 超过 8 张截图（每 Tab 通常 1-2 张）。
 
 **截图精简规则**：如果一个页面是重复样式的长列表（如 50+ 风格/模板/滤镜），不需要逐屏截图。只截首尾两屏 + 在 feature-checklist 备注中记录总数量（如 "52 种风格"）。
 
-**Level 2 — 子入口遍历**：
+**Level 2 — 子入口遍历**（**batch 化执行，每 8 个入口强制 Checkpoint**）：
 
 ```
-Step 6: 对每个 Tab 内的子功能卡片/入口：
+Step 6: 对每个 Tab 内的子功能卡片/入口，分 batch 执行：
+
+    batch_counter = 0
     for each sub_entry in tab:
         mobile_click → mobile_take_screenshot → 保存截图
         记录该功能的入口页面样式
+        更新 feature-checklist.md 覆盖状态
         返回上级
+        batch_counter += 1
+
+        if batch_counter >= 8:
+            # 到达 batch 上限，强制执行 CP3 Checkpoint
+            1. 把本 batch 发现的功能结构化写入 phase-summaries.md
+               追加一段 "## CP3 — Phase 2a Level 2 Batch {n}（子入口 {start}-{end}）"
+            2. 更新 exploration-state.json：
+               checkpoints.last_written = "CP3-batch{n}"
+               checkpoints.batches_completed 追加
+               checkpoints.next_batch = "CP3-batch{n+1}"
+            3. 向 PM 输出 Checkpoint 消息（格式见 Context 管理章节）
+            4. 等待 PM 回复 "continue" 再进入下一 batch
+            batch_counter = 0
 ```
+
+**为什么必须 batch 化**：Phase 2a Level 2 通常有 20-40 个子入口，对应 20-40 张 1125×2436 截图。不 batch 化会在一个 phase 内直接累积到 dimension limit（#IJ809A 的根因）。batch=8 留出安全余量，即使中间有少量额外截图（系统弹窗、误入页面等）也不会立刻爆。
 
 **注意**：App 内功能目录已在 Phase 1.5 提前完成，此处不再重复。如遇到引导弹窗/功能推广，截图并更新 feature-checklist。
 
@@ -500,7 +620,7 @@ feature-checklist 不是静态文档。Phase 2 探索过程中，每次看到截
 
 **Level 2 结束后**：对照 feature-checklist，确认每个功能至少有一张入口截图。未覆盖的功能立即补截图。
 
-#### Phase 2b: 核心流程深度走通（每步截图）
+#### Phase 2b: 核心流程深度走通（每步截图，**每条流程独立 Checkpoint**）
 
 从 feature-checklist 中 priority=core 的功能，挑选 3-5 条核心用户流程，端到端走通：
 
@@ -510,11 +630,19 @@ for each core_flow:
     2. 每一步：操作 → take_screenshot（确认）→ 保存截图 → 记录步骤
     3. 遇到需要真实输入的步骤（拍照/扫描）→ 告知 PM 操作
     4. 走到流程终点或遇到 PAYWALL → 记录并截图
-    5. 返回起点，开始下一条流程
-    6. 更新 feature-checklist 中对应功能的覆盖状态为 🔄
+    5. 返回起点
+
+    6. (CP4) 本条流程 Checkpoint：
+       a. 追加 "## CP4 — Phase 2b Flow {n}: {流程名}" 到 phase-summaries.md
+          内容：流程步骤列表（每步一行：步骤名 + 截图文件名 + 关键观察）
+       b. 更新 feature-checklist：对应功能覆盖状态 → 🔄
+       c. 更新 exploration-state.json.checkpoints + completed_flows
+       d. 输出 CP4 Checkpoint 消息给 PM，等待 "continue" 再进入下一条流程
 ```
 
-#### Phase 2c: 边界探索
+**为什么每条流程独立 Checkpoint**：一条端到端流程通常 5-8 步，每步一张截图，单条流程就可能接近 batch 上限。如果把 3-5 条流程在一个 batch 内连跑，必然超标。每条流程独立收口 = 每条流程后都有安全的 /compact 机会。
+
+#### Phase 2c: 边界探索（**结束后 CP5 Checkpoint**）
 
 ```
 - 空状态页面截图
@@ -522,6 +650,9 @@ for each core_flow:
 - 付费墙/会员引导截图（遇到时截图，标记 ⛔）
 - 未保存确认弹窗等交互细节
 - 错误状态（如无网络）截图
+
+CP5: 边界探索完成后，追加 "## CP5 — Phase 2c 边界态" 到 phase-summaries.md，
+     更新 checkpoints，输出 Checkpoint 消息。
 ```
 
 #### Phase 2d: 覆盖率 Checkpoint（强制执行）
@@ -540,6 +671,11 @@ python3 ~/.ae/pm/scripts/coverage-stats.py speckit/feature-checklist.md \
 #    能进入的 → 立即补截图
 #    需要登录/付费的 → 标记原因
 #    需要实物（证件/发票）的 → 标记 [需PM协助]
+
+# 4. (CP6) 覆盖率达标后 Checkpoint：
+#    追加 "## CP6 — Phase 2d 覆盖率达标" 到 phase-summaries.md
+#    记录最终覆盖率数字 + 未覆盖功能清单及原因
+#    输出 CP6 Checkpoint 消息给 PM，等待 "continue" 进入 Phase 2e
 ```
 
 #### Phase 2e: 隐私脱敏（Phase 2d 通过后、Phase 3 之前）
@@ -565,6 +701,11 @@ python3 ~/.ae/pm/scripts/coverage-stats.py speckit/feature-checklist.md \
      --mask-notifications \
      --avatar-region 330,44,60,60
 6. 快速浏览脱敏后的截图确认无遗漏
+7. (CP7) 脱敏完成后 Checkpoint：
+   追加 "## CP7 — Phase 2e 脱敏完成" 到 phase-summaries.md
+   记录脱敏覆盖截图数 + 特殊处理项（avatar-region 等）
+   输出 CP7 Checkpoint 消息给 PM，**此处强烈建议 /compact 后进入 Phase 3**
+   （Phase 3 只需要纯文本生成，不需要再 Read 截图，/compact 是零成本的）
 ```
 
 > **注意**：`--mask-notifications` 基于 OCR 启发式检测通知横幅（Messages/FaceTime/微信等关键词 + 屏幕顶部区域），作为 DND 的安全网。screenshot-save.py 截图前也会自动尝试关闭弹窗（`--auto-dismiss`），双保险。
@@ -715,6 +856,7 @@ python3 ~/.ae/pm/scripts/screenshot-save.py screenshots/{name}
 | Webview 自定义控件对 WDA 不透明 | `<select>`/`<input range>`/JS 按钮无法自动化 | 第一次交互失败后直接请 PM 手动操作，不要反复尝试不同 WDA 方式 |
 | App relaunch 后 UI 状态不一致 | 促销弹窗/interstitial/session 过期打乱流程 | relaunch 后必须截图确认状态，不假设回到退出前页面 |
 | WDA W3C Actions API 偶发 INFINITY 崩溃 | `point.x != INFINITY` 错误，整个 action chain 失败 | fallback 到简单 WDA endpoint（`/wda/tap`、swipe），不要连续重试 W3C Actions |
+| **截图累积触发 many-image 2000px 上限**（#IJ809A） | 10-15 张截图后出现 "dimension limit" 错误，skill 中断需人工 `/compact` | **batch 化 + Checkpoint**：Phase 2a Level 2 每 8 个子入口、Phase 2b 每条流程、Phase 2c/2d/2e 各自一个 Checkpoint。每 Checkpoint 必写 `phase-summaries.md` 持久化摘要 + 输出 Checkpoint 消息给 PM 提示可 /compact。恢复时只读纯文本摘要，不批量 Read 历史截图 |
 
 ## 复用说明
 
