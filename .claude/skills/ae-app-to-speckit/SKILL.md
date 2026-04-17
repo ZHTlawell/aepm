@@ -66,6 +66,7 @@ smoke_test:
 4. **每步必看** — 每次操作后必须 `mobile_take_screenshot` 确认画面内容，不能盲操作。截图是证据，也是下游 vibe coding 的参照物
 5. **广度 100% + 核心深度** — 先确保每个功能至少有一张入口截图（广度覆盖 100%），再对核心流程做端到端深度走通。不需要每个功能都端到端，但每个功能必须有"长什么样"的截图
 6. **发现问题当场提 issue** — 探索过程中发现脚本 bug、流程缺陷、工具不好用时，**当场使用 `/ae-submit-bug` 提交 issue 再继续当前任务**。不要等到最后汇总。如果已有完整 bug 信息，可以用 `ae pm submit-bug "标题" "描述"` 跳过交互追问直接提交
+7. **context 外溢一律落盘** — 大体积中间产物（元素树 XML / OCR 结果 / 截图 / 网页原文）必须 `--save` 到磁盘，再按需 `grep` / `head` 读取片段；**禁止让全量内容作为 stdout 进入 LLM context**。context 增长主要由截图驱动（已由 CP batch + `phase-summaries.md` + `autoCompact` 管控），不应再叠加可落盘的文本产物
 
 ## 前置条件
 
@@ -394,6 +395,10 @@ Run /compact to remove old images from context, or start a new session.
   "payment_strategy": "free_only | paid_weekly | paid_confirmed",
   "mcp_available": true,
   "bundle_id": "com.example.app",
+  "dirty_state_pages": [
+    {"page": "Counter", "reason": "计数器残留值", "reset_action": "长按清零按钮 或 调用 F06 Reset"},
+    {"page": "DraftEditor", "reason": "草稿自动保存", "reset_action": "清空文本框"}
+  ],
   "asset_inventory": [
     {"id": "A01", "type": "illustration", "description": "树种插画", "ref_screenshot": "2b-flow01-step03.png", "quantity": "5态×6种", "gen_hint": "AI 生图，需种间风格一致"}
   ],
@@ -468,6 +473,7 @@ Run /compact to remove old images from context, or start a new session.
 - **需要上传照片测试时**，先推送测试图片到设备相册：`ios push-photo test.jpg --udid=<udid>`（需 go-ios 支持），或告知 PM 手动将测试图片存到相册
 - **Swipe 安全距离**：所有 swipe 的起始 x 坐标必须 ≥ 屏幕宽度 1/3（至少 130pt），建议用屏幕中心。起始 x < ~80pt 会触发 iOS 系统「边缘滑动返回」手势，App 直接退出到上一级甚至回到主屏幕
 - **App relaunch 后必须截图确认状态**：不要假设回到退出前的页面。常见变化：促销弹窗、评价请求、what's new、session 过期、interstitial 广告。先截图判断当前状态再继续操作
+- **有持久化状态的页面必须做幂等性检查**（#IJ85I0）：进入 Counter / 表单 / 草稿 / 任何会被持久化的值展示页时，**先观察当前值是否为默认值**——非默认值意味着"上次会话残留"，必须先 reset 到 0 / 清空 / 默认状态再演示流程。历史反面教材：LoopCraft Counter 残留 1 未 reset，直接 +1×3 → 4，叙事失真。把此类页面记入 `exploration-state.json.dirty_state_pages`（数组），恢复时优先 reset
 
 **Agent-PM 交互协议**（遇到需要人工操作的步骤时）：
 
@@ -490,22 +496,31 @@ iOS bottom sheet 的关闭按钮通常是 `XCUIElementTypeOther`，无 name/labe
 
 **标准 tap 操作模板**（避免反复猜坐标，每次点击都用此流程）：
 
-```
-1. mobile_list_elements_on_screen → 获取页面元素树
-2. 在元素树中找到目标元素 → 读取其 rect {x, y, width, height}
-3. 计算中心点坐标：center_x = x + width/2, center_y = y + height/2
-4. mobile_click_on_screen_at_coordinates(center_x, center_y)
-5. mobile_take_screenshot → 确认点击成功
-6. **如果截图未变化（tap 无响应）→ 先检查是否有系统弹窗**：
-   curl -s http://localhost:8100/session/{sid}/alert/text
-   如果有弹窗 → 用 Alert API 处理（见下方「iOS 系统弹窗处理」）
+> **机制性约束（#IJ85I0）**：历史 SKILL.md 只写"规则"不足以约束 agent 在长会话下图省事裸坐标 tap。当前模板已升级为**强制走 `wda-cli.py tap-element`**——该子命令内置 alert 前置检查 + 按元素定位，从机制上堵住"拍脑袋坐标"路径。
 
-如果元素树不完整（Flutter/RN/WebView App）：
-1. mobile_take_screenshot → 获取当前画面
-2. python3 ocr-screenshot.py --wda --json → OCR 识别文字和坐标
-   注意：OCR 返回的是像素坐标，需 ÷3 转换为逻辑点坐标
-3. 用 OCR 文字坐标点击目标
-4. mobile_take_screenshot → 确认点击成功
+```
+Step 0（前置，一次 tap 内必查）: 系统弹窗检查
+    python3 wda-cli.py alert --action text
+    如果非 "(no alert)" → 用 Alert API 处理（见「iOS 系统弹窗处理」），
+      处理完再回到 Step 1；**不要先 tap 再观察**（历史反面教材：F07 相机权限浪费 1-2 张截图）
+
+Step 1（首选）: 按元素 tap —— 禁止裸坐标
+    python3 wda-cli.py tap-element --by name --value "按钮 label"
+    支持的 --by：accessibility_id / name / label / xpath / predicate / class_chain
+    该命令会自动：
+      - 先做 alert 前置检查（有弹窗直接失败退出码 2）
+      - 通过 WDA /element 找到元素 → 取 rect → 计算中心点 tap
+      - 找不到元素退出码 3，并提示 `wda-cli.py source` 排查
+
+Step 2: mobile_take_screenshot（或 wda-cli.py screenshot --save ...）→ 确认点击成功
+
+Step 3（仅当 Step 1 失败）: 降级到 OCR / 裸坐标
+    仅当元素树不完整（Flutter/RN/WebView）或目标无 name/label 时允许：
+      python3 ocr-screenshot.py --wda --json → 获取 OCR 坐标（像素坐标需 ÷3）
+      python3 wda-cli.py alert-safe-tap X Y  # 仍会前置检查 alert，杜绝 alert 下裸 tap
+    绝对禁止直接用 mobile_click_on_screen_at_coordinates(X, Y) 裸坐标——
+      这条路径没有 alert 前置检查，且容易在"长会话累积疲劳"下被 agent 滥用。
+```
 
 ⚠️ **Webview 自定义控件限制**：Webview 内的 `<select>` 下拉框、
 `<input type="range">` 滑块、自定义 JS 按钮等控件，WDA 的 touch 事件
@@ -513,9 +528,9 @@ iOS bottom sheet 的关闭按钮通常是 `XCUIElementTypeOther`，无 name/labe
 tap/swipe/W3C Actions 全部无效。**第一次交互失败后直接请 PM 手动操作，
 不要反复尝试不同的 WDA 交互方式**（WDA tap、W3C Actions、element click、
 swipe drag、element value 设值均已验证无效）。
-```
 
-**绝对不要凭视觉猜坐标。** 每次点击都必须先获取元素/OCR 坐标，再计算中心点。
+**绝对不要凭视觉猜坐标。** 每次点击必须走 `tap-element`（首选）或
+`alert-safe-tap`（OCR 回退），两者都内置 alert 前置检查。
 
 **iOS 系统弹窗处理**（ATT / 权限请求 / 系统 Alert）：
 
@@ -547,7 +562,8 @@ Step 5: 逐 Tab 截图（**完成所有 Tab 后执行 CP2 Checkpoint**）：
         mobile_click → mobile_take_screenshot（确认到达）→ 保存截图
         mobile_list_elements_on_screen → 记录元素
         如有滚动内容 → swipe + 再次截图
-        滚动回顶部：优先点击状态栏（屏幕最顶部 y=0 区域），如不生效则多次上滑
+        滚动回顶部：**默认 `wda-cli.py scroll-to-top`**（内置 status-bar tap + swipe×6 fallback）
+          历史验证（#IJ85I0）：纯 tap (y=0) 在 LoopCraft 多个场景完全无效，不再作为推荐路径
 
 Step 6 (CP2): 全部 Tab 遍历完成后，Checkpoint：
     1. 追加 "## CP2 — Phase 2a Level 1 Tab 遍历" 到 phase-summaries.md
@@ -892,6 +908,10 @@ python3 ~/.ae/pm/scripts/screenshot-save.py screenshots/{name}
 | WDA W3C Actions API 偶发 INFINITY 崩溃 | `point.x != INFINITY` 错误，整个 action chain 失败 | fallback 到简单 WDA endpoint（`/wda/tap`、swipe），不要连续重试 W3C Actions |
 | **截图累积触发 many-image 2000px 上限**（#IJ809A） | 10-15 张截图后出现 "dimension limit" 错误，skill 中断需人工 `/compact` | **batch 化 + Checkpoint**：Phase 2a Level 2 每 8 个子入口、Phase 2b 每条流程、Phase 2c/2d/2e 各自一个 Checkpoint。每 Checkpoint 必写 `phase-summaries.md` 持久化摘要；依赖 `autoCompact: true` 自动压缩。恢复时只读纯文本摘要，不批量 Read 历史截图 |
 | **每 CP 强制等 PM `continue` 阻断自动化**（#IJ84WI） | 单次扫描 10+ 次手动 `continue`，严重降低可用性；混淆了图片维度约束与 token 上限 | **默认 autonomous 模式**：CP 写摘要+更新状态后直接继续；仅在「物理操作节点」（PII 收集/付费决策/拍照/付费墙/登录墙/CP7 脱敏后）暂停请 PM 接管。`--interactive` 保留老行为回退 |
+| **文档约束在长会话下失效 / 裸坐标 tap 复现**（#IJ85I0） | 长会话后 agent 跳过元素树直接拍坐标，历史已在 SKILL.md 写明的 tap 模板被忽略 | **机制性约束取代文档约束**：强制走 `wda-cli.py tap-element --by ... --value ...`，该命令内置 alert 前置 + 找不到元素 fail-fast（退出码 3），物理上阻断裸坐标 tap 路径 |
+| **状态栏 tap 滚顶在真机上不稳定**（#IJ85I0） | tap (200, 0/5/10) 在多个 App 完全无响应（自定义 nav bar 拦截系统手势） | 封装 `wda-cli.py scroll-to-top`：先尝试 status-bar tap（best-effort），再 swipe-down × N 默认回退。SKILL.md 不再把 status bar 作为"优先"方案 |
+| **alert 检测写在 tap 失败分支导致弯路**（#IJ85I0） | 历史模板"if 截图无变化再查 alert"——agent 默认先 tap 再回头查，浪费 1-2 张截图 | 把 alert 检查前置到 Step 0；`tap-element` / `alert-safe-tap` 在 CLI 层自动前置检查，有 alert 则退出码 2 |
+| **持久化状态页面 relaunch 后污染叙事**（#IJ85I0） | Counter / 草稿页残留上一会话值，agent 继续操作产生错误演示（如 Counter 残留 1 → +3 → 显示 4） | 进入"可持久化状态"页面时必做幂等性检查；`exploration-state.json.dirty_state_pages` 记录已知污染页 + reset 动作，恢复时优先 reset |
 
 ## 复用说明
 

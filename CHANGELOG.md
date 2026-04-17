@@ -1,5 +1,38 @@
 # Changelog
 
+## v0.44.1 (2026-04-17) — ae-app-to-speckit 机制性约束替代文档约束 [`#IJ85I0`](https://gitee.com/turningsyn/ae-pm/issues/IJ85I0)
+
+### Bug Fix
+
+- **wda-cli.py 新增 `tap-element` 子命令**（[`#IJ85I0`](https://gitee.com/turningsyn/ae-pm/issues/IJ85I0) P0）— 物理上禁止裸坐标 tap
+  - 支持 `--by accessibility_id|name|label|xpath|predicate|class_chain` 定位元素
+  - 内置 alert 前置检查（有 iOS 系统弹窗直接退出码 2，不允许 tap 下穿）
+  - 找不到元素 fail-fast 退出码 3，并提示 `wda-cli.py source` 排查
+  - 解决历史问题：长会话下 agent 图省事直接拍脑袋坐标（LoopCraft 实战复现 3 次）
+- **wda-cli.py 新增 `scroll-to-top` 子命令**（#IJ85I0 P1）— status-bar tap 降级为 fallback
+  - 默认先尝试 status-bar tap（best-effort），再 swipe-down × N（默认 6 次）
+  - 解决历史问题：SKILL.md 写的"优先点击状态栏 y=0"在多 App 完全无响应
+- **wda-cli.py 新增 `alert` / `alert-safe-tap` 子命令**（#IJ85I0 P1）— alert 检查前置化
+  - `alert --action text|buttons|accept|dismiss [--button-label LABEL]` 统一弹窗操作
+  - `alert-safe-tap` 在无弹窗时才 tap（有 alert 退出码 2），替代"先 tap 再查 alert"弯路
+  - 解决历史问题：agent 遇新页面仍先 tap 再查 alert，浪费 1-2 张截图
+- **SKILL.md 标准 tap 模板升级为强制流程**（#IJ85I0）— 从"建议"改为 CLI 强制
+  - Step 0 alert 前置检查；Step 1 强制 `wda-cli.py tap-element`；Step 3 裸坐标降级为最后手段
+  - 滚动回顶部默认 `wda-cli.py scroll-to-top`；不再把 y=0 tap 作为"优先"方案
+  - 持久化状态页面引入幂等性检查 + `exploration-state.json.dirty_state_pages` 字段（Counter/草稿残留防污染）
+  - 技术风险表新增 4 条对应 #IJ85I0 的机制性对策
+
+### 根因与对策
+
+历史修复（#IHZ400 第 5 项 / #IIS1I0 第 1、4 项）都是"在 SKILL.md 加一段说明"，但 LoopCraft 实战验证长会话下 agent 会绕过文档约束。v0.44.1 改为**机制性约束**：把规则下沉到 `wda-cli.py` CLI 层，用退出码和参数约束替代文档提醒，从路径上堵住回归。
+
+### 验证
+
+- `wda-cli.py tap-element --by name --value "Profile"` 在 WePray 真机成功跳转 Profile 页（元素中心点 320,800，rect 272,773,96,54）
+- `wda-cli.py tap-element --by name --value "NonExistentButton"` 返回退出码 3 + 排查提示
+- `wda-cli.py alert --action text` 在无弹窗时正确返回 "(no alert)"（404 已兼容）
+- `wda-cli.py scroll-to-top --max-swipes 2` 端到端执行通过
+
 ## v0.44.0 (2026-04-17) — ae-app-to-speckit 默认 autonomous 模式 [`#IJ84WI`](https://gitee.com/turningsyn/ae-pm/issues/IJ84WI)
 
 ### 新功能
