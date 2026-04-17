@@ -352,6 +352,51 @@ def cmd_issues_close(args):
     }, args.pretty)
 
 
+def cmd_issues_edit(args):
+    """Edit an existing issue's title and/or body."""
+    token = load_token(args.token)
+    if not token:
+        error_exit("未找到 GITEE_TOKEN，请运行 ae setup 配置", EXIT_AUTH_ERROR)
+
+    if args.title is None and args.body is None:
+        error_exit("至少需要 --title 或 --body 其中之一", EXIT_API_ERROR)
+
+    url = f"{GITEE_ENTERPRISE_API}/{args.owner}/issues/{args.number}"
+    body = {"access_token": token}
+    if args.title is not None:
+        body["title"] = args.title
+    if args.body is not None:
+        body["body"] = args.body
+
+    result = api_request("PATCH", url, body)
+    output({
+        "number": result.get("number", ""),
+        "title": result.get("title", ""),
+        "html_url": result.get("html_url", ""),
+        "updated_at": result.get("updated_at", ""),
+    }, args.pretty)
+
+
+def cmd_issues_edit_comment(args):
+    """Edit an existing issue comment's body."""
+    token = load_token(args.token)
+    if not token:
+        error_exit("未找到 GITEE_TOKEN，请运行 ae setup 配置", EXIT_AUTH_ERROR)
+
+    # Standard repo API path (mirrors cmd_issues_comment which uses GITEE_API, not enterprise)
+    url = f"{GITEE_API}/repos/{args.owner}/{args.repo}/issues/comments/{args.comment_id}"
+    body = {
+        "access_token": token,
+        "body": args.body,
+    }
+    result = api_request("PATCH", url, body)
+    output({
+        "id": result.get("id", ""),
+        "updated_at": result.get("updated_at", ""),
+        "body": result.get("body", ""),
+    }, args.pretty)
+
+
 # ── Upload Command ───────────────────────────────────────
 
 def cmd_upload_image(args):
@@ -473,6 +518,17 @@ def build_parser():
     p.add_argument("--repo", required=True)
     p.add_argument("--number", required=True)
 
+    p = issues_sub.add_parser("edit", help="Edit issue title and/or body", parents=[global_opts])
+    p.add_argument("--repo", required=True)
+    p.add_argument("--number", required=True)
+    p.add_argument("--title", default=None, help="New title (omit to keep current)")
+    p.add_argument("--body", default=None, help="New body (omit to keep current)")
+
+    p = issues_sub.add_parser("edit-comment", help="Edit an existing issue comment", parents=[global_opts])
+    p.add_argument("--repo", required=True)
+    p.add_argument("--comment-id", required=True, help="Comment ID (from list-comments or comment response)")
+    p.add_argument("--body", required=True, help="New comment body")
+
     # ── upload-image ──
     p = sub.add_parser("upload-image", help="Upload image to Gitee repo", parents=[global_opts])
     p.add_argument("--repo", required=True)
@@ -494,6 +550,8 @@ COMMANDS = {
     ("issues", "list"): cmd_issues_list,
     ("issues", "list-comments"): cmd_issues_list_comments,
     ("issues", "close"): cmd_issues_close,
+    ("issues", "edit"): cmd_issues_edit,
+    ("issues", "edit-comment"): cmd_issues_edit_comment,
     ("upload-image", None): cmd_upload_image,
     ("auth", "validate"): cmd_auth_validate,
     ("auth", "user"): cmd_auth_user,

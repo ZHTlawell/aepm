@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.43.1 (2026-04-17) — ae-git 补齐 edit / edit-comment 能力 [`#IJ83B3`](https://gitee.com/turningsyn/ae-platform/issues/IJ83B3)
+
+### 新功能
+- **`ae git issues edit`** — 修改 issue 标题或正文（企业版 PATCH 端点）
+- **`ae git issues edit-comment`** — 修改已发 comment 正文（标准 API PATCH 端点）
+- 补齐基础 CRUD，支持事后修订（错别字、敏感 URL、补充信息）
+- 实测通过：两个端点均成功 PATCH（#IJ83B3 验证评论 + IJ83ER 测试 issue）
+
 ## v0.43.0 (2026-04-17) — ae-preflight 新增 SwiftUI 代码质量扫描 + iOS 上架硬约束文档 [`#IJ7XIY`](https://gitee.com/turningsyn/ae-pm/issues/IJ7XIY) [`#IJ7XIS`](https://gitee.com/turningsyn/ae-pm/issues/IJ7XIS)
 
 ### 新功能

@@ -62,7 +62,7 @@ ${BOLD}COMMANDS${NC}
         submit-requirement <title>     向 AE Team 提交能力需求
 
     ${BOLD}git${NC} <subcommand>     Gitee API 统一工具
-        issues list/get/create/comment/list-comments/close
+        issues list/get/create/comment/list-comments/close/edit/edit-comment
         upload-image --repo REPO --file PATH
         auth validate/user
 
