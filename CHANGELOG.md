@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.45.0 (2026-04-17) — ae-app-to-speckit 全程自主推进（取消 CP7 停顿 + 截图结论即时落盘） [`#IJ864Z`](https://gitee.com/turningsyn/ae-pm/issues/IJ864Z)
+
+### 新功能
+
+- **P0 — 核心原则 #8「截图结论即时落盘」**（[`#IJ864Z`](https://gitee.com/turningsyn/ae-pm/issues/IJ864Z)）
+  - 每次 Read 一张截图后，**下一次 tool call 之前**必须把"这张图证明了什么"写到磁盘
+  - 两种落盘位置任选其一：`exploration-state.json.screenshot_to_feature["<文件名>"]` 或 `phase-summaries.md` 当前 CP 段落
+  - 写完后**不再 Read 同一张图**，需要引用时读结论文本
+  - 这是 autoCompact 自动触发后结论不丢失的必要条件
+- **P2 — 取消 CP7 的 `/compact` 停顿提示**（#IJ864Z）
+  - Phase 2e 脱敏后 skill 直接进入 Phase 3，不再建议 PM 手动 /compact
+  - 物理操作节点从 5 个降为 4 个（PII/付费/拍照/付费墙+登录墙），CP7 移出该列表
+  - autonomous CP7 日志改为 `[CP7] 脱敏完成（{n} 张截图），直接进入 Phase 3（autoCompact 会在压力大时自处理）`
+  - 依赖：P0 落盘纪律到位后，autoCompact 任意时刻自动触发都无损
+
+### 意义
+
+skill 从 Phase 0 到 Phase 3 **全程不再需要为 context 管理停下来等 PM**。只在"必须物理世界介入"的场景才暂停（PM 提供 PII、决策付费、拍照上传、登录墙/付费墙决策）。
+
+### 关联与延后
+
+- 完成：P0 落盘纪律 + P2 取消 CP7 停顿
+- 延后到 v0.46.0：**P1 subagent 隔离** — 把 Phase 2a Level 2 每 batch / Phase 2b 每条 flow 改为子 agent 执行，main agent context 只吃摘要不吃截图
+- 延后到 v0.47.0：**P3 screenshot 默认落盘** — 统一用 `wda-cli.py screenshot --save` 替代 `mobile_take_screenshot`
+- 前置：[`#IJ85I0`](https://gitee.com/turningsyn/ae-pm/issues/IJ85I0) v0.44.1 已完成的机制性约束改造
+
 ## v0.44.1 (2026-04-17) — ae-app-to-speckit 机制性约束替代文档约束 [`#IJ85I0`](https://gitee.com/turningsyn/ae-pm/issues/IJ85I0)
 
 ### Bug Fix

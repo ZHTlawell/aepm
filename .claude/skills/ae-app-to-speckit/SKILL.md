@@ -67,6 +67,11 @@ smoke_test:
 5. **广度 100% + 核心深度** — 先确保每个功能至少有一张入口截图（广度覆盖 100%），再对核心流程做端到端深度走通。不需要每个功能都端到端，但每个功能必须有"长什么样"的截图
 6. **发现问题当场提 issue** — 探索过程中发现脚本 bug、流程缺陷、工具不好用时，**当场使用 `/ae-submit-bug` 提交 issue 再继续当前任务**。不要等到最后汇总。如果已有完整 bug 信息，可以用 `ae pm submit-bug "标题" "描述"` 跳过交互追问直接提交
 7. **context 外溢一律落盘** — 大体积中间产物（元素树 XML / OCR 结果 / 截图 / 网页原文）必须 `--save` 到磁盘，再按需 `grep` / `head` 读取片段；**禁止让全量内容作为 stdout 进入 LLM context**。context 增长主要由截图驱动（已由 CP batch + `phase-summaries.md` + `autoCompact` 管控），不应再叠加可落盘的文本产物
+8. **截图结论即时落盘（autoCompact 安全前提）**（#IJ864Z）— 每次 Read 一张截图后，**在下一次 tool call 之前**必须把"这张图证明了什么"写到磁盘：
+   - 更新 `exploration-state.json.screenshot_to_feature["<文件名>"] = "<一句话结论，如 F07 入口在右上角齿轮图标>"`
+   - 或追加一行到 `phase-summaries.md` 当前 CP 段落：`- {文件名}: {结论}`
+   - **之后不再 Read 这张图**。需要再次引用时读结论文本，不重复 Read 图
+   - 这是 autoCompact 自动触发的安全前提：结论已在磁盘，即使图被压缩清除也无损失
 
 ## 前置条件
 
@@ -140,9 +145,15 @@ Step 0.9: 付费策略评估（Phase 1 完成后、Phase 2 开始前回来补充
 2. **Phase 0.8/0.9** — 付费策略决策（是否订阅解锁 paid 功能）
 3. **Phase 2b 核心流程中的物理输入** — 拍照扫描、上传 PDF、绑定邮箱/手机号等需要真实环境的步骤
 4. **首次遇到付费墙 / 登录墙** — 决策「跳过标记 ⛔/🔒」还是「PM 立即付费/登录后补测」
-5. **Phase 2e 脱敏后进入 Phase 3 之前** — 建议 `/compact`（强烈推荐但不强制）
+
+> **取消 CP7 停顿**（#IJ864Z，v0.45.0）：之前 Phase 2e 脱敏后会建议 PM 手动 `/compact` 再进 Phase 3，
+> 现已改为直接进入 Phase 3（不阻塞）。autoCompact 会在 context 真触顶时自动压缩；
+> 恢复依赖 `phase-summaries.md` + `exploration-state.json` + `feature-checklist.md` 三文件，无需手动 compact。
+> **前提保证**：核心原则 #8 要求每张截图结论即时落盘，即使 autoCompact 清掉图，磁盘结论不丢。
 
 **为什么默认 autonomous**：1M context + `autoCompact: true` 的组合下，CP1/CP2/CP5/CP6/CP7 这类单 batch CP 的截图占用远未触顶，强制 PM 手动 `continue` 是纯浪费；PM 需要介入的是物理操作，不是 context 管理。Checkpoint 的**持久化价值**（phase-summaries.md + exploration-state.json）与**阻塞行为**解耦——摘要照写，但不阻塞。
+
+**v0.45.0 进一步**（#IJ864Z）：CP7 也取消了"建议 /compact"的提示。skill 从 Phase 0 到 Phase 3 **全程不停 context 管理的点**，只在物理操作节点（PII/付费/拍照/付费墙/登录墙）暂停。前提是核心原则 #8 的"截图结论即时落盘"被严格执行——只要每张读过的图结论都在磁盘，autoCompact 随时自动触发都安全。
 
 ## 输出
 
@@ -474,6 +485,15 @@ Run /compact to remove old images from context, or start a new session.
 - **Swipe 安全距离**：所有 swipe 的起始 x 坐标必须 ≥ 屏幕宽度 1/3（至少 130pt），建议用屏幕中心。起始 x < ~80pt 会触发 iOS 系统「边缘滑动返回」手势，App 直接退出到上一级甚至回到主屏幕
 - **App relaunch 后必须截图确认状态**：不要假设回到退出前的页面。常见变化：促销弹窗、评价请求、what's new、session 过期、interstitial 广告。先截图判断当前状态再继续操作
 - **有持久化状态的页面必须做幂等性检查**（#IJ85I0）：进入 Counter / 表单 / 草稿 / 任何会被持久化的值展示页时，**先观察当前值是否为默认值**——非默认值意味着"上次会话残留"，必须先 reset 到 0 / 清空 / 默认状态再演示流程。历史反面教材：LoopCraft Counter 残留 1 未 reset，直接 +1×3 → 4，叙事失真。把此类页面记入 `exploration-state.json.dirty_state_pages`（数组），恢复时优先 reset
+- **每张 Read 过的截图必须当场写结论到磁盘**（#IJ864Z）：这是 autoCompact 不会造成结论丢失的前提。规则：
+  ```
+  Read(screenshots/2a-F07-scan.png)   # 读图
+  → 立刻更新 exploration-state.json.screenshot_to_feature 或 phase-summaries.md
+     记录：{"2a-F07-scan.png": "F07 扫描入口在工具箱顶部，按钮 label='扫描'"}
+  → 之后该图的信息**只通过磁盘文本引用**，不再 Read
+  ```
+  违反此规则的后果：autoCompact 触发后该图被清除，但结论只在"LLM 记忆"里也一并丢失，
+  恢复时发现 feature-checklist 说已覆盖但没有可追溯的结论 → 返工
 
 **Agent-PM 交互协议**（遇到需要人工操作的步骤时）：
 
@@ -753,8 +773,9 @@ python3 ~/.ae/pm/scripts/coverage-stats.py speckit/feature-checklist.md \
 7. (CP7) 脱敏完成后 Checkpoint：
    追加 "## CP7 — Phase 2e 脱敏完成" 到 phase-summaries.md
    记录脱敏覆盖截图数 + 特殊处理项（avatar-region 等）
-   **CP7 特殊性**：Phase 3 是纯文本生成，不再需要截图上下文——此处是 `/compact` 零成本的最佳时机。
-   autonomous（默认）：输出 `[CP7] 脱敏完成（{n} 张截图），⚠️ 建议 PM 现在 /compact 后进入 Phase 3（零成本）。若 context 仍宽松可直接继续`，然后继续进入 Phase 3（不阻塞）
+   **CP7 特殊性**（#IJ864Z，v0.45.0 更新）：Phase 3 是纯文本生成，理论上此处是 /compact 零成本的好时机，
+   **但 skill 不再建议 PM 手动 /compact**——依赖 autoCompact 自动处理，skill 直接进入 Phase 3。
+   autonomous（默认）：输出 `[CP7] 脱敏完成（{n} 张截图），直接进入 Phase 3（autoCompact 会在压力大时自处理）`，然后继续进入 Phase 3（不阻塞）
    interactive：输出 CP7 Checkpoint 消息给 PM，等待 "continue"
 ```
 
@@ -907,7 +928,8 @@ python3 ~/.ae/pm/scripts/screenshot-save.py screenshots/{name}
 | App relaunch 后 UI 状态不一致 | 促销弹窗/interstitial/session 过期打乱流程 | relaunch 后必须截图确认状态，不假设回到退出前页面 |
 | WDA W3C Actions API 偶发 INFINITY 崩溃 | `point.x != INFINITY` 错误，整个 action chain 失败 | fallback 到简单 WDA endpoint（`/wda/tap`、swipe），不要连续重试 W3C Actions |
 | **截图累积触发 many-image 2000px 上限**（#IJ809A） | 10-15 张截图后出现 "dimension limit" 错误，skill 中断需人工 `/compact` | **batch 化 + Checkpoint**：Phase 2a Level 2 每 8 个子入口、Phase 2b 每条流程、Phase 2c/2d/2e 各自一个 Checkpoint。每 Checkpoint 必写 `phase-summaries.md` 持久化摘要；依赖 `autoCompact: true` 自动压缩。恢复时只读纯文本摘要，不批量 Read 历史截图 |
-| **每 CP 强制等 PM `continue` 阻断自动化**（#IJ84WI） | 单次扫描 10+ 次手动 `continue`，严重降低可用性；混淆了图片维度约束与 token 上限 | **默认 autonomous 模式**：CP 写摘要+更新状态后直接继续；仅在「物理操作节点」（PII 收集/付费决策/拍照/付费墙/登录墙/CP7 脱敏后）暂停请 PM 接管。`--interactive` 保留老行为回退 |
+| **每 CP 强制等 PM `continue` 阻断自动化**（#IJ84WI） | 单次扫描 10+ 次手动 `continue`，严重降低可用性；混淆了图片维度约束与 token 上限 | **默认 autonomous 模式**：CP 写摘要+更新状态后直接继续；仅在「物理操作节点」（PII 收集/付费决策/拍照/付费墙/登录墙）暂停请 PM 接管。CP7 从 v0.45.0 起也不再建议 /compact，依赖 autoCompact。`--interactive` 保留老行为回退 |
+| **autoCompact 触发时截图结论丢失**（#IJ864Z） | Agent 读了截图但结论只在 "LLM 记忆"，autoCompact 清掉图后结论也丢，feature-checklist 说已覆盖但无可追溯结论 → 返工 | 核心原则 #8 硬规则：每张 Read 过的截图**在下次 tool call 前**必须把结论写到 `exploration-state.json.screenshot_to_feature` 或 `phase-summaries.md`；之后不再 Read 同一张图 |
 | **文档约束在长会话下失效 / 裸坐标 tap 复现**（#IJ85I0） | 长会话后 agent 跳过元素树直接拍坐标，历史已在 SKILL.md 写明的 tap 模板被忽略 | **机制性约束取代文档约束**：强制走 `wda-cli.py tap-element --by ... --value ...`，该命令内置 alert 前置 + 找不到元素 fail-fast（退出码 3），物理上阻断裸坐标 tap 路径 |
 | **状态栏 tap 滚顶在真机上不稳定**（#IJ85I0） | tap (200, 0/5/10) 在多个 App 完全无响应（自定义 nav bar 拦截系统手势） | 封装 `wda-cli.py scroll-to-top`：先尝试 status-bar tap（best-effort），再 swipe-down × N 默认回退。SKILL.md 不再把 status bar 作为"优先"方案 |
 | **alert 检测写在 tap 失败分支导致弯路**（#IJ85I0） | 历史模板"if 截图无变化再查 alert"——agent 默认先 tap 再回头查，浪费 1-2 张截图 | 把 alert 检查前置到 Step 0；`tap-element` / `alert-safe-tap` 在 CLI 层自动前置检查，有 alert 则退出码 2 |
