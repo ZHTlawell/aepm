@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.44.0 (2026-04-17) — ae-app-to-speckit 默认 autonomous 模式 [`#IJ84WI`](https://gitee.com/turningsyn/ae-pm/issues/IJ84WI)
+
+### 新功能
+- **ae-app-to-speckit 引入 autonomous 执行模式**（[`#IJ84WI`](https://gitee.com/turningsyn/ae-pm/issues/IJ84WI)）— 解决单次扫描 PM 手动输入 10+ 次 "continue" 的可用性问题
+  - **默认 autonomous**：CP1-CP7 写完 `phase-summaries.md` + 更新 `exploration-state.json` 后输出一行日志直接继续，不再阻塞等 PM `continue`
+  - **物理操作节点仍暂停**：Phase 0.7 PII 收集 / 0.8 付费决策 / 2b 拍照+上传 / 首次 paywall+登录墙 / CP7 脱敏后建议 /compact — 这些节点仍请 PM 接管
+  - **`--interactive` 回退**：`/ae-app-to-speckit --interactive` 恢复 v0.43 老行为（每 CP 等 PM `continue`），向下兼容
+  - **根因澄清**：过去版本把「持久化摘要（磁盘写入）」与「阻塞等待（PM continue）」绑在一起；实际上图片维度 2000px 上限由 batch 化 + `autoCompact: true` 自动处理，token 在 1M context 下远未触顶，CP 阻塞纯浪费 PM 时间
+  - 风险表新增 #IJ84WI 对策条目；test-scenarios.md 新增场景 6/7 覆盖 autonomous/interactive 两种模式
+
 ## v0.43.1 (2026-04-17) — ae-git 补齐 edit / edit-comment 能力 [`#IJ83B3`](https://gitee.com/turningsyn/ae-platform/issues/IJ83B3)
 
 ### 新功能

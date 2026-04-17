@@ -126,6 +126,23 @@ Step 0.9: 付费策略评估（Phase 1 完成后、Phase 2 开始前回来补充
 - **PM 补充指令**（可选）：重点功能、裁剪范围、差异化方向
 - **技术栈约束**：iOS SwiftUI（默认）或 Web SPA
 
+### 执行模式（#IJ84WI）
+
+| 模式 | 触发方式 | Checkpoint 行为 |
+|------|---------|----------------|
+| **autonomous**（默认） | `/ae-app-to-speckit ...` | CP1-CP7 写完摘要后**自动继续**，不等 PM `continue`。仅在「物理操作节点」（见下）时暂停 |
+| interactive | `/ae-app-to-speckit --interactive ...` | 每个 CP 写完摘要后输出消息给 PM，等 `continue` 再进入下一 batch（老行为，新用户/小心场景使用） |
+
+**物理操作节点**（两种模式下均会暂停，请 PM 接管）：
+
+1. **Phase 0.7** — PII 关键词收集（必须 PM 提供）
+2. **Phase 0.8/0.9** — 付费策略决策（是否订阅解锁 paid 功能）
+3. **Phase 2b 核心流程中的物理输入** — 拍照扫描、上传 PDF、绑定邮箱/手机号等需要真实环境的步骤
+4. **首次遇到付费墙 / 登录墙** — 决策「跳过标记 ⛔/🔒」还是「PM 立即付费/登录后补测」
+5. **Phase 2e 脱敏后进入 Phase 3 之前** — 建议 `/compact`（强烈推荐但不强制）
+
+**为什么默认 autonomous**：1M context + `autoCompact: true` 的组合下，CP1/CP2/CP5/CP6/CP7 这类单 batch CP 的截图占用远未触顶，强制 PM 手动 `continue` 是纯浪费；PM 需要介入的是物理操作，不是 context 管理。Checkpoint 的**持久化价值**（phase-summaries.md + exploration-state.json）与**阻塞行为**解耦——摘要照写，但不阻塞。
+
 ## 输出
 
 写入 `speckit/` 目录：
@@ -243,12 +260,13 @@ speckit 文档中引用截图时**必须使用 HTML img 标签限制显示宽度
    - 创建 phase-summaries.md（如不存在），追加 "## CP1 — Phase 1.5 功能目录补充"
    - 记录：新增功能 ID 列表 + 功能目录入口位置 + 截图文件名
    - 更新 exploration-state.json.checkpoints
-   - 输出 CP1 Checkpoint 消息给 PM，等待 "continue" 进入 Phase 2a
+   - **autonomous 模式（默认）**：输出一行日志 `[CP1] Phase 1.5 完成，新增 N 个功能，继续 Phase 2a`，直接继续
+   - **interactive 模式**：输出 CP1 Checkpoint 消息给 PM，等待 "continue" 进入 Phase 2a
 ```
 
 **完成后**：带着完整的 feature-checklist 进入 Phase 2，避免遍历中途大面积补功能。
 
-### Context 管理 / Phase Checkpoint 机制（#IJ809A）
+### Context 管理 / Phase Checkpoint 机制（#IJ809A + #IJ84WI）
 
 WDA 截图单张 1125×2436px，**超过 Claude API "many-image requests" 的 2000px 单边上限**，且单图 token 消耗极高。连续 10-15 张截图累积进 context，会出现：
 
@@ -257,23 +275,34 @@ An image in the conversation exceeds the dimension limit for many-image requests
 Run /compact to remove old images from context, or start a new session.
 ```
 
-**skill 无法自己触发 `/compact`**（这是 Claude Code 用户命令）。所以 skill 的 context 管理策略是：**把工作拆成 batch + 每 batch 结束写持久化摘要到磁盘 + 在 batch 边界显式提示 PM 可执行 `/compact`**。这样即使 context 被压缩，摘要仍然留在磁盘上，Phase 0 恢复流程能无损接续。
+**skill 无法自己触发 `/compact`**（这是 Claude Code 用户命令）。所以 skill 的 context 管理策略是：**把工作拆成 batch + 每 batch 结束写持久化摘要到磁盘**。这样即使 autoCompact 触发清理，摘要仍然留在磁盘上，Phase 0 恢复流程能无损接续。
 
-**Batch 边界**（下列每一处完成后，必须写 `phase-summaries.md` 并向 PM 发出 Checkpoint 消息）：
+**autonomous 与 interactive 的区别**（#IJ84WI）：
+- **batch 化 + 写摘要**：两种模式都执行，不可跳过（持久化价值独立于阻塞）
+- **是否阻塞等 PM `continue`**：autonomous 模式不阻塞（写完日志直接进入下一 batch），interactive 模式阻塞
+- 过去版本把两者绑在一起导致 PM 每次扫描手动 `continue` 10+ 次（见 #IJ84WI），现已解耦
+
+**Batch 边界**（下列每一处完成后，必须写 `phase-summaries.md` + 更新 `exploration-state.json.checkpoints`）：
 
 | Checkpoint | 位置 | 每 batch 截图预算 |
 |-----------|------|-------------------|
 | CP1 | Phase 1.5 完成后 | ~3 张功能目录截图 |
 | CP2 | Phase 2a Level 1 完成后（全部 Tab 遍历完） | 每 5 个 Tab 为 1 batch |
-| CP3 | Phase 2a Level 2 完成后（子入口遍历） | **每 8 个子入口为 1 batch，batch 间强制 checkpoint** |
+| CP3 | Phase 2a Level 2 完成后（子入口遍历） | **每 8 个子入口为 1 batch** |
 | CP4 | 每一条核心流程（Phase 2b）走通后 | 每条流程独立 checkpoint |
 | CP5 | Phase 2c 边界探索完成后 | ~5 张边界态截图 |
 | CP6 | Phase 2d 覆盖率 checkpoint 通过后 | — |
 | CP7 | Phase 2e 脱敏完成后 | — |
 
-**关键原则**：**预算上限 = 8 张截图 / batch**。接近上限时主动收口写摘要，不要跨越。
+**关键原则**：**预算上限 = 8 张截图 / batch**。接近上限时主动收口写摘要，不要跨越。依赖 `autoCompact: true` 在 context 压力大时自动压缩，skill 侧不阻塞。
 
-**Checkpoint 消息模板**（每到 batch 边界，skill 向 PM 输出）：
+**autonomous 模式 CP 日志格式**（默认，向 PM 输出一行）：
+
+```
+[CP{编号}] {阶段名} — 本 batch {k} 张截图（累计 {n}），覆盖 {m}/{total}；已写 phase-summaries.md，继续 {下一阶段/batch}
+```
+
+**interactive 模式 CP 消息模板**（仅 `--interactive` 时使用）：
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -287,11 +316,10 @@ Run /compact to remove old images from context, or start a new session.
 ⚠️ Context 管理建议：
   如果当前 context 使用率已高，请执行 /compact 后输入 "continue"；
   否则直接输入 "continue" 进入下一 batch。
-  （autoCompact=true 时 CLI 会自动压缩，可直接 continue）
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-**为什么要让 PM 决定 /compact 时机**：skill 无法观测 context 使用率。PM 看到 Claude Code 右下角的 token meter 或 autoCompact 提示后，自己判断何时 /compact 最划算。batch 边界是"/compact 零成本"的位置——因为所有工作状态已经持久化到磁盘。
+**为什么 autonomous 是默认**：1M context + `autoCompact: true` 下，CP1/2/5/6/7 这类单 batch 远未触顶，强制 `continue` 纯浪费 PM 时间。CP3/CP4 累计 8 张截图时，autoCompact 会在真正压力来临时自动处理，skill 不需要预先停顿。持久化摘要保证即使被 autoCompact 清掉历史，恢复仍然无损。
 
 ### 中断恢复机制
 
@@ -385,7 +413,7 @@ Run /compact to remove old images from context, or start a new session.
 }
 ```
 
-**恢复流程**（每次会话开始时 **或 /compact 后 PM 输入 "continue" 时** 执行）：
+**恢复流程**（每次会话开始时 **或 autoCompact / PM 手动 /compact 后** 执行）：
 
 ```
 1. 检查 speckit/ 目录是否已存在
@@ -521,11 +549,12 @@ Step 5: 逐 Tab 截图（**完成所有 Tab 后执行 CP2 Checkpoint**）：
         如有滚动内容 → swipe + 再次截图
         滚动回顶部：优先点击状态栏（屏幕最顶部 y=0 区域），如不生效则多次上滑
 
-Step 6 (CP2): 全部 Tab 遍历完成后，强制 Checkpoint：
+Step 6 (CP2): 全部 Tab 遍历完成后，Checkpoint：
     1. 追加 "## CP2 — Phase 2a Level 1 Tab 遍历" 到 phase-summaries.md
        内容：每个 Tab 的名称 + 页面主要元素 + 新发现的 discovered 功能
     2. 更新 exploration-state.json.checkpoints
-    3. 输出 CP2 Checkpoint 消息给 PM，等待 "continue"
+    3. autonomous（默认）：输出一行 `[CP2] Level 1 Tab 遍历完成...` 后直接进入 Level 2
+       interactive：输出 CP2 Checkpoint 消息给 PM，等待 "continue"
 ```
 
 **Tab 数量 > 5 时**：若 App 有 6+ 个 Tab（含更多/设置），按每 5 个为一 batch 拆分，避免单 batch 超过 8 张截图（每 Tab 通常 1-2 张）。
@@ -546,15 +575,15 @@ Step 6: 对每个 Tab 内的子功能卡片/入口，分 batch 执行：
         batch_counter += 1
 
         if batch_counter >= 8:
-            # 到达 batch 上限，强制执行 CP3 Checkpoint
+            # 到达 batch 上限，执行 CP3 Checkpoint
             1. 把本 batch 发现的功能结构化写入 phase-summaries.md
                追加一段 "## CP3 — Phase 2a Level 2 Batch {n}（子入口 {start}-{end}）"
             2. 更新 exploration-state.json：
                checkpoints.last_written = "CP3-batch{n}"
                checkpoints.batches_completed 追加
                checkpoints.next_batch = "CP3-batch{n+1}"
-            3. 向 PM 输出 Checkpoint 消息（格式见 Context 管理章节）
-            4. 等待 PM 回复 "continue" 再进入下一 batch
+            3. autonomous（默认）：输出 `[CP3-batch{n}] 完成子入口 {start}-{end}，继续 batch{n+1}`，直接进入下一 batch
+               interactive：输出 Checkpoint 消息（格式见 Context 管理章节），等待 PM 回复 "continue"
             batch_counter = 0
 ```
 
@@ -637,7 +666,8 @@ for each core_flow:
           内容：流程步骤列表（每步一行：步骤名 + 截图文件名 + 关键观察）
        b. 更新 feature-checklist：对应功能覆盖状态 → 🔄
        c. 更新 exploration-state.json.checkpoints + completed_flows
-       d. 输出 CP4 Checkpoint 消息给 PM，等待 "continue" 再进入下一条流程
+       d. autonomous（默认）：输出 `[CP4] Flow {n} {流程名} 完成（{步数}步），进入下一条流程`，直接继续
+          interactive：输出 CP4 Checkpoint 消息给 PM，等待 "continue"
 ```
 
 **为什么每条流程独立 Checkpoint**：一条端到端流程通常 5-8 步，每步一张截图，单条流程就可能接近 batch 上限。如果把 3-5 条流程在一个 batch 内连跑，必然超标。每条流程独立收口 = 每条流程后都有安全的 /compact 机会。
@@ -652,7 +682,9 @@ for each core_flow:
 - 错误状态（如无网络）截图
 
 CP5: 边界探索完成后，追加 "## CP5 — Phase 2c 边界态" 到 phase-summaries.md，
-     更新 checkpoints，输出 Checkpoint 消息。
+     更新 checkpoints。
+     autonomous（默认）：输出 `[CP5] 边界探索完成，进入 Phase 2d 覆盖率 checkpoint`，直接继续
+     interactive：输出 CP5 Checkpoint 消息给 PM，等待 "continue"
 ```
 
 #### Phase 2d: 覆盖率 Checkpoint（强制执行）
@@ -675,7 +707,8 @@ python3 ~/.ae/pm/scripts/coverage-stats.py speckit/feature-checklist.md \
 # 4. (CP6) 覆盖率达标后 Checkpoint：
 #    追加 "## CP6 — Phase 2d 覆盖率达标" 到 phase-summaries.md
 #    记录最终覆盖率数字 + 未覆盖功能清单及原因
-#    输出 CP6 Checkpoint 消息给 PM，等待 "continue" 进入 Phase 2e
+#    autonomous（默认）：输出 `[CP6] 覆盖率达标（core {x}%, in-app {y}%），进入 Phase 2e 脱敏`，直接继续
+#    interactive：输出 CP6 Checkpoint 消息给 PM，等待 "continue"
 ```
 
 #### Phase 2e: 隐私脱敏（Phase 2d 通过后、Phase 3 之前）
@@ -704,8 +737,9 @@ python3 ~/.ae/pm/scripts/coverage-stats.py speckit/feature-checklist.md \
 7. (CP7) 脱敏完成后 Checkpoint：
    追加 "## CP7 — Phase 2e 脱敏完成" 到 phase-summaries.md
    记录脱敏覆盖截图数 + 特殊处理项（avatar-region 等）
-   输出 CP7 Checkpoint 消息给 PM，**此处强烈建议 /compact 后进入 Phase 3**
-   （Phase 3 只需要纯文本生成，不需要再 Read 截图，/compact 是零成本的）
+   **CP7 特殊性**：Phase 3 是纯文本生成，不再需要截图上下文——此处是 `/compact` 零成本的最佳时机。
+   autonomous（默认）：输出 `[CP7] 脱敏完成（{n} 张截图），⚠️ 建议 PM 现在 /compact 后进入 Phase 3（零成本）。若 context 仍宽松可直接继续`，然后继续进入 Phase 3（不阻塞）
+   interactive：输出 CP7 Checkpoint 消息给 PM，等待 "continue"
 ```
 
 > **注意**：`--mask-notifications` 基于 OCR 启发式检测通知横幅（Messages/FaceTime/微信等关键词 + 屏幕顶部区域），作为 DND 的安全网。screenshot-save.py 截图前也会自动尝试关闭弹窗（`--auto-dismiss`），双保险。
@@ -856,7 +890,8 @@ python3 ~/.ae/pm/scripts/screenshot-save.py screenshots/{name}
 | Webview 自定义控件对 WDA 不透明 | `<select>`/`<input range>`/JS 按钮无法自动化 | 第一次交互失败后直接请 PM 手动操作，不要反复尝试不同 WDA 方式 |
 | App relaunch 后 UI 状态不一致 | 促销弹窗/interstitial/session 过期打乱流程 | relaunch 后必须截图确认状态，不假设回到退出前页面 |
 | WDA W3C Actions API 偶发 INFINITY 崩溃 | `point.x != INFINITY` 错误，整个 action chain 失败 | fallback 到简单 WDA endpoint（`/wda/tap`、swipe），不要连续重试 W3C Actions |
-| **截图累积触发 many-image 2000px 上限**（#IJ809A） | 10-15 张截图后出现 "dimension limit" 错误，skill 中断需人工 `/compact` | **batch 化 + Checkpoint**：Phase 2a Level 2 每 8 个子入口、Phase 2b 每条流程、Phase 2c/2d/2e 各自一个 Checkpoint。每 Checkpoint 必写 `phase-summaries.md` 持久化摘要 + 输出 Checkpoint 消息给 PM 提示可 /compact。恢复时只读纯文本摘要，不批量 Read 历史截图 |
+| **截图累积触发 many-image 2000px 上限**（#IJ809A） | 10-15 张截图后出现 "dimension limit" 错误，skill 中断需人工 `/compact` | **batch 化 + Checkpoint**：Phase 2a Level 2 每 8 个子入口、Phase 2b 每条流程、Phase 2c/2d/2e 各自一个 Checkpoint。每 Checkpoint 必写 `phase-summaries.md` 持久化摘要；依赖 `autoCompact: true` 自动压缩。恢复时只读纯文本摘要，不批量 Read 历史截图 |
+| **每 CP 强制等 PM `continue` 阻断自动化**（#IJ84WI） | 单次扫描 10+ 次手动 `continue`，严重降低可用性；混淆了图片维度约束与 token 上限 | **默认 autonomous 模式**：CP 写摘要+更新状态后直接继续；仅在「物理操作节点」（PII 收集/付费决策/拍照/付费墙/登录墙/CP7 脱敏后）暂停请 PM 接管。`--interactive` 保留老行为回退 |
 
 ## 复用说明
 

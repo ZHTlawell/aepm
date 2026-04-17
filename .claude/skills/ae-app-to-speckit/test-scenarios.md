@@ -24,3 +24,13 @@
 - **用户说**："我已经有 demo speckit 了，现在想对比线上 App"
 - **预期行为**：识别衔接意图，建议使用 ae-verify-app 做 E2E 对比
 - **验证标准**：正确引导到 ae-verify-app
+
+## 场景 6：autonomous 模式默认行为（#IJ84WI）
+- **用户说**："/ae-app-to-speckit 分析 LoopCraft"
+- **预期行为**：CP1-CP7 每个 checkpoint 写 phase-summaries.md + 更新 exploration-state.json 后，输出一行 `[CP{n}] ...` 日志直接进入下一阶段；只在 Phase 0.7（PII）、0.8（付费决策）、2b（拍照/上传）、首次 paywall/登录墙、CP7 后（建议 /compact）才暂停请 PM
+- **验证标准**：从 Phase 1.5 到 Phase 3 期间 PM 输入 `continue` 次数 = 0（除非遇到物理操作节点）；phase-summaries.md 每个 CP 的摘要仍然完整写入
+
+## 场景 7：interactive 模式回退
+- **用户说**："/ae-app-to-speckit --interactive 分析 CamScanner"
+- **预期行为**：每个 CP 输出完整 Checkpoint 消息并等待 PM 回复 `continue`（恢复 v0.42 老行为）
+- **验证标准**：CP1/2/3/4/5/6/7 每次都暂停等 PM 输入
