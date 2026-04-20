@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.48.1 (2026-04-20) — ae-app-to-speckit 修复图片上传测试失效 [`#IJB5M5`](https://gitee.com/turningsyn/ae-pm/issues/IJB5M5)
+
+### 修复
+
+- **SKILL.md line 614** — 删除虚构命令 `ios push-photo`（go-ios v1.0.188 实测无此子命令），改为三层可执行策略：
+  1. **真机 agent 自动（主选）** — Safari 下载路径：`~/.ae/pm/test-assets/` 起本地 http.server + `ios forward` + `mobile_open_url` + 长按 + 点"添加到照片"
+  2. **Simulator 专用** — `xcrun simctl addmedia`
+  3. **PM 兜底** — 明确 AirDrop / iMessage 可执行话术（不再只写"请手动"）
+- 新增成功后写入 `exploration-state.json.test_assets[]`，复用已推送素材避免重复
+- 标注"Safari 长按菜单在不同 iOS 版本可靠性不一"的已知风险，失败即降级
+
+### 触发场景
+
+任何"用户上传图片"型功能（AI 图像生成 / OCR / 头像 / 票据扫描 / Photo→Tutorial 等）都依赖此路径。LoopCraft F07 Photo→Tutorial 末端补测即为本次触发案例。
+
 ## v0.48.0 (2026-04-17) — ae-app-to-speckit 增加 App 健康度检测 [`#IJ87FB`](https://gitee.com/turningsyn/ae-pm/issues/IJ87FB)
 
 ### 新功能

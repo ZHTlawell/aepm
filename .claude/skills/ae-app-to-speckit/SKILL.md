@@ -611,7 +611,18 @@ Fallback 时 main agent 自己执行该 batch（老 v0.45.0 inline 方式），�
 - `mobile_save_screenshot` 在 iOS 真机上可能返回黑屏，**不要使用**。改用 WDA API 直接存：`curl -s http://localhost:8100/screenshot` → base64 decode → 写文件
 - 需要实际拍摄文档的步骤（扫描、OCR 等），让 PM 手动操作，Agent 负责截图和记录
 - 手机锁屏后截图会变黑屏，每次操作前先确认屏幕状态
-- **需要上传照片测试时**，先推送测试图片到设备相册：`ios push-photo test.jpg --udid=<udid>`（需 go-ios 支持），或告知 PM 手动将测试图片存到相册
+- **需要上传照片测试时**（#IJB5M5）：`ios push-photo` / `ios photo` **不存在**（已在 go-ios v1.0.188 验证），禁止使用。按以下优先级尝试，不得只丢一句"请 PM 手动"就卡住：
+  1. **真机 agent 自动 — Safari 下载路径（主选）**
+     - 准备图片：测试素材放在 `~/.ae/pm/test-assets/<app_id>/`（无则创建），在该目录起 `python3 -m http.server 8765`，再 `ios forward 8765 8765 --udid=<udid>` 暴露给设备
+     - `mcp__mobile-mcp__mobile_open_url http://localhost:8765/test.jpg` 打开 Safari
+     - 长按图片：`mcp__mobile-mcp__mobile_long_press_on_screen_at_coordinates(x, y)`（坐标取自图片中心，可用 `wda-cli.py source` 查 Safari `XCUIElementTypeImage` 的 rect）→ 菜单出现 → `wda-cli.py tap-element --by label --value "添加到照片"`（中文系统）或 `Add to Photos`（英文系统）
+     - **已知风险**：不同 iOS 版本 Safari 长按菜单对 WDA 点击稳定性不一，失败即降级
+  2. **Simulator 专用**：`xcrun simctl addmedia <sim_udid> <path/to/test.jpg>`（真机不可用，跳过）
+  3. **PM 兜底（必须给可执行指令，不能只说"请手动存到相册"）**
+     - 首选话术："请在 Mac 上右键目标图片 → 共享 → AirDrop → 选 [设备名] → 手机点'接受'，图会自动入相册"
+     - 备选话术："用 iMessage/微信发给自己 → 手机长按收到的图片 → '存储图像' / '保存到相册'"
+     - PM 回复"好了"后 agent 打开 Photos 截图确认入库
+  任一路径成功后，在 `exploration-state.json.test_assets[]` 记录 `{asset:"test.jpg", path_on_device:"Photos/Recents", method:"safari|airdrop|imessage", timestamp}`，后续流程复用，避免重复推送
 - **Swipe 安全距离**：所有 swipe 的起始 x 坐标必须 ≥ 屏幕宽度 1/3（至少 130pt），建议用屏幕中心。起始 x < ~80pt 会触发 iOS 系统「边缘滑动返回」手势，App 直接退出到上一级甚至回到主屏幕
 - **App relaunch 后必须截图确认状态**：不要假设回到退出前的页面。常见变化：促销弹窗、评价请求、what's new、session 过期、interstitial 广告。先截图判断当前状态再继续操作
 - **有持久化状态的页面必须做幂等性检查**（#IJ85I0）：进入 Counter / 表单 / 草稿 / 任何会被持久化的值展示页时，**先观察当前值是否为默认值**——非默认值意味着"上次会话残留"，必须先 reset 到 0 / 清空 / 默认状态再演示流程。历史反面教材：LoopCraft Counter 残留 1 未 reset，直接 +1×3 → 4，叙事失真。把此类页面记入 `exploration-state.json.dirty_state_pages`（数组），恢复时优先 reset
