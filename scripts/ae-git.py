@@ -120,6 +120,9 @@ def strip_control_chars(text):
 def api_request(method, url, body=None, token=None, timeout=30):
     """Make HTTP request to Gitee API with retry and robust JSON parsing.
 
+    Auth is sent via `Authorization: Bearer <token>` header (Gitee blocks the
+    legacy `?access_token=` query param at the gateway as of 2026-04).
+
     Returns parsed JSON dict on success.
     Calls sys.exit() on unrecoverable errors.
     """
@@ -131,7 +134,11 @@ def api_request(method, url, body=None, token=None, timeout=30):
     else:
         data = None
 
-    headers = {"Content-Type": "application/json"} if data else {}
+    headers = {}
+    if data:
+        headers["Content-Type"] = "application/json"
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
 
     last_error = None
     for attempt in range(MAX_RETRIES):
@@ -155,8 +162,9 @@ def api_request(method, url, body=None, token=None, timeout=30):
 
             # Auth errors — no retry
             if status in (401, 403):
+                api_msg = err_data.get("message", "") or err_data.get("raw", "")
                 error_exit(
-                    f"认证失败 (HTTP {status}): {err_data.get('message', '')}",
+                    f"Token 无效或已过期 (HTTP {status})：{api_msg or '请到 https://gitee.com/profile/personal_access_tokens 重新生成并更新 ~/.config/ae/credentials.env'}",
                     EXIT_AUTH_ERROR,
                 )
 
@@ -212,12 +220,11 @@ def cmd_issues_create(args):
 
     url = f"{GITEE_API}/repos/{args.owner}/issues"
     body = {
-        "access_token": token,
         "repo": args.repo,
         "title": args.title,
         "body": args.body,
     }
-    result = api_request("POST", url, body)
+    result = api_request("POST", url, body, token=token)
     output({
         "number": result.get("number", ""),
         "html_url": result.get("html_url", ""),
@@ -233,10 +240,9 @@ def cmd_issues_comment(args):
 
     url = f"{GITEE_API}/repos/{args.owner}/{args.repo}/issues/{args.number}/comments"
     body = {
-        "access_token": token,
         "body": args.body,
     }
-    result = api_request("POST", url, body)
+    result = api_request("POST", url, body, token=token)
     output({
         "id": result.get("id", ""),
         "html_url": result.get("html_url", ""),
@@ -250,8 +256,8 @@ def cmd_issues_get(args):
         error_exit("未找到 GITEE_TOKEN，请运行 ae setup 配置", EXIT_AUTH_ERROR)
 
     # Enterprise issue endpoint (supports alphanumeric issue numbers like II8R1M)
-    url = f"{GITEE_ENTERPRISE_API}/{args.owner}/issues/{args.number}?access_token={token}"
-    result = api_request("GET", url)
+    url = f"{GITEE_ENTERPRISE_API}/{args.owner}/issues/{args.number}"
+    result = api_request("GET", url, token=token)
     output({
         "number": result.get("number", ""),
         "html_url": result.get("html_url", ""),
@@ -275,9 +281,9 @@ def cmd_issues_list(args):
 
     while True:
         url = (f"{GITEE_API}/repos/{args.owner}/{args.repo}/issues"
-               f"?access_token={token}&state={args.state}"
+               f"?state={args.state}"
                f"&per_page={per_page}&page={page}&sort=updated&direction=desc")
-        batch = api_request("GET", url)
+        batch = api_request("GET", url, token=token)
 
         if not isinstance(batch, list):
             break
@@ -310,8 +316,8 @@ def cmd_issues_list_comments(args):
 
     while True:
         url = (f"{GITEE_ENTERPRISE_API}/{args.owner}/issues/{args.number}/comments"
-               f"?access_token={token}&per_page={per_page}&page={page}")
-        batch = api_request("GET", url)
+               f"?per_page={per_page}&page={page}")
+        batch = api_request("GET", url, token=token)
 
         if not isinstance(batch, list):
             break
@@ -341,10 +347,9 @@ def cmd_issues_close(args):
     # Enterprise endpoint for closing issues
     url = f"{GITEE_ENTERPRISE_API}/{args.owner}/issues/{args.number}"
     body = {
-        "access_token": token,
         "state": "closed",
     }
-    result = api_request("PATCH", url, body)
+    result = api_request("PATCH", url, body, token=token)
     output({
         "number": result.get("number", ""),
         "state": result.get("state", result.get("issue_state_detail", {}).get("title", "")),
@@ -362,13 +367,13 @@ def cmd_issues_edit(args):
         error_exit("至少需要 --title 或 --body 其中之一", EXIT_API_ERROR)
 
     url = f"{GITEE_ENTERPRISE_API}/{args.owner}/issues/{args.number}"
-    body = {"access_token": token}
+    body = {}
     if args.title is not None:
         body["title"] = args.title
     if args.body is not None:
         body["body"] = args.body
 
-    result = api_request("PATCH", url, body)
+    result = api_request("PATCH", url, body, token=token)
     output({
         "number": result.get("number", ""),
         "title": result.get("title", ""),
@@ -386,10 +391,9 @@ def cmd_issues_edit_comment(args):
     # Standard repo API path (mirrors cmd_issues_comment which uses GITEE_API, not enterprise)
     url = f"{GITEE_API}/repos/{args.owner}/{args.repo}/issues/comments/{args.comment_id}"
     body = {
-        "access_token": token,
         "body": args.body,
     }
-    result = api_request("PATCH", url, body)
+    result = api_request("PATCH", url, body, token=token)
     output({
         "id": result.get("id", ""),
         "updated_at": result.get("updated_at", ""),
@@ -418,11 +422,10 @@ def cmd_upload_image(args):
 
     url = f"{GITEE_API}/repos/{args.owner}/{args.repo}/contents/{remote_path}"
     body = {
-        "access_token": token,
         "message": f"chore: upload attachment {basename}",
         "content": content_b64,
     }
-    result = api_request("POST", url, body, timeout=60)
+    result = api_request("POST", url, body, token=token, timeout=60)
 
     download_url = result.get("content", {}).get("download_url", "")
     output({
@@ -442,9 +445,13 @@ def cmd_auth_validate(args):
     clear_proxy()
     ctx = _ssl_context()
 
-    url = f"{GITEE_API}/user?access_token={token}"
+    url = f"{GITEE_API}/user"
     try:
-        req = urllib.request.Request(url, method="GET")
+        req = urllib.request.Request(
+            url,
+            method="GET",
+            headers={"Authorization": f"Bearer {token}"},
+        )
         with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
             output({"valid": True, "http_status": resp.status}, args.pretty)
     except urllib.error.HTTPError as e:
@@ -460,8 +467,8 @@ def cmd_auth_user(args):
     if not token:
         error_exit("未找到 GITEE_TOKEN，请运行 ae setup 配置", EXIT_AUTH_ERROR)
 
-    url = f"{GITEE_API}/user?access_token={token}"
-    result = api_request("GET", url)
+    url = f"{GITEE_API}/user"
+    result = api_request("GET", url, token=token)
     output({
         "login": result.get("login", ""),
         "name": result.get("name", ""),

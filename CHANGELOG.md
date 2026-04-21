@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.48.2 (2026-04-21) — ae git CLI 升级 Bearer header 鉴权 [`#IJC7PK`](https://gitee.com/turningsyn/ae-go/issues/IJC7PK)
+
+### 修复
+
+- **scripts/ae-git.py** — Gitee 网关已停用 `?access_token=xxx` query param 鉴权方式（请求直接 drop → 所有命令 timeout）。统一改走标准 `Authorization: Bearer <token>` HTTP header：
+  - `api_request()` 接收 `token` 参数后注入 Authorization header，URL 和 body 不再带 `access_token`
+  - 覆盖所有命令：`issues create/comment/get/list/list-comments/close/edit/edit-comment` + `upload-image` + `auth validate/user`
+  - 401/403 错误信息从"认证失败"改为"Token 无效或已过期"，附带重新生成 token 的链接，减少误判为网络问题
+- 移除 URL 中的 token → 规避 URL 日志/Referer 泄露风险
+
+### 验证
+
+- `python3 scripts/ae-git.py auth user` → 返回 login/name/id（HTTP 200）
+- `python3 scripts/ae-git.py issues list --repo ae-go` → 正常返回 issue 列表
+- `python3 scripts/ae-git.py issues list --repo ae-go --token invalid_xyz` → exit 2 + "Token 无效或已过期 (HTTP 401)"
+- 抓包确认：请求头含 `Authorization: Bearer …`，URL 中无 `access_token`
+
 ## v0.48.1 (2026-04-20) — ae-app-to-speckit 修复图片上传测试失效 [`#IJB5M5`](https://gitee.com/turningsyn/ae-pm/issues/IJB5M5)
 
 ### 修复
