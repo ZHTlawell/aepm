@@ -1,12 +1,3 @@
-# Builder 周期节奏对齐 Prompt
-
-> **用法**：启动 Claude Code 后把下面代码块整段粘贴进去。Claude 作为"节奏教练"帮你对齐当前阶段、下一个对齐时点、该阶段的交付物，让你不掉队。
-> **适用**：已经或即将开始新产品开发的 Builder（不限新老），每进入新一周或新阶段可重新跑一次。
-> **与 `engineer-bootstrap-prompt.md` 的关系**：那份讲"技术怎么做"（M0→M3 工具链编排），本份讲"节奏怎么对齐 + 每个时点交付什么"。两份可并用。
-
----
-
-```
 你是一个 AE Team Builder 节奏教练，帮助我对齐新产品开发的周期节奏、识别下一个对齐时点、确认该阶段该交付什么。请严格按下面的流程和我互动，**一次只问一个问题，等我回答后再推进**。
 
 ## 背景（你必须知道）
@@ -111,28 +102,3 @@
 - 每次回复不超过 10 行
 
 开始吧，先问我 Stage 0 的第一个问题。
-```
-
----
-
-## 使用说明
-
-### 什么时候用本 prompt
-
-- **新阶段开始**：从 idea 阶段推进到 Demo / TestFlight / 打分等新阶段时，粘贴一次做对齐
-- **每周节奏检查**：周一 / 周五等时点前，粘贴一次确认交付到位
-- **卡壳迷茫时**：不知道下一个对齐点是什么时，粘贴让 Claude 帮你梳理
-
-### 本 prompt vs `engineer-bootstrap-prompt.md`
-
-| 场景 | 用哪份 |
-|------|--------|
-| 完全空白起步，要从 idea 走到 TestFlight | `engineer-bootstrap-prompt.md` |
-| 已经在做产品，需要对齐周期节奏 / 交付物 / 卡点路由 | 本 prompt |
-| 两者并不冲突，可以在不同阶段各跑一次 | — |
-
-### 延伸阅读
-
-- [ae-pm-flow.md](ae-pm-flow.md) — M0→M3 技术流程图
-- [issue-template.md](issue-template.md) — 主 tracking issue 模板（Part A + Part B Wave 评论）
-- [README.md](README.md) — 本目录定位与使用路径

@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.50.1 (2026-04-22) — builder-kickoff 重构为 README 入口 + 子 prompt 结构 [`#IJDC46`](https://gitee.com/turningsyn/ae-pm/issues/IJDC46)
+
+### 改动（docs/builder-kickoff/ 内部结构调整）
+
+- **`README.md` 重写为入口 prompt** — 作为"入门教练"做分诊 + 路由，不再是目录导览文档。组织内部人员直接把 README 整个粘贴到 Claude Code，由 Claude 根据产品状态（A-E）和意图路由到对应子 prompt
+- **`engineer-bootstrap-prompt.md` 格式统一** — 去掉外层 README 包装 + 内嵌代码块，与 `builder-cadence-prompt.md` 对齐为纯 prompt 格式
+- **子 prompt 引用路径统一为绝对路径** `~/.ae/pm/docs/builder-kickoff/...`，避免工程师在任意 cwd 启动 Claude Code 时读不到
+
+新结构：
+```
+README.md (入口 prompt，分诊+路由)
+├── engineer-bootstrap-prompt.md  (技术流程子 prompt)
+├── builder-cadence-prompt.md     (周期节奏子 prompt)
+├── ae-pm-flow.md                 (资源：M0→M3 流程图)
+└── issue-template.md             (资源：tracking issue 模板)
+```
+
+README Stage 2 定义了切换指令表（"切到节奏对齐" / "回到技术流程" / "建 repo 怎么做" / "TestFlight 前规范检查" 等），使用者过程中可随时跳转。
+
+### 验证
+
+- `bash scripts/build.sh pm` → `dist/pm/docs/builder-kickoff/` 五份文件齐备
+- 三份 prompt 首行均直接进入 prompt 主体，无外层 README / 代码块包装
+
 ## v0.50.0 (2026-04-22) — 新增 docs/ 目录 + Builder 入门引导（内部文档） [`#IJDBZ3`](https://gitee.com/turningsyn/ae-pm/issues/IJDBZ3)
 
 ### 新增（内部文档，非用户运行时）

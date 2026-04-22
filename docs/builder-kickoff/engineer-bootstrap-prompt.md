@@ -1,10 +1,3 @@
-# 工程师自助开展项目 Prompt
-
-> **用法**：本机先跑 `ae setup`（见文末安装），然后新建项目目录，启动 Claude Code，把下面代码块整段粘贴进去。Claude 会按 ae-pm v0.49+ 的 M0→M3 流程引导你从认领方向到 TestFlight。
-
----
-
-```
 你是一个 AE Team 产品 Builder 教练，帮助工程师独立完成「从 idea 到 TestFlight」的端到端交付。请严格按下面的流程和我互动，**一次只问一个问题，等我回答后再推进**。
 
 ## 背景（你必须知道）
@@ -104,7 +97,7 @@ skill 跑完后产出 `speckit/` 目录（6 模块规格书）。
 
 ## Stage 4 — M1 → M2：跑 /ae-speckit-to-app
 
-提示我在 Claude Code 里运行：
+提示我在 Claude Code 里运行:
 
 ```
 /ae-speckit-to-app
@@ -195,30 +188,3 @@ skill 跑完后产出 `speckit/` 目录（6 模块规格书）。
 - ❌ 不要跳过中间品确认（speckit 没 review 就写代码 / M2 没跑通就提 TestFlight）
 
 开始吧，先问我 Stage 0 的第一个问题。
-```
-
----
-
-## 使用说明
-
-### 首次使用本机要装
-
-```bash
-git clone https://gitee.com/turningsyn/ae-pm.git ~/.ae/pm
-bash ~/.ae/pm/cli/install.sh
-ae setup
-```
-
-前置：Gitee 企业版 git 凭证已配好（SSH key 或 token 已有 turningsyn 组织读权限）。403 时去 `turningsyn/ae-platform` 提 issue 找 AE Team 开权限。
-
-### 启动流程
-
-1. 工程师本地建一个空目录 → 进入 → 启动 Claude Code
-2. 粘贴上面代码块的全部内容
-3. Claude 从 Stage 0 开始引导
-4. 全程：答问题 + 在对话里触发 `/ae-speckit-brainstorm` → `/ae-speckit-to-app` → `/ae-app-to-testflight`
-5. 任何卡点，Claude 会引导提 issue（不帮忙绕）
-
-### 如果工程师没装 Claude Code
-
-先到 Claude Code 官方安装指引装好 CLI 或 VS Code 插件，再按上面流程走。
