@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.50.2 (2026-04-22) — builder-kickoff 扁平化：合并单一 README + 资源，去装机 + 去 ~/.ae 路径 [`#IJDCIQ`](https://gitee.com/turningsyn/ae-pm/issues/IJDCIQ)
+
+### 改动
+
+- **删除** `docs/builder-kickoff/engineer-bootstrap-prompt.md` + `builder-cadence-prompt.md` — 两份 prompt 内容合并进 `README.md`
+- `README.md` 去掉装机 / Token / 403 / `ae setup` 相关段落（这些归属 ae-pm 主 README，不在内部文档里重复）
+- 所有路径引用改为同目录相对路径（`issue-template.md` / `ae-pm-flow.md`），不再写死 `~/.ae/pm/docs/...`（这是用户装机后的 runtime 路径，不该绑进"给有仓库权限 agent 读"的文档）
+- README 开头加一句前置说明：`本文档假设 ae-pm 已装好，装机流程见 ae-pm 仓库主 README`
+
+### 新结构（3 文件）
+
+```
+docs/builder-kickoff/
+├── README.md          ← 唯一 prompt（分诊 Stage 0 + 路径 A 技术流程 + 路径 B 周期节奏对齐）
+├── ae-pm-flow.md      ← 资源：M0→M3 流程图
+└── issue-template.md  ← 资源：tracking issue 模板
+```
+
+### 设计反思
+
+v0.50.0 两份并列 prompt → v0.50.1 三层路由 → v0.50.2 扁平化到单一 README。去掉了过度工程的分层 + 错误的"agent 依赖装机路径"假设。
+
+### 验证
+
+- `bash scripts/build.sh pm` → `dist/pm/docs/builder-kickoff/` 三份文件齐备
+- `grep '~/.ae/pm\|ae setup' README.md` → 无匹配
+
 ## v0.50.1 (2026-04-22) — builder-kickoff 重构为 README 入口 + 子 prompt 结构 [`#IJDC46`](https://gitee.com/turningsyn/ae-pm/issues/IJDC46)
 
 ### 改动（docs/builder-kickoff/ 内部结构调整）
