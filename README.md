@@ -104,15 +104,19 @@ PM 产品线路线定调为 **Route B**（Route A 不再维护）：
 ### 一键搭建（推荐）
 
 ```bash
-# 1. 安装 ae CLI（只需一次）
-curl -sSL https://raw.githubusercontent.com/ligenjian001-ai/ae-platform/master/cli/install.sh | sh
+# 1. 克隆 ae-pm 并运行安装脚本（首次安装）
+git clone https://gitee.com/turningsyn/ae-pm.git ~/.ae/pm
+bash ~/.ae/pm/cli/install.sh
 
 # 2. 一键搭建环境（安装依赖 + 配置 Token + 入驻确认）
 ae setup
 ```
 
+> 首次 `git clone` 需要你已在本机配置好 Gitee 企业版 git 凭证（`git config user.name/email` + 通过 SSH key 或 token 有 turningsyn 组织的读取权限）。如果 clone 报 403，联系 AE Team 开通权限。
+
+`bash install.sh` 会把 ae CLI 软链到 `~/.ae/bin/ae`，并尝试克隆 ae-go / ae-dev（已有则跳过）。
+
 `ae setup` 会自动完成：
-- 克隆 ae-pm / ae-dev 仓库到 `~/.ae/`
 - 交互式配置 Gitee Token（引导你生成并验证）
 - 环境健康检查
 - 自动完成入驻确认
@@ -254,7 +258,7 @@ ae pm submit-bug "问题标题" "问题描述"
 
 查看 [CHANGELOG.md](CHANGELOG.md) 了解完整更新记录。
 
-当前版本：**v0.49.0**
+当前版本：**v0.49.1**
 
 ## 由谁维护
 

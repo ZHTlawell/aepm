@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.49.1 (2026-04-22) — 修复 README 一键安装 URL 失效 [`#II8UYE`](https://gitee.com/turningsyn/ae-pm/issues/II8UYE)
+
+### 修复
+
+- **`templates/pm/README.md` "一键搭建" 段** — 原 `curl -sSL https://raw.githubusercontent.com/ligenjian001-ai/ae-platform/.../install.sh | sh` 一行安装命令指向的 GitHub 个人账号 raw URL **HTTP 404**，且 URL 混淆了公司 Gitee 企业版业务与个人 GitHub 账号边界。
+- 改为 `git clone https://gitee.com/turningsyn/ae-pm.git ~/.ae/pm && bash ~/.ae/pm/cli/install.sh` 两步流程：
+  - 业务代码全程留在 Gitee 企业版（turningsyn）内部
+  - 不再依赖任何匿名公共 raw URL（Gitee 企业版天然禁用匿名 raw）
+  - install.sh 已支持"pm 目录已存在则跳过 clone"逻辑，新老流程完全兼容
+- 新增"首次 clone 需要 Gitee 企业版 git 凭证"前置条件说明，避免 403 困惑
+
+### 验证
+
+- `grep -rn "raw.githubusercontent.com/ligenjian001-ai" templates/` → 零命中
+- README "一键搭建" 段落替换后可被 PM 按新步骤跑通
+
 ## v0.49.0 (2026-04-22) — PM 产品线结构性重写：M0→M3 中间品流水线 [`#IJC8D4`](https://gitee.com/turningsyn/ae-platform/issues/IJC8D4) [`#II8UYE`](https://gitee.com/turningsyn/ae-pm/issues/II8UYE)
 
 ### 重大变更
