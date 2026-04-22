@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.50.0 (2026-04-22) — 新增 docs/ 目录 + Builder 入门引导（内部文档） [`#IJDBZ3`](https://gitee.com/turningsyn/ae-pm/issues/IJDBZ3)
+
+### 新增（内部文档，非用户运行时）
+
+- **`docs/builder-kickoff/`** — 面向有 ae-pm repo 权限的组织内部人员（AE Team 成员 / 被授权 builder）的入门引导材料：
+  - `README.md` — 目录定位 + 两份 prompt 场景区分
+  - `engineer-bootstrap-prompt.md` — **技术流程引导**（8 Stage M0→M3 薄 orchestrator，顺序触发 `/ae-speckit-brainstorm` → `/ae-speckit-to-app` → `/ae-app-to-testflight`）
+  - `builder-cadence-prompt.md` — **周期节奏对齐**（认领 → Demo → TestFlight → 打分 → 迭代 + TestFlight 前 Onboarding/Paywall/Survey/求好评/求评分规范硬关卡）
+  - `ae-pm-flow.md` — M0→M3 流程图 + 工程师 7 步人话版
+  - `issue-template.md` — 产品 tracking issue 模板（Part A body + Part B Wave 评论）
+
+### 改动
+
+- `scripts/build.sh` — 新增通用 `templates/<role>/docs/` 打包逻辑（以后任意角色新增 docs 自动打包）
+
+### 打磨原则
+
+- 去团队特指 / 去人名（用"产品负责人"/"签名负责人"等通用角色）
+- 时间锚点相对化（周期节奏，具体日期由产品负责人在启动时告知）
+- 黑话首次出现加解释（Route B / BCStoreKit / ATT / ASC 等）
+- 卡点继续策略具体化（workaround → 并行 P0 阻塞项 → `[blocking]` 加急）
+- 两份 prompt 定位互补（技术流程 vs 周期节奏），不重复
+
+### 验证
+
+- `bash scripts/build.sh pm` → `dist/pm/docs/builder-kickoff/` 五份文件齐备
+- 人名 / 地域 / 内部黑话全量 grep 扫描无残留
+
 ## v0.49.1 (2026-04-22) — 修复 README 一键安装命令 [`#II8UYE`](https://gitee.com/turningsyn/ae-pm/issues/II8UYE)
 
 ### 修复
