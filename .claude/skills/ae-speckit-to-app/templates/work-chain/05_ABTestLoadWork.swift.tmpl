@@ -1,0 +1,18 @@
+//
+//  ABTestLoadWork.swift
+//  {{PRODUCT_NAME}}
+//
+//  来源: bible-ios-template / 2026-04-15
+//  Work Chain 第 5 步 (TS-022 / TS-025)
+//
+
+import AppImports
+
+class ABTestLoadWork: WorkVoidCallbackTask {
+    func work(_ callback: @escaping VoidCallback) {
+        Task {
+            await BCABTest.shared.preload(types: ABTestType.preloadTypes, force: true)
+            await MainActor.run { callback() }
+        }
+    }
+}

@@ -88,7 +88,7 @@ EOF
         fi
     fi
 
-    # Playwright MCP（go/pm/all 均需要：ae-web-browse + ae-testflight-publish）
+    # Playwright MCP（go/pm/all 均需要：ae-web-browse + ae-app-to-testflight）
     if command -v claude &>/dev/null; then
         if claude mcp list 2>/dev/null | grep -qi "playwright"; then
             ok "  Playwright MCP: 已连接"

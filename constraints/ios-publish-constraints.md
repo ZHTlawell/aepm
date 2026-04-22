@@ -248,7 +248,7 @@ Button("Submit", action: submit)
 
 ### `ios-pub-120` 建议接入 Firebase Analytics + Adjust
 
-无埋点的 TestFlight 等于盲测；无 Adjust 的投放无法做归因。详见 `/ae-analytics-setup`。
+无埋点的 TestFlight 等于盲测；无 Adjust 的投放无法做归因。详见 `/ae-analytics-integrate`。
 
 ### `ios-pub-130` 付费功能必须实现 Restore Purchases
 

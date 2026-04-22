@@ -1,0 +1,121 @@
+source "https://cdn.cocoapods.org"
+
+platform :ios, "15.0"       # TS-003
+use_frameworks!
+inhibit_all_warnings!
+
+# TS-002: 必须同时配置 V1 + V2 两个私有源
+GITLAB_BASE_URL = "https://gitlab.bytescell.net/components/ios/2.0"
+GITLAB_LocalPath = "../../Components/2.0"
+
+GITLAB_BASE_URLV1 = "https://gitlab.bytescell.net/components/ios"
+GITLAB_LocalPathV1 = "../../Components"
+
+ENV["COCOAPODS_TIMEOUT"] = "600"
+
+# 第三方（公开 CocoaPods）
+def thirdlib
+  pod "SnapKit",                      "5.7.1"
+  pod "CTMediator",                   "48"
+  pod "IQKeyboardManager",            "6.5.19"
+  pod "lottie-ios",                   "4.5.2"
+  pod "Toast-Swift",                  "~> 5.1.1"
+  pod "SKPhotoBrowser",               "7.1.0"
+  pod 'Popovers',                     "1.3.0"
+  pod 'MJRefresh',                    "3.7.9"
+end
+
+# 本地业务 Pod — TS-004
+def local
+  pod "AppImports",         :path => "Locals/AppImports"
+  pod "AppModels",          :path => "Locals/AppModels"
+  pod "AppRepository",      :path => "Locals/AppRepository"
+  pod "DeleteAccountPage",  :path => "Locals/DeleteAccountPage"
+  pod "BCConfig",           :path => "Locals/BCConfig"
+  pod "AppSettings",        :path => "Locals/AppSettings"
+  pod "Welcome_01",         :path => "Locals/Welcome_01"
+  pod "Welcome_02",         :path => "Locals/Welcome_02"
+  pod "Welcome",            :path => "Locals/Welcome"
+  pod "BCCameraController", :path => "Locals/BCCameraController"
+  pod "BCAppSearch",        :path => "Locals/BCAppSearch"
+  # 业务模块 — 按产品替换
+  pod "{{PRODUCT_NAME}}",   :path => "Locals/{{PRODUCT_NAME}}"
+end
+
+# Debugger（V2 私有源）
+def debug
+  pod "BCDebuggerExtension", :git => "#{GITLAB_BASE_URL}/bc_debugger_extension.git"
+  pod "BCDebugger",          :git => "#{GITLAB_BASE_URL}/bc_debugger.git",           :tag => '1.0.0', :configurations => ['Debug']
+  pod "BCAnalyticsDebugger", :git => "#{GITLAB_BASE_URL}/bc_analytics_debugger.git", :tag => '1.0.1', :configurations => ['Debug']
+end
+
+# BytesCell 核心组件（V2 + V1 混用）— TS-010~015 必须走这些封装
+def components
+  pod "AppGroupCore",            :git => "#{GITLAB_BASE_URL}/app_group_core.git",           :tag => "1.23.0"
+  pod "BCCache",                 :git => "#{GITLAB_BASE_URL}/bc_cache.git",                  :tag => "1.2.0"
+  pod "BCStoreKit",              :git => "#{GITLAB_BASE_URL}/bc_storekit.git",               :tag => "1.4.0"    # TS-012/015
+  pod "BCUtils",                 :git => "#{GITLAB_BASE_URL}/bc_utility.git",                :tag => "2.1.2"
+  pod "BCWidget",                :git => "#{GITLAB_BASE_URL}/bc_widget.git",                 :tag => "1.15.2"
+  pod "BCLocalization",          :git => "#{GITLAB_BASE_URL}/bc_localization.git",           :tag => "1.6.1"
+  pod "BCWebImage",              :git => "#{GITLAB_BASE_URL}/bc_webimage.git",               :tag => "1.4.2"
+  pod "BCMessageApiBasicModel",  :git => "#{GITLAB_BASE_URL}/bc_message_api_basic_model.git",:tag => "1.2.2"
+  pod "BCConfigExtension",       :git => "#{GITLAB_BASE_URL}/bc_config_extension.git",       :tag => "1.5.0"
+  pod "BCAccountExtension",      :git => "#{GITLAB_BASE_URL}/bc_accountextension.git",       :tag => "1.7.1"
+  pod "BCAccount",               :git => "#{GITLAB_BASE_URL}/bc_account.git",                :tag => "1.8.0"    # TS-023
+  pod "BCSensor",                :git => "#{GITLAB_BASE_URL}/bc_sensor.git",                 :tag => "1.4.1"    # TS-011/026
+  pod "BCAnalyticsUI",           :git => "#{GITLAB_BASE_URL}/bc_analytics_ui.git",           :tag => "1.2.0"
+  pod "BCAwsUploader",           :git => "#{GITLAB_BASE_URL}/bc_aws_uploader.git",           :tag => "1.2.0"
+  pod "BCAdjust",                :git => "#{GITLAB_BASE_URL}/bc_adjust.git",                 :tag => "1.0.1"    # TS-010
+  pod "BCUserNotification",      :git => "#{GITLAB_BASE_URL}/bc_user_notification.git",      :tag => "1.0.2"
+  pod "BCNetwork",               :git => "#{GITLAB_BASE_URL}/bc_network.git",                :tag => "1.5.2"    # TS-013
+  pod "BCImageProcess",          :git => "#{GITLAB_BASE_URLV1}/bc_imageprocess.git",         :tag => "1.0.0"    # V1! 权限检查见 precheck P1
+  pod "SwiftUIIntrospect",       :git => "#{GITLAB_BASE_URL}/swiftui-introspect.git",        :tag => "1.0.1"
+  pod "BCFeedback",              :git => "#{GITLAB_BASE_URL}/bcfeedback.git",                :tag => "1.6.0"
+  pod "BCShare",                 :git => "#{GITLAB_BASE_URL}/bcshare.git",                   :tag => "1.2.1"
+  pod "BCImagePicker",           :git => "#{GITLAB_BASE_URL}/bc_imagepicker.git",            :tag => "1.4.0"
+  pod "BCPermission",            :git => "#{GITLAB_BASE_URL}/bc_permission.git",             :tag => "1.1.0"
+  pod "BCAppReviewPrompt",       :git => "#{GITLAB_BASE_URL}/bcappreviewprompt.git",         :tag => "1.4.2"
+  pod "BCText",                  :git => "#{GITLAB_BASE_URL}/bctext.git",                    :tag => "1.0.7"
+  pod "WaterfallGrids",          :git => "#{GITLAB_BASE_URL}/waterfallgrids.git",            :tag => "1.0.0"
+  pod "BCCamera",                :git => "#{GITLAB_BASE_URL}/bc_camera.git",                 :tag => "1.1.0"
+  pod "CL10nKit",                :git => "#{GITLAB_BASE_URL}/CL10nKit.git",                  :tag => "1.10.2"
+  pod "BCAssetKit",              :git => "#{GITLAB_BASE_URL}/bcassetkit.git",                :tag => "1.4.2"
+  pod "LegalPrompt",             :git => "#{GITLAB_BASE_URL}/legalprompt.git",               :tag => "1.1.1"
+  pod "BCImageCropper",          :git => "#{GITLAB_BASE_URL}/bcimagecropper.git",            :tag => "1.0.1"
+end
+
+# 付费墙 base — 子类见 templates/purchase/BCPurchaseUIBase.swift.tmpl
+def basevip
+  pod "BCPurchaseBasicUI", :git => "#{GITLAB_BASE_URL}/bc_purchase_basic_ui.git", :tag => "1.5.1"
+end
+
+# 付费墙皮肤分支
+# bible-app 踩坑 F4：默认模板引用 plant/07 会显示植物主题，必须改为本产品分支
+# 方案 A: 让龙哥创建 {{PRODUCT_NAME_LOWER}}/07 分支
+# 方案 B: 不加载皮肤，纯靠 PurchaseUI{{MEMO}}ViewController 子类覆盖（推荐）
+def vip
+  pod "BCPurchaseUI_07", :git => "#{GITLAB_BASE_URL}/bc_purchaseui.git", :branch => "{{VIP_BRANCH}}"
+  # 例: branch => "bible/07"
+end
+
+target "Template" do
+  thirdlib
+  debug
+  components
+  basevip
+  vip
+  local
+end
+
+post_install do |installer|
+  installer.generated_projects.each do |project|
+    project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings["CODE_SIGN_IDENTITY"] = ""
+        if config.build_settings["IPHONEOS_DEPLOYMENT_TARGET"].to_f < 15.0
+          config.build_settings["IPHONEOS_DEPLOYMENT_TARGET"] = "15.0"
+        end
+      end
+    end
+  end
+end

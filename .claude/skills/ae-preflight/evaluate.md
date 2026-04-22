@@ -26,9 +26,9 @@
 - **Expect**: Skill 在 Phase 6 中列出可自动修复的项目表格（无 .gitignore → 生成标准模板；无 PrivacyInfo.xcprivacy → 生成骨架；API Key 硬编码 → 提取到 Secrets.plist），区分"需要 PM 确认"和"直接修"两类。对需要人工操作的 blocker（如 Xcode 登录 Apple ID）给出明确操作步骤，不尝试自动修复。
 - **Max Time**: 120s
 
-### Story 5: 与 ae-testflight-publish 的流程衔接
+### Story 5: 与 ae-app-to-testflight 的流程衔接
 - **Prompt**: "preflight 全部通过了，下一步该做什么？"
-- **Expect**: Skill 在 Phase 7 写入 `publish-state.yaml`（status: done，scanned_at 日期，blockers/warnings 列表），并在报告 NEXT STEPS 中明确引导用户：签名阻塞 → `/ae-testflight-publish`；资产缺失 → `/ae-store-assets`；埋点缺失 → `/ae-analytics-setup`；编译通过 → 直接进入 `/ae-testflight-publish` Phase 3-4。体现 skill 之间的流程衔接。
+- **Expect**: Skill 在 Phase 7 写入 `publish-state.yaml`（status: done，scanned_at 日期，blockers/warnings 列表），并在报告 NEXT STEPS 中明确引导用户：签名阻塞 → `/ae-app-to-testflight`；资产缺失 → `/ae-store-assets`；埋点缺失 → `/ae-analytics-integrate`；编译通过 → 直接进入 `/ae-app-to-testflight` Phase 3-4。体现 skill 之间的流程衔接。
 - **Max Time**: 60s
 
 You've hit your limit · resets 2am (Asia/Shanghai)
@@ -47,7 +47,7 @@ You've hit your limit · resets 2am (Asia/Shanghai)
 | 指定 App Store 目标的完整检查 | 2/5 | 57.0s | Skill 预判路径不可访问，未实际尝试 | 直接给出 workaround 指引而非尝试 ls/访问目标路径，过度保守 |
 | 项目路径不存在或非 iOS 项目 | 4/5 | 40.0s | 耗时超出 30s 上限 | 输出结构化 PREFLIGHT REPORT，正确在 Phase 0 终止，格式规范，BLOCKER 识别准确 |
 | BLOCKERS 准确识别与修复建议 | 1/5 | 65.5s | 无法处理上下文follow-up场景 | 未识别为后续问题，仅回复"项目路径是什么"，未输出任何修复建议 |
-| 与 ae-testflight-publish 流程衔接 | 0/5 | 35.6s | API 速率限制 | 触发 rate limit，无任何输出，无法评估 skill 衔接能力 |
+| 与 ae-app-to-testflight 流程衔接 | 0/5 | 35.6s | API 速率限制 | 触发 rate limit，无任何输出，无法评估 skill 衔接能力 |
 
 ## 瓶颈分析
 - **测试环境缺乏真实 iOS 项目**：Story 1/2/4 均因无实际 iOS 项目可扫描而无法展示核心能力（Phase 1-6），建议测试环境预置一个包含典型问题的 scaffold iOS 项目（含 .xcodeproj、硬编码 key、缺失 PrivacyInfo 等）

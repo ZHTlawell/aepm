@@ -1,0 +1,86 @@
+//
+//  ConversionPageWork.swift
+//  {{PRODUCT_NAME}}
+//
+//  来源: bible-ios-template / 2026-04-15 ~ 04-16
+//  Work Chain 第 12 步 (TS-022 / TS-024)
+//
+//  关键点：
+//  - BCPurchaseUIManager.open 通过 NSClassFromString("PurchaseUI{{MEMO}}ViewController") 加载子类
+//  - 单次冷启动避免叠加 onboarding 自带的 paywall：消费一次 hasShownOnboardingPaywallThisSession
+//  - launchvipShowtimesPerday AB 控制当日弹出上限
+//
+
+import AppImports
+import BCStoreKit
+import BCPurchaseBasicUI
+
+class ConversionPageWork: WorkVoidCallbackTask {
+    func work(_ callback: @escaping VoidCallback) {
+        guard let topvc = UIApplication.shared.keyWindow?.rootViewController else {
+            BCTrack.track("conversionpageWork_notopvc")
+            callback()
+            return
+        }
+        launchOpen(controller: topvc, isHistoryVip: PurchaseUI.isHistoryVip, callback: callback)
+    }
+
+    private func launchOpen(controller: UIViewController,
+                            isHistoryVip: Bool,
+                            callback: @escaping VoidCallback) {
+        guard shouldShowRechargeView() else { callback(); return }
+        let vc = open(type: .addChild, controller: controller, isHistoryVip: isHistoryVip) { _ in callback() }
+        if vc == nil { callback() }
+    }
+
+    private func open(type: BCPurchaseOpenType,
+                      controller: UIViewController,
+                      isHistoryVip: Bool,
+                      callback: @escaping BoolCallback) -> UIViewController? {
+        let isHistoryVip = PurchaseUI.isHistoryVip
+        let info: BCPurchaseInfo = .init(
+            memo: PurchaseUI.defaultLaunchMemo.memo,
+            historyMemo: PurchaseUI.defaultHistoryMemo.memo,
+            isInHistory: isHistoryVip,
+            closeAlpha: isHistoryVip ? PurchaseUI.defaultHistoryMemo.closeAlpha : PurchaseUI.defaultLaunchMemo.closeAlpha,
+            from: "launch"
+        )
+        return BCPurchaseUIManager.open(type: type, info: info, from: controller, completion: callback)
+    }
+
+    private func shouldShowRechargeView() -> Bool {
+        if BCAccount.isVip { return false }
+        // 单次会话避免叠加 onboarding paywall
+        let kOnboardingPaywallShown = "hasShownOnboardingPaywallThisSession"
+        if UserDefaults.standard.bool(forKey: kOnboardingPaywallShown) {
+            UserDefaults.standard.removeObject(forKey: kOnboardingPaywallShown)
+            return false
+        }
+        let kVipAlertDate = "kVipAlertDate"
+        let kVipAlertCount = "kVipAlertCount"
+        var ret = false
+        let maxCount = self.maxCount
+        if !BCAccount.isVip && maxCount > 0 {
+            let canOpenVipBuyPage = BCNetworkReachabilityTool.isReachable
+            if canOpenVipBuyPage {
+                ret = true
+                if let alertDate: Date = BCCache.object(key: kVipAlertDate) {
+                    if alertDate.bc_isToday {
+                        let alertCount = BCCache.intValue(key: kVipAlertCount) ?? 0
+                        if alertCount >= maxCount { return false }
+                        BCCache.setInt(alertCount + 1, key: kVipAlertCount)
+                        return true
+                    }
+                }
+                BCCache.setObject(Date(), key: kVipAlertDate)
+                BCCache.setInt(1, key: kVipAlertCount)
+            }
+        }
+        return ret
+    }
+
+    private var maxCount: Int {
+        let defaultValue = ABTestType.launchvipShowtimesPerday.defaultValue.intValue ?? 1
+        return BCABTest.shared.syncFetchType(ABTestType.launchvipShowtimesPerday, defaultValue: defaultValue)
+    }
+}

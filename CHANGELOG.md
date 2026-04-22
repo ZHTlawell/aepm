@@ -1,5 +1,72 @@
 # Changelog
 
+## v0.49.0 (2026-04-22) — PM 产品线结构性重写：M0→M3 中间品流水线 [`#IJC8D4`](https://gitee.com/turningsyn/ae-platform/issues/IJC8D4) [`#II8UYE`](https://gitee.com/turningsyn/ae-pm/issues/II8UYE)
+
+### 重大变更
+
+整条 PM 产品线围绕 **4 个人类可确认中间品（M0 Idea → M1 Speckit → M2 本地可用程序 → M3 TestFlight）** 重新组织，替代原 Phase 0-7 结构。skill 职责按中间品边界重新切分，并明确"skill = 中间品之间的变换"这一设计原则。
+
+### 新增 skill
+
+- **`/ae-speckit-to-app`** 🆕 — M1→M2 核心段。承载 Route B 约束（CocoaPods + BCStoreKit + BCSensor + BCAdjust + BCNetwork + Work Chain 12 步）+ 代码模板包，作为薄 harness 透传给外部构建环境。内部 precheck 吸收自原 `/ae-preflight`。
+- **`/ae-speckit-brainstorm`** 🆕 — M0→M1 集合。从零与 PM 对话共创 Speckit，填补"没有 demo、没有参考 App、只有想法"这一起点的入口缺口。
+
+### 改名
+
+- **`/ae-analytics-setup` → `/ae-analytics-integrate`** — M2→M3 段的埋点接入 skill 改名，命名与中间品变换语义对齐。
+- **`/ae-testflight-publish` → `/ae-app-to-testflight`** — M2→M3 段的 TestFlight 分发 skill 改名，命名格式统一为"起点中间品→终点中间品"。
+
+### 废弃
+
+- **`/ae-superwall-setup`** — Route A 遗产，目录已删除。Route B 下支付集成收敛至 BCStoreKit，由 `/ae-speckit-to-app` 内置约束。
+
+### 归档为 utility
+
+下列 skill 不在主线 M0→M3 流水线上，但保留为按需使用的 utility，源码仍在 `skills/pm/`：
+
+- `/ae-verify-app` — E2E 对比 demo vs 成品
+- `/ae-file-bugs` — 从 verify 报告批量提 bug
+- `/ae-demo-to-figma` — 原型转 Figma
+- `/ae-image-decopyrighter` — 图片去版权化
+- `/ae-prod-to-local` — 线上代码转本地原型
+
+### 移出主线（另议）
+
+下列能力暂时移出 M0→M3 主线，源码保留供参考，路线和需求另议：
+
+- `/ae-app-review-check` — App Store 审核自检（M3 之后另议）
+- `/ae-asc-submit` — ASC 元数据提交审核（M3 之后另议）
+- `/ae-prod-data-feedback-report` — 产品数据反馈报告（Stage 5 另议）
+- `/ae-preflight` — 已融入 `/ae-speckit-to-app` 内部 precheck，不再独立触发；目录暂保留供参考。
+
+### 路线定调
+
+- **Route B**（唯一维护路线）：CocoaPods 依赖管理 + BCStoreKit + BCSensor + BCAdjust + BCNetwork + Work Chain 12 步构建流水线。所有约束内置在 `/ae-speckit-to-app` 中，由 skill 透传给外部 harness。
+- **Route A** 不再维护（`/ae-superwall-setup` 随之废弃）。
+
+### 设计原则
+
+1. **Skill = 人类可确认中间品之间的变换** — 每段 skill 有明确输入输出中间品（M0/M1/M2/M3），PM 可在中间品处停检。
+2. **Harness 薄，透传约束** — skill 不重复造轮子，把 Route B 约束和代码模板打包交给外部 harness（ae-dev / Claude Code）执行。
+3. **一次通过率为核心度量** — 每段 skill 的目标都是 first-pass yield，失败通过 `/ae-report-fix` 回流修复。
+
+### 验证
+
+经 agent team 三层验证全部通过：
+
+- **V1 构建**：`scripts/build.sh pm` 退出码 0；`dist/pm/.claude/skills/` 含 ae-speckit-to-app / ae-speckit-brainstorm / ae-analytics-integrate / ae-app-to-testflight；不含废弃 skill；README M0/M3 出现 16 次，Phase 0-7 零出现
+- **V2 元数据**：4 个新/改名 skill frontmatter 全部合法；18 个 skill 目录清单正确；交叉引用命中全部属于豁免（CHANGELOG 改名说明 / README 过渡对照）
+- **V3 Dogfood 编译**：
+  - L1 模板语法：16/16 `.swift.tmpl` `swiftc -parse` 零 error（Swift 6.2.1）
+  - L2 对比 `bible-ios-template` 真实代码：13 个 Work 模板 + BCConfig.swift.tmpl 与真实源**结构完全对齐**，diff 10-36% 全部来自注释本地化/格式优化/增值防御（如 06_UserInitWork 加 `DEBUG_SKIP_USERINIT` 逃逸）
+  - L3 真实工程编译：`xcodebuild -workspace Template.xcworkspace ... build` **BUILD SUCCEEDED**，所有私有源 Pod 框架成功编译
+
+### 关联
+
+- 主 issue: [`#IJC8D4`](https://gitee.com/turningsyn/ae-platform/issues/IJC8D4)（PM 产品线结构性重写）
+- Route B 路线: [`#II8UYE`](https://gitee.com/turningsyn/ae-pm/issues/II8UYE)
+- 埋点与支付整合: [`#II8RAE`](https://gitee.com/turningsyn/ae-pm/issues/II8RAE)
+
 ## v0.48.2 (2026-04-21) — ae git CLI 升级 Bearer header 鉴权 [`#IJC7PK`](https://gitee.com/turningsyn/ae-go/issues/IJC7PK)
 
 ### 修复

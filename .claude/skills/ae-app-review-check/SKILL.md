@@ -1,285 +1,165 @@
 ---
-description: "App Store 审核自检 — 对照 Apple Review Guidelines + AI 审核已知规则扫描项目"
+description: "App Store 审核自检 — 知识库驱动，按 Apple Guideline 分章节扫描项目 + 关联真实拒审案例"
 permissions:
   allow:
     - "Bash(grep *)"
     - "Bash(find *)"
-    - "Bash(xcodebuild -showBuildSettings:*)"
     - "Bash(plutil *)"
-    - "Bash(cat *)"
+    - "Bash(python3 scripts/app-review-scan.py *)"
+    - "Bash(python3 scripts/app-review-kb-lint.py *)"
+    - "Bash(python3 scripts/app-review-kb-feedback.py *)"
 dependencies:
   mcp: []
   cli:
-    - name: xcodebuild
-      verify: "xcodebuild -version"
+    - name: python3
+      verify: "python3 --version"
+    - name: pyyaml
+      verify: "python3 -c 'import yaml'"
     - name: plutil
       verify: "which plutil"
   api_keys: []
-  scripts: []
+  scripts:
+    - scripts/app-review-scan.py
+    - scripts/app-review-kb-lint.py
 smoke_test:
-  command: "xcodebuild -version"
+  command: "python3 scripts/app-review-kb-lint.py"
   expected_exit: 0
-  description: "xcodebuild available"
+  description: "kb entries lint clean"
 ---
 
 # Skill: App Store 审核自检 (ae-app-review-check)
 
 ## 触发条件
 
-当 PM 完成 TestFlight 验证、准备提交 App Store 审核时执行。典型场景：
-- TestFlight Build 验证通过，准备提审
-- 被 Apple 拒审后修复完成，重新自检
-- 不确定 App 是否符合审核规则
+- PM 完成 TestFlight 验证、准备提交 App Store 审核
+- 被 Apple 拒审后修复完成，需要复检
+- 不确定 App 是否符合某个 Guideline
 
 ## 核心原则
 
-**基于实际检测，不靠猜测。** 每个检查项必须有对应的 grep/find/plutil 命令验证，输出 pass/warn/fail + 具体文件和行号。
+**知识库驱动，不靠猜测。** 所有检查规则来自结构化 kb（按 Apple Guideline 章节组织），每条规则关联 Apple 官方条文 + 真实拒审案例 URL。kb 条目位于 `skills/pm/ae-app-review-check/kb/`，案例位于 `cases/cases.jsonl`。
 
 ## 输入
 
 | 输入 | 必填 | 说明 |
 |------|------|------|
 | iOS 项目路径 | 是 | 包含 .xcodeproj 或 project.yml 的根目录 |
-| 上次拒审原因 | 否 | 如有，针对性加强对应规则检查 |
+| ASC 元数据（Privacy Policy URL / Review Notes 等） | 否 | 如有，用于生成 Review Notes 草稿 |
+| 上次拒审邮件内容 | 否 | 触发反馈入库流程 |
 
 ## 执行流程
 
-### Phase 1: Guideline 2.1 — 性能 (App Completeness)
-
-检查 App 是否功能完整、无明显崩溃风险。
-
-**1a. 占位符 / TODO / 测试数据**
+### Phase 1: Lint & 环境检查
 
 ```bash
-# 检查代码中的占位符
-grep -rn "TODO\|FIXME\|HACK\|PLACEHOLDER\|lorem ipsum\|test@\|example\.com" --include="*.swift" . -i
-
-# 检查 UI 中的占位符文本
-grep -rn '"Lorem\|"Test \|"Sample \|"Placeholder\|"Coming Soon' --include="*.swift" .
+python3 scripts/app-review-kb-lint.py
 ```
 
-- 有匹配 → warn：审核员会认为 App 未完成
+确认 kb YAML 条目格式正确、case_refs 引用完整。lint 不通过不能继续。
 
-**1b. 空白页面 / 未实现功能**
+### Phase 2: 扫描
 
 ```bash
-# 检查空 View body
-grep -rn "Text(\".*Coming Soon\|EmptyView()\|fatalError(\"Not implemented" --include="*.swift" .
-
-# 检查 NavigationLink 指向空页面
-grep -rn "NavigationLink.*destination.*EmptyView\|NavigationLink.*destination.*Text(\"" --include="*.swift" .
+python3 scripts/app-review-scan.py --project-dir <iOS 项目路径> --output both --report-file review-check-report
 ```
 
-- 有匹配 → fail：未实现功能是 2.1 常见拒审原因
+脚本会：
+1. 从 `kb/` 递归加载所有 YAML 条目
+2. 按 chapter 顺序执行每条 `auto_checks` 下的规则
+3. 根据 `expected` + `match_pattern` 评估 pass/fail/warn/skip
+4. 输出 markdown 报告 + JSON 机读结果
 
-**1c. 崩溃风险：Force Unwrap**
+### Phase 3: 报告解读
 
-```bash
-# 高风险 force unwrap（排除 IBOutlet）
-grep -rn '![^=]' --include="*.swift" . | grep -v "IBOutlet\|@objc\|//\|guard\|if let\|!=\|!=" | head -20
-```
+报告分三档：
+- **FAIL**（severity=high 且 check 未通过）：大概率被拒，必须修
+- **WARN**（severity=medium/low 且 check 未通过）：降低拒审风险，建议修
+- **PASS**：当前检查通过
 
-- 大量 force unwrap → warn：建议检查是否有安全的 fallback
+每个 FAIL/WARN 项会：
+- 打印 Apple 精确错误码（如 ITMS-91053/91056/91061）
+- 附 `case_refs` 指向 `cases/cases.jsonl` 中的真实拒审案例 URL
+- 给出 `fix_suggestions` 修复路径
 
-### Phase 2: Guideline 2.3 — 准确的元数据
+### Phase 4: 已知扫描盲区 — 人工复核
 
-**2a. App 名称 vs Bundle Display Name**
+以下项目静态扫描覆盖不到，**PM 必须手动复核**：
 
-```bash
-# 获取 Bundle Display Name
-grep -r "CFBundleDisplayName\|CFBundleName" . --include="*.plist" -A 1
-```
+| 项目 | 如何验证 |
+|------|---------|
+| Superwall / RevenueCat / Adapty Paywall 远程配置 | 登录对应 dashboard，确认 Paywall 模板含 Terms of Service + Privacy Policy + 自动续费披露 |
+| ASC 后台截图 + 描述 | 登录 ASC，确认截图是真实运行截图（2.3.3），描述无占位符（2.3.1） |
+| App Icon 版权与原创性 | 人工确认图标非盗用、无蹭品牌 |
+| 内容合规（宗教/政治敏感性） | PM 自行判断 |
+| Review Notes demo account | 确认 demo 账号已注册 + 预置数据且可登录 |
 
-- 名称含 "beta"/"test"/"demo" → fail：元数据不准确
+### Phase 5: Review Notes 草稿生成
 
-**2b. 版本号合理性**
+从命中的 kb 条目 `review_notes_template` 字段拼装 Review Notes。例如：
+- 若 3.1.1 全部 pass → 自动拼一段 "All digital content purchases use StoreKit 2..."
+- 若 ai-attribution-sdk-detected 命中 → 拼一段 "The app uses Adjust SDK for internal attribution only..."
 
-```bash
-grep -r "CFBundleShortVersionString\|MARKETING_VERSION" . --include="*.plist" --include="project.yml" --include="*.pbxproj" -A 1
-```
+### Phase 6: 状态持久化
 
-- 版本号为 0.x 或 999.x → warn：看起来不是正式发布
-
-### Phase 3: Guideline 3.1 — 付费相关
-
-**3a. 订阅信息披露**
-
-```bash
-# 检查是否有订阅
-grep -rn "StoreKit\|Product\|Subscription\|purchase\|subscribe" --include="*.swift" . -i | head -10
-```
-
-如果有订阅：
-
-```bash
-# 检查是否有订阅条款展示
-grep -rn "Terms\|条款\|Privacy Policy\|隐私政策\|auto-renew\|自动续费\|subscription period\|cancel" --include="*.swift" . -i
-```
-
-- 有订阅但无条款展示 → fail：Guideline 3.1.2 要求在 Paywall 展示自动续费条款
-- 无 Restore Purchase 按钮 → fail：Guideline 3.1.1 要求
-
-**3b. Restore Purchase**
-
-```bash
-grep -rn "restorePurchases\|AppStore.sync\|Transaction.currentEntitlements\|restore" --include="*.swift" . -i
-```
-
-- 有订阅但无 restore 逻辑 → fail
-
-### Phase 4: Guideline 4.3 — Spam / 抄袭
-
-**4a. App 独特性**
-
-```bash
-# 检查是否有过多模板/样板代码标记
-grep -rn "Generated by\|Template\|Boilerplate\|starter kit" --include="*.swift" . -i | head -5
-```
-
-- 大量模板标记 → warn：可能被判定为 4.3 Spam
-
-**4b. 最低功能性**
-
-```bash
-# 统计 Swift 文件数和 View 数量
-find . -name "*.swift" -not -path "*/Pods/*" -not -path "*/.build/*" | wc -l
-grep -rn "struct.*View.*:.*View" --include="*.swift" . | wc -l
-```
-
-- View 少于 3 个 → warn：可能被判定功能不足
-
-### Phase 5: Guideline 5.1 — 隐私
-
-**5a. Privacy Policy URL**
-
-```bash
-# 检查项目中是否有 Privacy Policy URL 配置
-grep -rn "privacy.*policy\|privacyPolicy\|privacy_policy" --include="*.swift" --include="*.plist" . -i
-```
-
-- 无 Privacy Policy URL → fail：上架和外部 TestFlight 都需要
-
-**5b. 数据收集声明 vs 实际**
-
-```bash
-# 检查实际使用了哪些追踪/分析 SDK
-grep -rn "import Adjust\|import Firebase\|import AppTrackingTransparency\|ATTrackingManager" --include="*.swift" .
-```
-
-- 有追踪 SDK 但无 ATT 弹窗 → warn：iOS 14.5+ 需要 ATT
-
-**5c. PrivacyInfo.xcprivacy 完整性**
-
-```bash
-find . -name "PrivacyInfo.xcprivacy" -not -path "*/Pods/*" -exec cat {} \;
-```
-
-- 不存在 → fail
-- 存在但 privacy tracking 配置与实际 SDK 不匹配 → warn
-
-### Phase 6: Apple AI 自动审核已知规则
-
-Apple 已部署 AI 自动审核系统，以下是已知的检测模式：
-
-**6a. Attribution SDK 误判广告**
-
-```bash
-# 检查 Adjust / AppsFlyer / Branch 等归因 SDK
-grep -rn "import Adjust\|import AppsFlyerLib\|import Branch" --include="*.swift" .
-```
-
-- 有归因 SDK → warn：AI 可能误判为广告 App，Review Notes 中应主动说明用途
-
-**6b. Firebase Auth Demo Account 要求**
-
-```bash
-# 检查是否有 Firebase Auth 或任何登录
-grep -rn "import FirebaseAuth\|Auth.auth()\|signIn\|SignInView\|LoginView" --include="*.swift" .
-```
-
-- 有登录功能 → warn：Review Notes 必须提供 demo account（用户名 + 密码）
-
-**6c. WebView 包装检测**
-
-```bash
-# 检查 WebView 使用比例
-WEBVIEW_COUNT=$(grep -rn "WKWebView\|WebView\|SFSafariViewController" --include="*.swift" . | wc -l)
-NATIVE_VIEW_COUNT=$(grep -rn "struct.*:.*View" --include="*.swift" . | wc -l)
-echo "WebView refs: $WEBVIEW_COUNT, Native views: $NATIVE_VIEW_COUNT"
-```
-
-- WebView 引用远多于 Native View → fail：4.2 Minimum Functionality，纯 WebView 包装会被拒
-
-### Phase 7: 生成审核自检报告
-
-```
-═══════════════════════════════════════════════════
-  APP REVIEW CHECK — {项目名}
-  Date: {日期}
-═══════════════════════════════════════════════════
-
-FAIL (必须修复，否则大概率被拒):
-  ❌ [3.1.2] 有订阅但无自动续费条款展示 — PaywallView.swift
-  ❌ [5.1] 无 Privacy Policy URL 配置
-
-WARN (建议修复，降低拒审风险):
-  ⚠️ [AI审核] 有 Adjust SDK，Review Notes 应说明非广告用途
-  ⚠️ [2.1] 3 处 TODO 注释未清理 — SettingsView.swift:42, ...
-  ⚠️ [5.1] 有 Firebase Analytics 但未配置 ATT 弹窗
-
-PASS:
-  ✅ [2.1] 无空白页面或未实现功能
-  ✅ [2.3] Bundle Display Name 无测试标记
-  ✅ [4.3] 15 个独立 View，功能充分
-  ✅ [5.1] PrivacyInfo.xcprivacy 存在
-
-REVIEW NOTES 建议:
-  建议在 App Store Connect 的 Review Notes 中包含以下内容：
-  1. Adjust SDK 用于归因分析，非广告投放
-  2. [如有登录] Demo account: test@example.com / password123
-
-NEXT STEPS:
-  1. 修复所有 FAIL 项
-  2. 在 ASC 填入 Review Notes
-  3. 修复完成后重跑 /ae-app-review-check 确认
-  4. 全部 PASS 后进入 /ae-asc-submit
-═══════════════════════════════════════════════════
-```
-
-### Phase 8: 状态持久化
-
-将自检结果追加到 `publish-state.yaml`：
+将结果追加到项目的 `publish-state.yaml`：
 
 ```yaml
 app_review_check:
   status: pass | blocked
   checked_at: <ISO 日期>
-  fails:
-    - guideline: "3.1.2"
-      description: "有订阅但无自动续费条款展示"
-      file: "PaywallView.swift"
-  warns:
-    - guideline: "AI-attribution"
-      description: "Adjust SDK 需在 Review Notes 说明"
+  kb_version: <kb commit hash>
+  fails: [{guideline, check_id, evidence, case_refs}]
+  warns: [...]
   review_notes_draft: |
-    1. Adjust SDK is used for attribution analytics only, not for advertising.
+    ...
+  manual_review_required:
+    - "Verify Superwall paywall template includes Terms/Privacy links"
 ```
 
-## 已验证的约束
+### Phase 7: 拒审反馈入库（可选）
+
+若 PM 提供了 Apple 拒审邮件：
+
+```bash
+python3 scripts/app-review-kb-feedback.py --rejection-email <path>
+```
+
+（P3 实现）脚本会解析邮件文本 → 识别 Guideline → 生成新 case 条目 append 到 `cases.jsonl`，并可选更新 kb auto_checks。
+
+## kb 扩展指南
+
+### 新增 Guideline 条目
+
+1. 在 `kb/_sources/apple-official/` 下补充官方条文 fixture（标注 fetch 日期 + URL）
+2. 在 `kb/<chapter>/<guideline>-<slug>.yaml` 写条目，引用 fixture 中的原文
+3. 跑 `python3 scripts/app-review-kb-lint.py` 确认格式正确
+
+### 新增拒审案例
+
+1. 案例原文存 `kb/_sources/cases-raw/`
+2. 脱敏后追加到 `cases/cases.jsonl`（一行一个 JSON）
+3. kb 相关条目的 `case_refs` 字段加上新 case id
+
+## 已验证的约束（从 P1 扫描 bible-app 得出）
 
 | ID | 约束 | 发现场景 |
 |----|------|---------|
-| review-001 | 有订阅必须展示自动续费条款和 Restore Purchase | Guideline 3.1.1 / 3.1.2 |
-| review-002 | 外部 TestFlight 和 App Store 都需要 Privacy Policy URL | Guideline 5.1 |
-| review-003 | 有归因 SDK 时 Review Notes 主动说明用途 | Apple AI 审核误判 |
-| review-004 | 有登录功能时 Review Notes 必须提供 demo account | Apple AI 审核要求 |
+| review-001 | PrivacyInfo.xcprivacy 必须覆盖所有实际使用的 Required Reason API（至少 UserDefaults） | 2.3.1 ITMS-91053 |
+| review-002 | NSPrivacyTracking 声明必须与 tracking SDK 使用情况一致 | 2.3.1 声明矛盾 |
+| review-003 | 第三方 SDK 必须使用带 privacy manifest 的版本（Apple 清单 87 项） | 2.3.1 ITMS-91061 |
+| review-004 | API Key 必须外部化，不能硬编码到源码/plist | 2.3.1 安全风险 |
+| review-005 | 有订阅必须展示 Terms/Privacy/自动续费（Paywall 内而不是 Settings） | 3.1.2 |
+| review-006 | 有归因 SDK 必须在 Review Notes 主动说明用途 | AI 审核误判 |
+| review-007 | 有登录必须在 ASC Review Notes 提供 demo account | AI 审核要求 |
+| review-008 | 有账户注册必须提供账户删除入口 | 5.1.1(v) |
+| review-009 | 敏感 API（Camera/Location/Photos/Microphone）必须配置 Info.plist usage description | ITMS-90683 |
 
 ## 与其他 skill 的关系
 
 ```
 /ae-preflight → 代码就绪
     ↓
-/ae-testflight-publish → TestFlight 验证
+/ae-app-to-testflight → TestFlight 验证
     ↓
 /ae-app-review-check → 审核自检 ← 本 skill
     ↓
@@ -288,7 +168,8 @@ app_review_check:
 
 ## 已知限制
 
-- **无法覆盖所有审核规则** — Apple 有 100+ 条 Guidelines，本 skill 聚焦高频拒审原因
-- **AI 审核规则持续变化** — 已知规则基于 2026-04 的观察，需持续更新
-- **无法替代人工审核判断** — 内容合规（如宗教/政治敏感性）需 PM 自行判断
-- **不检查截图和描述** — 元数据内容由 `/ae-asc-submit` 负责
+- **无法覆盖所有 Apple Guideline 条款** — 当前 kb 覆盖 2.1/2.3.1/3.1.1/3.1.2/4.1/4.2/4.3/5.1.1 + 3 条 AI 审核规则。其他条款（1.x Safety / 5.1.3 Health 等）按需扩展
+- **AI 审核规则持续变化** — 本 kb 基于 2026-04 调研，需定期更新 fixture
+- **远程配置盲区** — Superwall/RevenueCat Paywall、ASC 截图与描述无法静态扫，依赖 PM 人工复核（Phase 4）
+- **内容合规判断** — 宗教/政治/地域敏感性仍需 PM 结合当地法律自行判断
+- **Apple Dev Forum 案例采集** — 目前只抓公开源（Reddit 被我的搜索工具屏蔽，CSDN/V2EX 可抓）。Apple Dev Forum 部分帖子需登录，由 PM 按需手动粘贴

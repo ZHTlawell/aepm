@@ -147,10 +147,12 @@ CLI 会自动加载 credentials、调用 Gitee API、返回 issue 链接。
 | App 逆向提取 Speckit | `/ae-app-to-speckit` — 从已上架 App 逆向生成 speckit（iPhone 真机探索 + 截图 + feature-checklist） | 可用（需 iPhone + USB + WDA） |
 | Onboarding 页面生成 | `/ae-onboarding-design` — 生成产品 Onboarding 幻灯片（HTML/CSS/JS，Superwall Flow 或 WebView） | 可用 |
 | Paywall 页面生成 | `/ae-paywall-design` — 生成 Paywall 付费墙页面（HTML 或 Native StoreKit 2） | 可用 |
-| 埋点接入 | `/ae-analytics-setup` — Firebase Analytics + Adjust SDK 双轨埋点（杭州团队协作） | 可用 |
-| Superwall 集成 | `/ae-superwall-setup` — Superwall 支付集成全流程（账号 + ASC 订阅 + SDK + StoreKit 2） | 可用 |
+| 埋点接入 | `/ae-analytics-integrate` — Firebase Analytics + Adjust SDK 双轨埋点（M2→M3 optional，杭州团队协作） | 可用 |
+| Speckit 头脑风暴 | `/ae-speckit-brainstorm` — 多 speckit 联合设计（merge 或 reference 双模式） | 🆕 v0.49.0 |
+| Speckit → 本地可用程序 | `/ae-speckit-to-app` — Route B 选型约束 + 代码模板包（M1→M2 核心） | 🆕 v0.49.0 |
+| TestFlight 分发 | `/ae-app-to-testflight` — archive → upload → TestFlight 分发（M2→M3 主路径） | 可用 |
 | Skill 构建 | `/ae-skill-creator` — 标准化 skill 构建全流程（六段标准 + 审计模式） | 可用 |
-| 发布前预检 | `/ae-preflight` — iOS 一体化生产就绪扫描（签名/Icon/隐私/API Key 泄漏/资源尺寸） | 可用 |
+| 发布前预检 | `/ae-preflight` — iOS 一体化生产就绪扫描（已融入 ae-speckit-to-app 内部 precheck，仍可独立触发） | 可用 |
 | 线上项目本地化 | `/ae-prod-to-local` — 分析线上项目结构，生成可本地编译运行的配置 | 可用 |
 | Demo 转 Figma | `/ae-demo-to-figma` — 将 demo 项目的 UI 导入 Figma 设计稿 | 可用（需 Figma MCP） |
 | 审核自检 | `/ae-app-review-check` — 对照 Apple Review Guidelines + AI 审核规则自检 | 可用 |
@@ -194,6 +196,14 @@ PM vibe coding 时必须遵守的技术栈约束。**完整约束请读取：** 
 执行任何 `/ae-*` skill 前，先检查当前项目中是否存在 `.claude/overrides/` 目录。如果目录中有 `.md` 文件（README.md 除外），读取并遵守其中的规则——它们是用户对 AE 默认行为的定制，**优先级高于 constraints/ 中的默认策略**。
 
 `ae update` 不会修改 overrides/ 中的文件，用户的定制永远安全。
+
+## 设计原则（Skill 设计三条）
+
+本产品线围绕 4 个人类可确认中间品（M0 Idea → M1 Speckit → M2 本地可用程序 → M3 TestFlight）组织。理解并遵守以下原则是正确使用和扩展 ae-pm skill 的前提：
+
+1. **Skill = 人类可确认中间品之间的变换** — 每段 skill 有明确的输入输出中间品，PM 可在中间品处停检。不要把多个跨中间品的职责耦合进一个 skill。
+2. **Harness 薄，透传约束** — skill 本身不重复造轮子，职责是把 Route B 约束和代码模板打包交给外部 harness（ae-dev / Claude Code / Codex）执行，不在 skill 内部实现构建逻辑。
+3. **一次通过率为核心度量** — 每段 skill 的目标都是 first-pass yield（第一次就跑通），失败时通过 `/ae-report-fix` 回流修复经验，让所有用户受益。
 
 ## 行为准则
 

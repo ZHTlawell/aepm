@@ -20,7 +20,7 @@
 - **预期行为**：smoke_test 阶段发现缺失，提示安装 Xcode
 - **验证标准**：清晰告知需要安装 Xcode
 
-## 场景 5：preflight 后衔接 testflight-publish
+## 场景 5：preflight 后衔接 ae-app-to-testflight
 - **用户说**："预检通过了，直接帮我发 TestFlight"
-- **预期行为**：确认无 block 项后，引导进入 ae-testflight-publish 流程
+- **预期行为**：确认无 block 项后，引导进入 ae-app-to-testflight 流程
 - **验证标准**：不重复执行已完成的检查项

@@ -1,0 +1,26 @@
+//
+//  UserInitWork.swift
+//  {{PRODUCT_NAME}}
+//
+//  来源: bible-ios-template / 2026-04-15
+//  Work Chain 第 6 步 (TS-022 / TS-023)
+//
+//  ⚠️ 最高频阻塞点：login 会调后端 /api/user/v1/initialize
+//  - 后端不可达 → 永远卡在启动页（白屏）
+//  - 调试时用 DEBUG_SKIP_USERINIT=1 环境变量早 callback（SKILL.md 4.2）
+//
+
+import Foundation
+import BCUtils
+
+class UserInitWork: WorkVoidCallbackTask {
+    func work(_ callback: @escaping VoidCallback) {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["DEBUG_SKIP_USERINIT"] == "1" {
+            callback()
+            return
+        }
+        #endif
+        LaunchTransitionViewController.show(title: BCConsts.appName, completion: callback)
+    }
+}

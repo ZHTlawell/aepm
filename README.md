@@ -6,159 +6,93 @@
 
 AE PM Agent 是一套 **AI 编程助手的指令和能力包**，安装后你的 AI 编码工具（Claude Code / Codex / Cursor 等）就具备了产品经理专属的工作流支持。
 
-它解决的核心问题是：**PM 用 vibe coding 做出的 demo 原型，与真正能上架 App Store 之间存在大量工程化环节。** AE PM Agent 把从 demo 到上架的完整路径拆成 8 个 Phase，每个 Phase 对应一组 Skill，走完即可提审。
+它解决的核心问题是：**PM 用 vibe coding 做出的 demo 原型，与真正能上架 App Store 之间存在大量工程化环节。**
 
-## 端到端流水线
+设计原则是 **skill = 人类可确认中间品之间的变换**：整条流水线被拆成 4 个人类可审阅的中间品（M0→M3），每个 skill 负责把一个中间品变成下一个。PM 在每个中间品处可以停下来检查，确认无误再推进下一段。
+
+## 中间品流水线
 
 ```
-Phase 0  Vibe Coding Demo ─── PM 用 AI 工具产出 demo（受技术选型约束）
-   │
-Phase 1  Demo → Speckit ───── 提取标准规格书 / 逆向已上架 App
-   │
-Phase 2  Speckit → 成品 ───── ae-dev 生成 iOS + 后端，E2E 对比验证
-   │
-Phase 3  发布准备 ──────────── 预检 + 埋点 + 支付 + Onboarding + Paywall
-   │
-Phase 4  TestFlight 分发 ──── 签名 → Archive → Upload → 测试组
-   │
-Phase 5  验证 & 修复 ──────── 真机验证 + 埋点验证 + 购买验证 + Bug 修复
-   │
-Phase 6  App Store 提审 ──── 审核自检 + ASC 配置 + Submit  ← 🆕 建设中
-   │
-Phase 7  运营迭代 ──────────── 去版权化 + 原型转 Figma + A/B 测试
+M0  Idea ─────────────────────── 产品想法 / demo 雏形 / 参考 App
+ │
+ │  [M0 → M1] PM 工具箱（集合）
+ │
+M1  Speckit ────────────────────  6 模块标准规格书（产品/场景/架构/设计/数据/API）
+ │
+ │  [M1 → M2] ae-speckit-to-app（核心段）
+ │
+M2  本地可用程序 ───────────────── Route B 代码骨架 + E2E 跑通
+ │
+ │  [M2 → M3] 发布段
+ │
+M3  TestFlight ──────────────── 可测 Build 已分发
 ```
 
-## 各 Phase 详细说明
+一次通过率（first-pass yield）是核心度量：每段 skill 都尽量做到"一次跑完即成"，失败时通过 `/ae-report-fix` 回流修复经验。
 
-### Phase 0: Vibe Coding Demo
+## 各段 skill 详解
 
-用 AI 编码工具（Antigravity / Claude Code / Cursor）做出 demo 原型。ae-pm 的技术选型约束会确保 demo 符合工程规范。
+### M0 → M1：PM 工具箱（集合）
 
-**输出：** 可运行的 demo 项目
+把"想法/参考 App/demo"变成规范化的 Speckit。依据起点不同，选择合适的入口：
 
-### Phase 1: Demo → Speckit
+| Skill | 说明 | 触发命令 |
+|-------|------|---------|
+| `/ae-app-to-speckit` | 从已上架 App 逆向提取 speckit（iPhone + USB + WDA） | `/ae-app-to-speckit` |
+| `/ae-demo-to-speckit` | 从 demo 源码自动提取 6 模块 Speckit | `/ae-demo-to-speckit` |
+| `/ae-onboarding-design` | 生成 Onboarding 幻灯片规格（HTML/CSS/JS） | `/ae-onboarding-design` |
+| `/ae-paywall-design` | 生成 Paywall 付费墙规格（HTML 或 Native StoreKit 2） | `/ae-paywall-design` |
+| `/ae-speckit-brainstorm` 🆕 | 从零开始与 PM 对话共创 Speckit（无 demo / 无参考 App） | `/ae-speckit-brainstorm` |
 
-| Skill | 说明 |
-|-------|------|
-| `/ae-demo-to-speckit` | 从 demo 源码自动提取 6 模块标准规格书 |
-| `/ae-app-to-speckit` | 从已上架 App 逆向提取 speckit（需 iPhone + USB + WDA） |
+**输出：** `speckit/` 目录，人类可审阅。
 
-```bash
-/ae-demo-to-speckit
-```
+### M1 → M2：ae-speckit-to-app（核心段）
 
-**输出：** `speckit/` 目录（产品定位/场景/架构/设计/数据/API）
+| Skill | 说明 | 触发命令 |
+|-------|------|---------|
+| `/ae-speckit-to-app` 🆕 | Route B 约束 + 代码模板包，从 Speckit 生成本地可用程序 | `/ae-speckit-to-app` |
 
-### Phase 2: Speckit → 成品
+这是 PM 产品线最核心、技术约束最密集的一段。skill 本身是**薄 harness**，只做约束透传 + 模板装配 + precheck，具体构建由外部 harness（ae-dev / Claude Code / Codex）驱动。预检已融入这个 skill 内部（不再独立 `/ae-preflight`）。
 
-**这一步需要切换到 ae-dev 环境。**
+**输出：** 可在模拟器/真机本地运行的 iOS 工程（含后端）。
 
-```bash
-# 方式一：ae CLI（推荐）
-ae dev speckit-receive ~/Projects/MyApp/speckit/
+### M2 → M3：发布段
 
-# 方式二：手动
-cd ~/Projects/MyApp-prod && ae link dev . && claude
-```
+| Skill | 说明 | 触发命令 | 标记 |
+|-------|------|---------|------|
+| `/ae-app-to-testflight` | 签名 → Archive → Upload → TestFlight 分发（原 `ae-testflight-publish` 改名） | `/ae-app-to-testflight` | — |
+| `/ae-analytics-integrate` | Firebase Analytics + Adjust SDK 双轨埋点（原 `ae-analytics-setup` 改名） | `/ae-analytics-integrate` | optional |
 
-Dev Agent 自动执行：验证 speckit → 生成 OpenAPI 契约 → 生成 Spring Boot 后端 → 生成 SwiftUI iOS → 编译验证。
+**输出：** TestFlight 可测 Build。
 
-验证阶段：
+## Utility Skills
 
-| Skill | 说明 |
-|-------|------|
+下列 skill 不在主线 M0→M3 流水线上，但在日常 PM 工作中按需触发。源码仍保留在 `skills/pm/` 下。
+
+| Skill | 一句话定位 |
+|-------|-----------|
 | `/ae-verify-app` | E2E 对比 demo vs 成品，自动归因差异 |
 | `/ae-file-bugs` | 从 verify 报告批量生成 issue 并提交 |
-
-**输出：** 功能完整的 iOS + 后端项目
-
-### Phase 3: 发布准备 (Publish-Ready)
-
-| Skill | 说明 |
-|-------|------|
-| `/ae-preflight` | 预检扫描 — API Key 泄漏/Icon/Privacy/签名/资源尺寸 |
-| `/ae-analytics-setup` | Firebase Analytics + Adjust SDK 双轨埋点 |
-| `/ae-superwall-setup` | Superwall 支付集成（账号 + ASC 订阅 + SDK + StoreKit 2） |
-| `/ae-onboarding-design` | 生成 Onboarding 幻灯片（HTML/CSS/JS，Superwall/WebView） |
-| `/ae-paywall-design` | 生成 Paywall 付费墙（HTML 或 Native StoreKit 2） |
-
-```bash
-/ae-preflight          # 先扫描，修完所有 blocker
-/ae-analytics-setup    # 接埋点
-/ae-superwall-setup    # 接支付
-```
-
-**输出：** 代码满足上架标准
-
-### Phase 4: TestFlight 分发
-
-| Skill | 说明 |
-|-------|------|
-| `/ae-testflight-publish` | 签名 → Archive → Upload → TestFlight 测试组分发 |
-
-```bash
-/ae-testflight-publish
-```
-
-真机自动化环境（如需要）通过 ae-go 提供：`/ae-mobile-setup` + `/ae-mobile-agent`
-
-**输出：** TestFlight 可测 Build
-
-### Phase 5: 验证 & 修复
-
-| 验证项 | 方法 |
-|--------|------|
-| 功能验证 | 真机安装 TestFlight Build，核心流程走通 |
-| 埋点验证 | GA4 Realtime + Adjust Sandbox 确认数据到达 |
-| 购买验证 | StoreKit Sandbox 购买流程完整 |
-| Bug 修复 | `/ae-report-fix` 回流修复方案 |
-
-**输出：** 全链路验证通过
-
-### Phase 6: App Store 提审 `建设中`
-
-| Skill | 说明 | 状态 |
-|-------|------|------|
-| `/ae-app-review-check` | 对照 Apple Review Guidelines + AI 审核规则自检 | 🔨 待建 |
-| `/ae-asc-submit` | ASC 截图/描述/关键词/Privacy URL → Submit for Review | 🔨 待建 |
-
-**输出：** 审核通过上线
-
-### Phase 7: 运营迭代
-
-| Skill | 说明 |
-|-------|------|
+| `/ae-demo-to-figma` | 将 demo 原型导入 Figma 设计稿 |
 | `/ae-image-decopyrighter` | 图片 AI 重绘去版权化（Gemini Imagen 4.0） |
-| `/ae-demo-to-figma` | 将 demo 项目 UI 导入 Figma 设计稿 |
-
-## 通用能力（不属于特定 Phase）
-
-| Skill | 说明 |
-|-------|------|
-| `/ae-submit-bug` | 提交 bug 报告到 Gitee |
-| `/ae-submit-requirement` | 提交可复用能力需求 |
-| `/ae-report-fix` | 本地修复成功后回流方案给 AE Team |
-| `/ae-lark-feishu` | 飞书消息搜索/读取/发送 + 会议妙记/逐字稿 |
 | `/ae-prod-to-local` | 将线上项目转为本地可编译运行的配置 |
-| `/ae-skill-creator` | 标准化 skill 构建流程（六段标准 + 审计模式） |
-| 查收更新 | 直接告诉 agent，查看 CHANGELOG 了解最新版本 |
 
-## 技术选型约束
+## 路线：Route B
 
-安装后，你的 AI 编码工具在 vibe coding 时会遵守以下约束：
+PM 产品线路线定调为 **Route B**（Route A 不再维护）：
 
-**iOS 前端**
-- 必须使用 SwiftUI Native（禁止 WebView hybrid）
-- 所有可交互元素必须有 `accessibilityIdentifier`
-- 单文件不超过 500 行
+- **工程形态：** CocoaPods 依赖管理（不用 SPM），多 target Xcode 工程
+- **SDK 栈：** BCStoreKit（支付）+ BCSensor（埋点）+ BCAdjust（归因）+ BCNetwork（网络）
+- **构建流程：** Work Chain 12 步（从环境预检到 Archive 的固定流水线）
+- **约束位置：** `/ae-speckit-to-app` skill 内置所有 Route B 约束 + 代码模板，harness 只负责透传
 
-**后端**
-- Spring Boot 3.x + MyBatis + Flyway
-- 多模块 Gradle 工程
+关联 issue：[#II8UYE](https://gitee.com/turningsyn/ae-pm/issues/II8UYE) / [#II8RAE](https://gitee.com/turningsyn/ae-pm/issues/II8RAE) / [#IJC8D4](https://gitee.com/turningsyn/ae-platform/issues/IJC8D4)
 
-**数据层**
-- 数据不得硬编码在 UI 代码中
-- Mock API 必须遵循标准 REST 契约
+## 核心原则
+
+1. **Skill = 人类可确认中间品之间的变换** — 每段 skill 有明确输入输出中间品（M0/M1/M2/M3），PM 可在中间品处停检。
+2. **Harness 薄，透传约束** — skill 本身不重复造轮子，把 Route B 约束和代码模板打包交给外部 harness（ae-dev / Claude Code）执行。
+3. **一次通过率为核心度量** — 每段 skill 的目标都是 first-pass yield，失败即通过 `/ae-report-fix` 回流修复。
 
 ## 快速开始
 
@@ -183,13 +117,37 @@ ae setup
 - 环境健康检查
 - 自动完成入驻确认
 
+### 第一次使用（最小命令序列）
+
 ```bash
-# 3. 在你的项目中启用
+# 1. 在项目目录中启用
 cd 你的项目目录
 ae link pm .
+
+# 2. 打开 AI 编码工具（Claude Code / Codex / Cursor）
+# 然后根据起点选择入口 skill：
+
+# 起点是 demo 源码：
+/ae-demo-to-speckit
+# 起点是已上架 App：
+/ae-app-to-speckit
+# 起点只是想法：
+/ae-speckit-brainstorm
+
+# 3. Speckit 生成后，构建本地可用程序
+/ae-speckit-to-app
+
+# 4. 发布到 TestFlight
+/ae-app-to-testflight
 ```
 
-搞定！打开 AI 编码工具即可使用所有 AE PM 能力。
+### 更新（一次更新，所有项目生效）
+
+```bash
+ae update
+```
+
+通过软链接挂载的 skills 自动更新，无需逐项目操作。
 
 ### 手动搭建
 
@@ -224,16 +182,6 @@ cd 你的项目目录
 ae link pm .
 ```
 
-或手动链接：
-
-```bash
-mkdir -p .claude/skills
-ln -sf ~/.ae/pm/.claude/skills/* .claude/skills/
-echo '' >> CLAUDE.md
-echo '## AE PM 约束' >> CLAUDE.md
-echo '请同时遵守 ~/.ae/pm/CLAUDE.md 中的技术选型约束和工作流。' >> CLAUDE.md
-```
-
 **Step 4: 验证**
 
 ```bash
@@ -242,16 +190,6 @@ ae doctor
 
 </details>
 
-### 更新（一次更新，所有项目生效）
-
-```bash
-ae update
-```
-
-或手动：`cd ~/.ae/pm && git pull origin main`
-
-通过软链接挂载的 skills 自动更新，无需逐项目操作。
-
 ### 项目结构示意
 
 ```
@@ -259,41 +197,40 @@ ae update
 ├── pm/                         ← ae-pm
 │   ├── CLAUDE.md
 │   ├── .claude/skills/
-│   │   ├── ae-demo-to-speckit/SKILL.md
-│   │   ├── ae-verify-app/SKILL.md
-│   │   ├── ae-submit-requirement/SKILL.md
-│   │   └── ae-submit-bug/SKILL.md
+│   │   ├── ae-speckit-brainstorm/SKILL.md
+│   │   ├── ae-speckit-to-app/SKILL.md
+│   │   ├── ae-app-to-testflight/SKILL.md
+│   │   └── ...
 │   ├── README.md
 │   └── CHANGELOG.md
 └── dev/                        ← ae-dev（开发者用）
-    ├── CLAUDE.md
-    └── .claude/skills/
 
-~/Projects/ShoeLens/            ← 你的项目（任意多个）
+~/Projects/YourApp/             ← 你的项目（任意多个）
 ├── .claude/skills/             ← 软链接到 ~/.ae/pm/.claude/skills/
-├── CLAUDE.md                   ← 你的项目指令 + ae-pm 引用
-├── ShoeLens/
-└── ...
-
-~/Projects/AnotherApp/          ← 另一个项目
-├── .claude/skills/             ← 同样软链接
 ├── CLAUDE.md
 └── ...
 ```
+
+## 移出主线（另议）
+
+下列能力从本次 M0→M3 主线中移出，源码保留供参考，但需求和路线另议：
+
+- **`/ae-app-review-check`** — App Store 审核自检（M3 之后另议）
+- **`/ae-asc-submit`** — ASC 元数据提交审核（M3 之后另议）
+- **`/ae-prod-data-feedback-report`** — 产品数据反馈报告（Stage 5 另议）
+- **`/ae-preflight`** — 已融入 `/ae-speckit-to-app` 内部 precheck，不再独立触发；目录暂保留供参考。
+
+**已废弃：** `/ae-superwall-setup`（Route A 遗产，已删除目录）。
 
 ## 反馈与贡献
 
 ### 遇到问题？
 
-**方式一：通过 agent（推荐）**
-
-在 Claude Code 中使用 `/ae-submit-bug` skill，或告诉 agent：
+在 Claude Code 中使用 `/ae-submit-bug`，或告诉 agent：
 
 > "帮我提一个 bug：[描述你的问题]"
 
-Agent 会引导你描述问题，然后通过 `ae` CLI 自动提交到 Gitee。
-
-**方式二：直接用 CLI**
+或直接用 CLI：
 
 ```bash
 ae pm submit-bug "问题标题" "问题描述"
@@ -301,26 +238,23 @@ ae pm submit-bug "问题标题" "问题描述"
 
 ### 想要新能力？
 
-使用 `/ae-submit-requirement` skill。注意：**每个需求必须是可复用机制**，而非一次性任务。
+使用 `/ae-submit-requirement`。**每个需求必须是可复用机制**，而非一次性任务。
 
-例如：
-- 合格："希望 PM agent 能自动生成 API 文档" — 所有 PM 都能复用
-- 不合格："帮我把这个项目部署上线" — 一次性任务
+### Meta skill
 
-### 获取更新
+- `/ae-skill-creator` — 造 skill 的 skill，标准化 skill 构建流程（六段标准 + 审计模式）
 
-```bash
-cd ae-pm
-git pull origin main
-```
+## 关联 Issue
 
-或告诉 agent "查收更新"，它会对比本地和远端版本。
+- [#IJC8D4](https://gitee.com/turningsyn/ae-platform/issues/IJC8D4) — PM 产品线结构性重写
+- [#II8UYE](https://gitee.com/turningsyn/ae-pm/issues/II8UYE) — Route B 路线定调
+- [#II8RAE](https://gitee.com/turningsyn/ae-pm/issues/II8RAE) — 埋点与支付整合
 
 ## 版本历史
 
 查看 [CHANGELOG.md](CHANGELOG.md) 了解完整更新记录。
 
-当前版本：**v0.48.2**
+当前版本：**v0.49.0**
 
 ## 由谁维护
 

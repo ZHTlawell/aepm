@@ -502,5 +502,5 @@ W1 + W2 + W3 + W4 的新增用户数之和 应 ≈ D1 查询中的总分母
 ## 关联 Skill
 
 - `ae-app-to-speckit` — 前置：生成 speckit
-- `ae-analytics-setup` — 如 APP 未接入埋点
+- `ae-analytics-integrate` — 如 APP 未接入埋点
 - `ae sensors` CLI — 数据查询工具
