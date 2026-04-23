@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.51.0 (2026-04-23) — 新增 `ae-paywall-integrate`：iOS Paywall 全流程 skill（BCStoreKit 路线）[`#IJDREM`](https://gitee.com/turningsyn/ae-platform/issues/IJDREM)
+
+### 新增
+
+- **`ae-paywall-integrate`** — Scale Global 生态 iOS Paywall 全流程：
+  - UI 设计（SwiftUI 470 行模板，含 PricingPlan / PricingCard / 三链接 / Restore 按钮）
+  - BCStoreKit 订阅封装（`SubscriptionService` 70 行，绑 `BCAccount.isVip` + `.accountUserChanged` 监听）
+  - Adjust 联动边界（明确标注 BCStoreKit 内部自动上报 vip/weekly/monthly/yearly/subscribe/purchase，业务代码禁止重复调用）
+  - 沙盒验证（真机 + Sandbox 账号走购买 / 恢复 / 失败三流程）
+
+### 技术路线
+
+基于 WePray（bible-app）实战代码审计，走 Scale Global 内部 **BCStoreKit / BCAccount / BCAdjust 生态**（非纯 StoreKit 2）：
+- VIP 状态走 `BCAccount.isVip` 服务端判定，不用 `Transaction.currentEntitlements`
+- `BCStoreKit.restore` 是 callback API，必须用 `withCheckedContinuation` 包
+- `PaymentResult` 五分支必须全处理（`.success/.cancelled/.appstorefailed/.networkError/.serverError`）
+
+沉淀 **6 条硬性规则 + 7 条反模式 + 7 条故障排查 + 10 条已验证约束**，全部来自 WePray Bug R / Q / T / K 真实跌坑 + Pods/BCStoreKit 内部审计。
+
+### 与 `ae-paywall-design` 关系
+
+合并（根据用户决策）：
+- 本 skill 继承原 `ae-paywall-design` 的 SwiftUI 模板能力
+- 废弃 HTML WebView + Superwall 路线（Scale Global 无先例）
+- 改纯 StoreKit 2 为 BCStoreKit
+- **原 `ae-paywall-design` 保留，等龙哥审计本 skill 通过后再下线**
+
+### 待审计
+
+本版本为 **草稿版**，`test-scenarios.md` 末尾 3 条阻塞项待龙哥补充（BCStoreKit 初始化位置、Product 加载时机、BCAccount 收据验证耗时），7 个用户场景待在实际新项目（非 WePray 审计过的代码）跑通。
+
 ## v0.50.3 (2026-04-23) — builder-kickoff 规则调整：反馈统一到 ae-pm，主 tracking issue 中央化
 
 来源：Scale Builder 群 2026-04-23 真实用户卡点反馈（胡印斌走 Stage A3 被引导去 `turningsyn/ae-platform` 申请建仓权限，实际无 ae-platform 权限 Gitee 返回 404 阻塞）+ 后续规则更新。内部 docs 微调，不开独立 issue 跟踪。

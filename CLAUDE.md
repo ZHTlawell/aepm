@@ -146,7 +146,8 @@ CLI 会自动加载 credentials、调用 Gitee API、返回 issue 链接。
 | 飞书消息与会议 | `/ae-lark-feishu` — 搜索群聊、读取/搜索消息、下载图片、会议妙记/逐字稿、发送消息 | 可用 |
 | App 逆向提取 Speckit | `/ae-app-to-speckit` — 从已上架 App 逆向生成 speckit（iPhone 真机探索 + 截图 + feature-checklist） | 可用（需 iPhone + USB + WDA） |
 | Onboarding 页面生成 | `/ae-onboarding-design` — 生成产品 Onboarding 幻灯片（HTML/CSS/JS，Superwall Flow 或 WebView） | 可用 |
-| Paywall 页面生成 | `/ae-paywall-design` — 生成 Paywall 付费墙页面（HTML 或 Native StoreKit 2） | 可用 |
+| Paywall 页面生成（旧） | `/ae-paywall-design` — 生成 Paywall 付费墙页面（HTML 或 Native StoreKit 2） | 待下线（等龙哥审计 `ae-paywall-integrate` 通过后） |
+| Paywall 全流程 | `/ae-paywall-integrate` — UI + BCStoreKit 订阅封装 + 沙盒验证（Scale Global 生态，合并原 `ae-paywall-design`）| 🆕 v0.51.0 草稿 |
 | 埋点接入 | `/ae-analytics-integrate` — Firebase Analytics + Adjust SDK 双轨埋点（M2→M3 optional，杭州团队协作） | 可用 |
 | Speckit 头脑风暴 | `/ae-speckit-brainstorm` — 多 speckit 联合设计（merge 或 reference 双模式） | 🆕 v0.49.0 |
 | Speckit → 本地可用程序 | `/ae-speckit-to-app` — Route B 选型约束 + 代码模板包（M1→M2 核心） | 🆕 v0.49.0 |
