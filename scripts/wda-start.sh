@@ -32,17 +32,43 @@ err()  { echo -e "${RED}[wda]${NC} $*" >&2; }
 # Parse args
 UDID=""
 CHECK_ONLY=false
+WITH_DOCTOR=true
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --udid) UDID="$2"; shift 2 ;;
         --port) WDA_PORT="$2"; shift 2 ;;
         --check-only) CHECK_ONLY=true; shift ;;
+        --no-doctor) WITH_DOCTOR=false; shift ;;
+        --with-doctor) WITH_DOCTOR=true; shift ;;
         *) err "Unknown arg: $1"; exit 1 ;;
     esac
 done
 
 # Per-port xcodebuild log to avoid stomping across parallel sessions
 XCB_LOG="/tmp/wda-xcodebuild-${WDA_PORT}.log"
+
+# wda-doctor.sh lives next to this script; resolve path so it works both
+# from source (ae-platform/scripts) and installed (~/.ae/{pm,go}/scripts)
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+DOCTOR_SCRIPT="$SCRIPT_DIR/wda-doctor.sh"
+
+start_doctor() {
+    # #IJDUAJ — auto-launch in-session tunnel health monitor.
+    # Only when --with-doctor (default) is set AND doctor not already running for this UDID.
+    $WITH_DOCTOR || return 0
+    [[ -x "$DOCTOR_SCRIPT" ]] || { warn "wda-doctor.sh 未找到，跳过 tunnel 在途监控"; return 0; }
+    local doctor_pidfile="/tmp/wda-doctor-${UDID}.pid"
+    if [[ -f "$doctor_pidfile" ]]; then
+        local existing_pid
+        existing_pid=$(cat "$doctor_pidfile" 2>/dev/null || echo "")
+        if [[ -n "$existing_pid" ]] && kill -0 "$existing_pid" 2>/dev/null; then
+            log "tunnel doctor 已在运行 (pid=$existing_pid)"
+            return 0
+        fi
+    fi
+    nohup bash "$DOCTOR_SCRIPT" --udid "$UDID" --port "$WDA_PORT" </dev/null >/dev/null 2>&1 &
+    log "tunnel doctor 已启动（后台守护 RSD 健康，日志 /tmp/wda-doctor-${UDID}.log）"
+}
 
 # Step 1: Check device
 log "Step 1: 检查设备连接..."
@@ -132,6 +158,7 @@ if len(img) > 80000: sys.exit(0)
 sys.exit(1)
 " 2>/dev/null; then
         log "截图验证通过 ✓"
+        start_doctor
         exit 0
     else
         warn "WDA 状态正常但截图可能异常，继续重启..."
@@ -152,7 +179,8 @@ fi
 log "Step 3: 启动 userspace tunnel..."
 tunnel_rsd_alive() {
     # Probe with a short timeout; ios info returns non-zero on RSD failure.
-    timeout 5 ios info --udid="$UDID" >/dev/null 2>&1
+    # 用 perl alarm 而非 timeout（macOS 默认无 GNU coreutils）
+    perl -e 'alarm 5; exec @ARGV' ios info --udid="$UDID" >/dev/null 2>&1
 }
 EXISTING_TUNNEL_PID=$(pgrep -f "ios tunnel" | head -1 || true)
 NEED_START_TUNNEL=true
@@ -399,6 +427,7 @@ else
         echo -e "${BOLD}配套脚本如何使用此端口:${NC}"
         echo "  export WDA_URL=http://localhost:${WDA_PORT}"
         echo ""
+        start_doctor
         exit 0
     fi
     warn "test-without-building 验证失败"
@@ -443,6 +472,7 @@ if verify_wda 4 8; then
     echo -e "${BOLD}配套脚本如何使用此端口:${NC}"
     echo "  export WDA_URL=http://localhost:${WDA_PORT}"
     echo ""
+    start_doctor
     exit 0
 fi
 

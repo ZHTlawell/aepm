@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.60.0 (2026-04-23) — 新增 `wda-doctor.sh`：长会话 tunnel 在途健康守护 [`#IJDUAJ`](https://gitee.com/turningsyn/ae-pm/issues/IJDUAJ)
+
+### 新增
+
+- **`scripts/wda-doctor.sh`** — 后台 tunnel 健康守护进程。每 45s 探活 `ios info --udid=$UDID`，连续 2 次失败则 pkill tunnel + forward 并重启，轮询 RSD 就绪后自动重建 port forward。`/ae-app-to-speckit` 等长会话场景不再因 tunnel 腐化中途失联。
+- **多设备安全** — 每 UDID 一个 doctor 实例（PID 文件 `/tmp/wda-doctor-${UDID}.pid`），重启 tunnel 走全局锁 `/tmp/wda-doctor.lock` 串行化，避免惊群。
+- **桌面通知** — 恢复成功/失败时通过 `osascript` 弹 macOS 通知，不打断工作流。
+- **运维命令** — `wda-doctor.sh --status` 列出所有实例，`--stop --udid X` 停某设备的守护，日志落盘 `/tmp/wda-doctor-${UDID}.log`。
+
+### 集成
+
+- **`wda-start.sh`** 启动成功后默认后台拉起 `wda-doctor.sh`（新增 `--no-doctor` flag 可关闭，`--with-doctor` 显式开启）。三个 success 退出点都会启动 doctor：早退（WDA 已在运行）、test-without-building 成功、test 回退成功。
+- **`ae-mobile-setup` SKILL.md** 新增"长会话 tunnel 健康守护"章节 + 权限 `Bash(bash ~/.ae/go/scripts/wda-doctor.sh:*)`。
+
+### 同时修复（macOS 兼容性）
+
+- **RSD 探活改用 `perl alarm`** — v0.59.1 用了 `timeout 5 ios info ...`，但 macOS 默认不带 GNU coreutils，`timeout` 命令不存在会导致 `probe_rsd` 永远返回 false → tunnel 被持续误重启。改用 `perl -e 'alarm 5; exec @ARGV'`（perl 在 macOS/Linux 都内置）。`wda-start.sh` 启动时探活和 `wda-doctor.sh` 都修正。
+
+### 背景
+
+#IJDSS3 已修复启动时的 RSD 探活，但长会话中途 tunnel 腐化依然需要用户手动重跑 `wda-start.sh`。本版本补齐在途自愈。
+
 ## v0.59.1 (2026-04-23) — WDA tunnel RSD 探活修复（真正的 code 74 根因）[`#IJDSS3`](https://gitee.com/turningsyn/ae-pm/issues/IJDSS3)
 
 ### 修复
