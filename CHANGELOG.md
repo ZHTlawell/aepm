@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.63.2 (2026-04-23) — README 后续流程完善（integrate 接入时机 + 项目结构补全 + ae update 说明 + 关联 IJD7GE）[`#IJD7GE`](https://gitee.com/turningsyn/ae-pm/issues/IJD7GE)
+
+`templates/pm/README.md` 四处完善（之前 README 审计留下的未处理项）：
+
+- **「第一次使用」命令序列**：在 `ae-speckit-to-app` 和 `ae-app-to-testflight` 之间新增步骤 4 ——**按产品需要接入 7 个后置 integrate 能力**（analytics 必装 / paywall / notification / feedback / i18n / abtest / onboarding 按需），并标明典型接入顺序；末尾补步骤 6 提审路径（`ae-app-review-check → ae-asc-submit`）
+- **项目结构示意补全**：原图只有 `pm/` + `dev/`，现补 `~/.ae/bin/ae` CLI + `~/.ae/go/`（全员通用 + scripts/ 含 wda-start.sh 等）+ `~/.config/ae/`（credentials.env + .update-available 缓存）。skills 清单也从旧 3 个示例补到含 paywall-integrate / analytics-integrate 等当前活跃 skill
+- **`ae update` 行为说明**：新增 5 条自动处理项 —— 拉 CHANGELOG/源码 / 刷新项目软链接 / **自动清理已退休 skill 的失效链接**（paywall-design / onboarding-design / preflight / prod-data-feedback-report）/ 共享 skill 不抖动 / 幂等
+- **关联 Issue 更新**：顶部新增"活跃 review / umbrella" 小节引用 `#IJD7GE`（当前跟进的 26 条 P0 + integrate 拆分 + dogfood gap 都在这里），历史路线 issue 归入"历史路线 / 结构性决策"
+
 ## v0.63.1 (2026-04-23) — ae-speckit-to-app 补 S1/S3 precheck + 文龙 review 剩余 4 条 AE 独立项落地 [`#IJD7GE`](https://gitee.com/turningsyn/ae-pm/issues/IJD7GE)
 
 IJD7GE 中 AE Team 能独立处理的 6 项全部落地到 `ae-speckit-to-app/SKILL.md`：

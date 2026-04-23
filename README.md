@@ -179,11 +179,24 @@ ae link pm .
 # 起点只是想法：
 /ae-speckit-brainstorm
 
-# 3. Speckit 生成后，构建本地可用程序
+# 3. Speckit 生成后，构建本地可用程序（M1→M2 核心）
 /ae-speckit-to-app
 
-# 4. 发布到 TestFlight
+# 4. 按产品需要接入后置 integrate（可选，不影响能否上 TestFlight）
+#    典型顺序：埋点先接（投放归因必需）→ 付费墙 → 通知/反馈/多语言/AB/onboarding
+/ae-analytics-integrate      # 必装（投放归因 + 埋点后台）
+/ae-paywall-integrate        # 有付费模型则装
+/ae-notification-integrate   # 需要本地提醒/召回则装
+/ae-feedback-integrate       # 需要用户满意度信号则装
+/ae-i18n-integrate           # 出海多语言则装
+/ae-abtest-integrate         # 需要 A/B 实验则装
+/ae-onboarding-integrate     # 需要欢迎引导 + AB 变体则装
+
+# 5. 发布到 TestFlight
 /ae-app-to-testflight
+
+# 6. 提审 App Store（可选）
+/ae-app-review-check  →  /ae-asc-submit
 ```
 
 ### 更新（一次更新，所有项目生效）
@@ -193,6 +206,14 @@ ae update
 ```
 
 通过软链接挂载的 skills 自动更新，无需逐项目操作。
+
+**`ae update` 会自动处理的事：**
+
+- 拉取 `~/.ae/pm/` 最新 CHANGELOG 和 skill 源码
+- 刷新所有项目 `.claude/skills/` 的软链接指向新版本
+- **自动清理失效软链接**（指向已退休 skill 的链接，如 `ae-paywall-design` / `ae-onboarding-design` / `ae-preflight` / `ae-prod-data-feedback-report` 下线后，链接会被静默移除）
+- 共享 skill（如 `ae-lark-feishu` 同时存在于 pm/go）不再随每次 update 在角色之间来回切换
+- 重复运行幂等（无新变动时静默 no-op）
 
 ### 手动搭建
 
@@ -239,16 +260,30 @@ ae doctor
 
 ```
 ~/.ae/                          ← 全局安装（只有一份）
-├── pm/                         ← ae-pm
+├── bin/
+│   └── ae                      ← ae CLI（由 install.sh 软链）
+├── pm/                         ← ae-pm（PM 角色）
 │   ├── CLAUDE.md
 │   ├── .claude/skills/
 │   │   ├── ae-speckit-brainstorm/SKILL.md
 │   │   ├── ae-speckit-to-app/SKILL.md
+│   │   ├── ae-paywall-integrate/SKILL.md
+│   │   ├── ae-analytics-integrate/SKILL.md
 │   │   ├── ae-app-to-testflight/SKILL.md
 │   │   └── ...
 │   ├── README.md
 │   └── CHANGELOG.md
-└── dev/                        ← ae-dev（开发者用）
+├── go/                         ← ae-go（全员通用，手机/桌面自动化）
+│   ├── .claude/skills/
+│   │   ├── ae-mobile-setup/SKILL.md
+│   │   ├── ae-mobile-agent/SKILL.md
+│   │   └── ...
+│   └── scripts/                ← wda-start.sh / mobile-precheck.sh 等
+└── dev/                        ← ae-dev（开发者角色）
+
+~/.config/ae/
+├── credentials.env             ← GITEE_TOKEN / GEMINI_API_KEY 等
+└── .update-available           ← ae update 缓存（自动管理）
 
 ~/Projects/YourApp/             ← 你的项目（任意多个）
 ├── .claude/skills/             ← 软链接到 ~/.ae/pm/.claude/skills/
@@ -292,7 +327,13 @@ ae pm submit-bug "问题标题" "问题描述"
 
 ## 关联 Issue
 
-- [#IJC8D4](https://gitee.com/turningsyn/ae-platform/issues/IJC8D4) — PM 产品线结构性重写
+**活跃 review / umbrella（当前跟进）**：
+
+- [#IJD7GE](https://gitee.com/turningsyn/ae-pm/issues/IJD7GE) — `[REVIEW] ae-speckit-to-app SKILL.md` 技术合理性审核（含 26 条 P0 + integrate 系列拆分 + S1~T3 dogfood gap 跟进）
+
+**历史路线 / 结构性决策**：
+
+- [#IJC8D4](https://gitee.com/turningsyn/ae-platform/issues/IJC8D4) — PM 产品线结构性重写（M0→M3 中间品流水线）
 - [#II8UYE](https://gitee.com/turningsyn/ae-pm/issues/II8UYE) — Route B 路线定调
 - [#II8RAE](https://gitee.com/turningsyn/ae-pm/issues/II8RAE) — 埋点与支付整合
 
@@ -300,7 +341,7 @@ ae pm submit-bug "问题标题" "问题描述"
 
 查看 [CHANGELOG.md](CHANGELOG.md) 了解完整更新记录。
 
-当前版本：**v0.63.1**
+当前版本：**v0.63.2**
 
 ## 由谁维护
 
