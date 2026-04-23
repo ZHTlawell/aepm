@@ -136,7 +136,7 @@ harness 只需要保证：每条 TS-XXX 约束被遵守、每个模板正确对�
 |-------|------|------|
 | **TS-001** | 包管理 | 必须用 **CocoaPods**（非 SPM）。私有 Pod 托管在 gitlab.bytescell.net |
 | **TS-002** | 私有源 | 必须同时配置 V2 + V1 双源：V2 `https://gitlab.bytescell.net/components/ios/2.0`，V1 `https://gitlab.bytescell.net/components/ios` |
-| **TS-003** | 部署目标 | 必须 iOS **15.0+**。禁止使用 iOS 16+ API（NavigationStack、ShareLink、.italic()、.scrollContentBackground、.toolbarColorScheme、TextField axis、.lineLimit(range)、.onChange 双参数版本） |
+| **TS-003** | 部署目标 | 必须 iOS **15.0+**。禁止使用 iOS 16+ API（NavigationStack、ShareLink、.italic()、.scrollContentBackground、.toolbarColorScheme、TextField axis、.lineLimit(range)、.onChange 双参数版本）。**完整禁止 API 清单 + 降级替代写法见 `templates/ios15-compat/api-downgrade-table.md`（不内嵌到此表，以保持薄 harness 原则，文龙 review 条目 3 决策）**。|
 | **TS-004** | 模块化 | 业务代码必须放在 `Locals/` 下的本地 Pod，每个功能一个 Pod |
 | **TS-005** | CI/CD | 必须走 GitLab CI 自动部署。本地开发调试，远程 repo 仅用于发布 |
 | **TS-006** | 环境切换 | 必须在 BCConfig.swift 中用 `env` 属性（.prod / .stage / .test），本地调试 `.test` 指向 localhost |
@@ -218,9 +218,37 @@ grep -rn 'NavigationStack\|ShareLink\|\.scrollContentBackground\|\.toolbarColorS
 
 ### 模板使用约定
 
-1. 所有 `.swift.tmpl` 文件的占位符格式：`{{PRODUCT_NAME}}` / `{{MEMO}}` / `{{BUNDLE_ID}}` / `{{TEAM_ID}}` 等
-2. harness 生成目标文件时，将 `.swift.tmpl` 去掉 `.tmpl` 后缀 + 替换占位符
+1. 所有 `.swift.tmpl` 文件的占位符格式：`{{UPPERCASE_KEY}}`
+2. harness 生成目标文件时，将 `.swift.tmpl` 去掉 `.tmpl` 后缀 + 按下表替换占位符
 3. 每个模板目录下的 `README.md` 描述该模板的职责、对接点、已知 TODO
+
+#### 占位符约定清单（文龙 review 条目 9）
+
+| 占位符 | 含义 | 示例 | 来源 |
+|--------|------|------|------|
+| `{{PRODUCT_NAME}}` | 产品代号（小写单词，无空格）| `bible` / `wepray` / `capvault` | PM + BCConfig `appProductId` |
+| `{{PRODUCT_DISPLAY_NAME}}` | 展示名称 | `"WePray"` / `"CapVault"` | PM |
+| `{{BUNDLE_ID}}` | iOS Bundle Identifier | `com.kjv.bible.prayer.app` | ASC + pbxproj |
+| `{{TEAM_ID}}` | Apple Developer Team ID | `ABCD1234EF` | ASC |
+| `{{APP_ID}}` | ASC App ID | `6761982880` | ASC 后台 |
+| `{{MAIN_HOST_PROD}}` | 生产环境 host | `app.bible.itemvaults.com` | BCConfig |
+| `{{MAIN_HOST_STAGE}}` | stage 环境 host | `app-stage.bible.itemvaults.com` | BCConfig |
+| `{{MEMO}}` | AB 变体标识（String，无长度/字符硬性限制）| `01` / `02` / `07` / `vip_a_big_cta` | `BCABTest.shared.syncFetch*()` |
+
+**`{{MEMO}}` 在两个 skill 中的拼接模式不同**（注意不可混用）：
+
+- **Paywall / 转化页**（`/ae-paywall-integrate`）：`PurchaseUI{{MEMO}}ViewController` — 直接拼接，**无下划线**
+- **Welcome / 欢迎页**（`/ae-onboarding-integrate`）：`Welcome_{{MEMO}}ViewController` — **下划线连接**
+
+两者 memo 语义相同（由 `BCABTest.shared.syncFetchVip()` 或 `syncFetchWecome()` 返回），但对应代码的类名拼接约定不同，硬编码写错会导致 `NSClassFromString` 动态加载失败 fallback 默认 variant。
+
+**harness 替换命令**：
+
+```bash
+sed -i '' "s|{{PRODUCT_NAME}}|$PRODUCT_NAME|g" $output_file
+sed -i '' "s|{{BUNDLE_ID}}|$BUNDLE_ID|g" $output_file
+# ... 其他占位符同上
+```
 
 ---
 
@@ -297,6 +325,41 @@ curl -sS -o /dev/null -w "%{http_code}\n" https://app-stage.{product}.itemvaults
 | **5xx（500/502/503）** | 服务端异常（后端崩 / OOM / 未启动） | 🛑 阻塞：查 stage EC2 Java 进程 + 日志（bible-app 踩坑：deploy 后 OOM）|
 | **504 / 连接超时 / curl error 28** | 服务不可达（网关 timeout / DNS 解析失败 / 端口未开放） | 🛑 阻塞：查网络 + Load Balancer + EC2 安全组 |
 
+### P7. pbxproj 品牌参数 + NSUsageDescription 合规扫描（S1 + S3，dogfood 发现）
+
+**S1 — pbxproj 品牌参数非模板残留：**
+
+```bash
+PBXPROJ=$(find . -name "*.xcodeproj" -maxdepth 2 | head -1)/project.pbxproj
+
+# 三个关键品牌字段必须 = 新产品命名，不是 WePray/CapVault/占位
+grep -E "PRODUCT_BUNDLE_IDENTIFIER\s*=" "$PBXPROJ" | sort -u | head -5
+grep -E "INFOPLIST_KEY_CFBundleDisplayName\s*=" "$PBXPROJ" | sort -u | head -3
+grep -E "PRODUCT_NAME\s*=" "$PBXPROJ" | sort -u | head -3
+
+# 反向扫描：是否残留历史品牌标识
+grep -iE "capvault|wepray|biblechat|\{\{[A-Z_]+\}\}" "$PBXPROJ" | head -10
+```
+
+预期：前三个字段 = 新产品命名（如 `com.{product}.app`），反向扫描 0 匹配。**发现残留 → 阻塞**，替换为新品牌值。
+
+**S3 — NSUsageDescription Apple Review Guideline 5.1.1 合规扫描：**
+
+```bash
+INFO_PLIST=$(find . -name "Info.plist" -not -path "./Pods/*" -not -path "./build/*" | head -1)
+
+plutil -p "$INFO_PLIST" | grep -E "NS(Camera|PhotoLibrary|Microphone|Location|FaceID|Contacts|Calendar|Motion|Speech|Reminders|UserTracking|Bluetooth|Health)UsageDescription"
+```
+
+每条 NS*UsageDescription 必须：
+
+- ✅ 非空
+- ✅ 非 Apple 默认占位（"Replace me" / "TODO" / "{{placeholder}}" / 纯英文骨架如 "We use your camera"）
+- ✅ 描述**清晰说明本产品使用场景**（不是复用 WePray/CapVault 的文案）
+- ✅ 符合 Apple 5.1.1：用途具体、不恐吓、不误导
+
+**发现不合规 → 阻塞**：向 PM 索要文案，或从 `/ae-asc-submit` 的 Review Notes 对齐。
+
 ---
 
 ## 核心第 4 块：调试方法速查
@@ -341,6 +404,17 @@ func work(_ callback: @escaping VoidCallback) {
 
 > ⚠️ **推 GitLab 前必须全部去除**（04-15 comment 已踩过）
 
+**自动检查（文龙 review 条目 10：双处强制）：**
+
+- **Precheck 提示层（agent 开发时看到）**：
+
+  ```bash
+  # 在 P7 之后加一条非阻塞提示（若扫到未守卫的 DEBUG_SKIP，提醒 agent 是否临时测试中）
+  grep -rn "DEBUG_SKIP" --include="*.swift" Template/ Locals/ 2>/dev/null | grep -v "#if DEBUG"
+  ```
+
+- **Done Criteria 发布卡点层（强制零匹配才 publish）**：见下方 Done Criteria **D6**。
+
 ### 4.3 Stage 500 定位 — 查 OPENAI_API_KEY + system_prompt
 
 **背景（04-15 comment）**：`/api/llm/v1/chat` 500 最常见两个原因：
@@ -377,10 +451,13 @@ done
 
 **背景（04-15 comment "坑5"）**：直接 `Write` 新 .swift 到 `Template/Feature/` 下，Xcode 项目 `.pbxproj` 不会自动识别。
 
+**推荐：团队统一用 Bundler（避免 gem 路径写死 CocoaPods 版本）：**
+
 ```ruby
-# 用 xcodeproj gem 添加文件引用
-GEM_HOME="/usr/local/Cellar/cocoapods/1.16.2_2/libexec" ruby -e "
-require 'xcodeproj'
+# Gemfile 加入 xcodeproj gem（随项目锁定版本）
+# gem 'xcodeproj'
+
+bundle exec ruby -rxcodeproj -e "
 project = Xcodeproj::Project.open('Template.xcodeproj')
 target = project.targets.find { |t| t.name == 'Template' }
 group = project.main_group.find_subpath('Template/Feature/TabContent/Chat', true)
@@ -390,13 +467,27 @@ project.save
 "
 ```
 
-或更简单：用 Xcode GUI → Add Files to Template → 勾选对应 target。
+**无 Bundler 的临时方案 — 动态定位 CocoaPods 内置的 xcodeproj：**
+
+```bash
+# 不要写死 1.16.2_2 等版本号（文龙 review 条目 11）
+# 方式 1：通过 pod binary 反查 libexec
+POD_LIBEXEC="$(dirname "$(dirname "$(which pod)")")/libexec"
+
+# 方式 2：如果 xcodeproj gem 已系统安装（或 rbenv/gem install），直接：
+ruby -rxcodeproj -e '...'
+
+# 方式 3：询问 CocoaPods 自己的 ruby 环境
+POD_RUBY_PATH=$(pod env 2>/dev/null | grep "Ruby Path" | awk -F': ' '{print $2}')
+```
+
+或更简单：用 Xcode GUI → Add Files to Template → 勾选对应 target（一次性操作用这个即可，不需写脚本）。
 
 ---
 
 ## Done Criteria（可机械验证）
 
-harness 必须验证以下 5 项全过才能标记 skill 完成：
+harness 必须验证以下 6 项全过才能标记 skill 完成：
 
 | # | 检查 | 命令 / 方法 | 通过标准 |
 |---|------|------------|----------|
@@ -405,6 +496,7 @@ harness 必须验证以下 5 项全过才能标记 skill 完成：
 | D3 | 真机 archive 可过 | `xcodebuild archive -workspace Template.xcworkspace -scheme Template -archivePath /tmp/{product}.xcarchive -destination 'generic/platform=iOS' -allowProvisioningUpdates CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM={TeamID}` | `** ARCHIVE SUCCEEDED **` |
 | D4 | 启动链跑通到 MainTab | 模拟器/真机启动 + `idb ui describe-all` 或手动观察 | 看到 4 个 Tab（按 Speckit 定义），非启动页白屏 |
 | D5 | stage CI 绿灯 | 推送后查 GitLab CI 页面 | **当前阶段**：iOS 侧无 CI（Scale Global iOS CI pipeline 未建立），**仅检查后端 Pipeline 全绿**；iOS CI 搭建后需回来更新本条 |
+| **D6** | **无未守卫的 `DEBUG_SKIP` 代码**（文龙 review 条目 10）| `grep -rn "DEBUG_SKIP" --include="*.swift" Template/ Locals/ \| grep -v "#if DEBUG"` | 0 匹配（所有 `DEBUG_SKIP_*` 分支必须包在 `#if DEBUG` / `#endif` 中，release 编译不生效）|
 
 **任一不过 → 不 publish，不 close issue，comment 说明阻塞原因。**
 

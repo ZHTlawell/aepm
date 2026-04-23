@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.63.1 (2026-04-23) — ae-speckit-to-app 补 S1/S3 precheck + 文龙 review 剩余 4 条 AE 独立项落地 [`#IJD7GE`](https://gitee.com/turningsyn/ae-pm/issues/IJD7GE)
+
+IJD7GE 中 AE Team 能独立处理的 6 项全部落地到 `ae-speckit-to-app/SKILL.md`：
+
+### A. Precheck 新增 P7（S1 + S3 dogfood gap）
+
+**P7 pbxproj 品牌参数 + NSUsageDescription 合规扫描**：
+
+- **S1 pbxproj 品牌参数扫描**：`PRODUCT_BUNDLE_IDENTIFIER` / `INFOPLIST_KEY_CFBundleDisplayName` / `PRODUCT_NAME` 非占位；反向扫描残留 `capvault|wepray|biblechat|{{...}}` 应为 0 匹配
+- **S3 NSUsageDescription Apple 5.1.1 合规**：每条 `NS*UsageDescription` 必须非空 + 非 Apple 默认占位（"Replace me" / "TODO" / "We use your camera" 骨架）+ 描述清晰说明本产品使用场景（不复用 WePray/CapVault 文案）
+
+### B. 文龙 review 剩余 AE 独立项（4 条）
+
+- **条目 3 iOS 15 API 列表保持独立** — `templates/ios15-compat/api-downgrade-table.md` 不内嵌到 TS-003（维持薄 harness 原则）。TS-003 行补"完整禁止 API 清单见 templates/..."引用
+- **条目 9 占位符约定文档补齐** — 模板使用约定段新增 8 项占位符清单（`{{PRODUCT_NAME}}` / `{{BUNDLE_ID}}` / `{{TEAM_ID}}` / `{{APP_ID}}` / `{{MAIN_HOST_PROD}}` / `{{MAIN_HOST_STAGE}}` / `{{MEMO}}` 等）+ 明确 `{{MEMO}}` 在 Paywall（`PurchaseUI{memo}ViewController` 直接拼接）vs Welcome（`Welcome_{memo}ViewController` 下划线连接）两种拼接模式不可混用
+- **条目 10 DEBUG_SKIP 双处强制** — Precheck 层作非阻塞提示（grep 未守卫 `DEBUG_SKIP` 提醒 agent 是否临时测试中）+ Done Criteria 新增 D6 强制 0 匹配（所有 `DEBUG_SKIP_*` 必须 `#if DEBUG` 包裹，release 不生效）
+- **条目 11 xcodeproj gem 动态查找** — 4.5 Xcode 项目引用段写死的 `GEM_HOME="/usr/local/Cellar/cocoapods/1.16.2_2/libexec"` 改为推荐 Bundler（`bundle exec ruby -rxcodeproj`）+ 无 Bundler 时 3 种动态定位方案（pod binary 反查 libexec / 系统 gem / `pod env` 查询）
+
+### 剩余未落地（需协作）
+
+- leting iOS 6 条里剩 2 条（条目 12 `idb 自动验证 Tab`、条目 14 `F9 iOS 26 橙色相机按钮`）— 需 iOS 真机经验判断
+- 杭州 BytesCell template 3 条（T1 LegalPromptWork / T2 Privacy Policy / T3 Welcome_01 内置 paywall）— 需改 template 仓库
+
 ## v0.63.0 (2026-04-23) — 文龙/Martinlehb 审计 26 条 P0 全部落地（5 个 integrate skill 批量修订）[`#IJD7GE`](https://gitee.com/turningsyn/ae-pm/issues/IJD7GE) note 49775397
 
 ### 背景
