@@ -1,0 +1,57 @@
+//
+//  CloseButtonHack — SwiftUI Paywall 在 UIKit 容器中关闭按钮失效的修复模板
+//
+//  来源: 04-16 comment "PurchaseUIBibleViewController 的关闭按钮：
+//        SwiftUI 的 X 按钮在 UIKit 容器中 touch 事件传递有问题，
+//        改为在 UIKit 层添加独立的 closeBtn 覆盖在最上层，
+//        override getCloseButton 让 base class 的 closeAlpha 机制正常工作"
+//
+//  现象：BCPurchaseUIBase 子类里把 SwiftUI PaywallView 放进 BCHostingController，
+//       SwiftUI 里的 X 按钮看得见但点不着。原因：UIKit PurchaseUIBaseViewController
+//       有一层 gesture/hit-test 劫持逻辑，SwiftUI 的 button touch 被吞。
+//
+//  修复原则：
+//  1. SwiftUI PaywallView **不再**在内部画 X 按钮（或画了但不绑 action）
+//  2. UIKit 层独立 UIButton，addTarget(self, action: #selector(close), for: .touchUpInside)
+//  3. hostingVC.view 先 addSubview，closeBtn 后 addSubview → 保证 closeBtn 在最上层
+//  4. override var getCloseButton: UIButton? { closeBtn } → 让 base class 的 closeAlpha 淡入机制生效
+//
+//  代码片段（参考 BCPurchaseUIBase.swift.tmpl）：
+
+/*
+private lazy var closeBtn: UIButton = {
+    let btn = UIButton(type: .system)
+    let config = UIImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+    btn.setImage(UIImage(systemName: "xmark", withConfiguration: config), for: .normal)
+    btn.tintColor = UIColor.white.withAlphaComponent(0.5)
+    btn.backgroundColor = UIColor.white.withAlphaComponent(0.1)
+    btn.layer.cornerRadius = 16
+    btn.addTarget(self, action: #selector(close), for: .touchUpInside)
+    return btn
+}()
+
+override func viewDidLoad() {
+    super.viewDidLoad()
+
+    // Step 1: 先加 hosting VC
+    let hostingVC = BCHostingController(rootView: paywallView)
+    addChild(hostingVC)
+    view.addSubview(hostingVC.view)
+    hostingVC.view.frame = view.bounds
+    hostingVC.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    hostingVC.didMove(toParent: self)
+
+    // Step 2: 再加 closeBtn（在 hosting view 之上）
+    view.addSubview(closeBtn)
+    closeBtn.translatesAutoresizingMaskIntoConstraints = false
+    NSLayoutConstraint.activate([
+        closeBtn.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+        closeBtn.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+        closeBtn.widthAnchor.constraint(equalToConstant: 32),
+        closeBtn.heightAnchor.constraint(equalToConstant: 32),
+    ])
+}
+
+// Step 3: 暴露给 base class，让 closeAlpha 机制工作
+override var getCloseButton: UIButton? { closeBtn }
+*/

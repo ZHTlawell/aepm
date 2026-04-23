@@ -145,21 +145,46 @@ fi
 
 # Step 3: Start userspace tunnel (iOS 17+)
 # Userspace tunnel is per-machine (serves all connected devices via pymobiledevice3).
-# Reuse if already running — killing it would break any other session's WDA.
+# Reuse only if the RSD connection is still alive — stale tunnels (common after
+# several hours of uptime) leave the process running but RSD reset-by-peer, which
+# silently breaks port forwarding and manifests as xcodebuild "code 74".
+# See issue #IJDSS3 for the failure mode.
 log "Step 3: 启动 userspace tunnel..."
+tunnel_rsd_alive() {
+    # Probe with a short timeout; ios info returns non-zero on RSD failure.
+    timeout 5 ios info --udid="$UDID" >/dev/null 2>&1
+}
 EXISTING_TUNNEL_PID=$(pgrep -f "ios tunnel" | head -1 || true)
+NEED_START_TUNNEL=true
 if [[ -n "$EXISTING_TUNNEL_PID" ]]; then
-    log "tunnel 已在运行 (PID: $EXISTING_TUNNEL_PID) — 复用，不重启"
-    TUNNEL_PID="$EXISTING_TUNNEL_PID"
-else
+    if tunnel_rsd_alive; then
+        log "tunnel 已在运行且 RSD 健康 (PID: $EXISTING_TUNNEL_PID) — 复用"
+        TUNNEL_PID="$EXISTING_TUNNEL_PID"
+        NEED_START_TUNNEL=false
+    else
+        warn "tunnel 进程存在但 RSD 不可达（已失效，常见于长时间运行后）— 重启"
+        warn "注意：如有其他并行 WDA session，需同步重连"
+        pkill -f "ios tunnel" 2>/dev/null || true
+        pkill -f "ios forward" 2>/dev/null || true
+        sleep 2
+    fi
+fi
+
+if $NEED_START_TUNNEL; then
     ios tunnel start --userspace &>/dev/null &
     TUNNEL_PID=$!
-    sleep 2
-
+    # Wait for RSD to come up (userspace tunnel bootstrap can take 3-8s)
+    for i in $(seq 1 8); do
+        sleep 1
+        if tunnel_rsd_alive; then
+            log "tunnel 已启动且 RSD 就绪 (PID: $TUNNEL_PID, ${i}s)"
+            break
+        fi
+    done
     if ! kill -0 "$TUNNEL_PID" 2>/dev/null; then
         warn "tunnel 进程已退出（可能 iOS < 17 不需要 tunnel）"
-    else
-        log "tunnel 已启动 (PID: $TUNNEL_PID)"
+    elif ! tunnel_rsd_alive; then
+        warn "tunnel 启动后 RSD 仍不可达 — 继续尝试，可能在后续步骤失败"
     fi
 fi
 

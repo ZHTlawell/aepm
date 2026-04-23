@@ -1,0 +1,62 @@
+guideline: "2.1"
+chapter: "2-Performance"
+title: "App Completeness — 功能完整性"
+severity: high
+official_text: |
+  (From Apple App Review Guidelines Section 2.1)
+  Submit your app for review only when it is complete and ready to be
+  published. Make sure to thoroughly test your app on-device with the final
+  release candidate build, fix any bugs before submitting, and include demo
+  account info (and turn on your back-end service) in the "App Review
+  Information" section of App Store Connect.
+
+  Apps that crash, display placeholder content, or have references to test
+  data or to the test environment will be rejected.
+official_url: "https://developer.apple.com/app-store/review/guidelines/#2.1"
+
+triggers:
+  - "任何 App 提审前"
+
+auto_checks:
+  - id: "2.1-no-placeholder-in-code"
+    type: shell
+    command: "grep -rEn '(TODO|FIXME|HACK|PLACEHOLDER|lorem ipsum)' --include='*.swift' . 2>/dev/null | grep -vE '//\\s*TODO\\s*:\\s*$' | head -10"
+    expected: empty
+    severity: medium
+    on_fail: "代码中存在 TODO/FIXME/PLACEHOLDER/lorem ipsum 字样 — 审核员会认为 App 未完成"
+    case_refs: []
+
+  - id: "2.1-no-placeholder-ui-text"
+    type: shell
+    command: "grep -rEn '\"(Lorem|Test\\s|Sample\\s|Placeholder|Coming Soon|待实现|敬请期待)' --include='*.swift' --include='*.strings' . 2>/dev/null | head -5"
+    expected: empty
+    severity: high
+    on_fail: "UI 文本含 'Coming Soon'/'Placeholder'/'Lorem Ipsum'/'待实现'/'敬请期待' 等字样"
+    case_refs: []
+
+  - id: "2.1-no-unimplemented-views"
+    type: shell
+    command: "grep -rEn 'fatalError\\(\"Not implemented|fatalError\\(\"TODO|EmptyView\\(\\)\\s*//\\s*TODO' --include='*.swift' . 2>/dev/null | head -5"
+    expected: empty
+    severity: high
+    on_fail: "存在 fatalError('Not implemented') 或 EmptyView 占位 — Guideline 2.1 常见拒审原因"
+    case_refs: []
+
+  - id: "2.1-no-nav-to-empty-views"
+    type: shell
+    command: "grep -rEn 'NavigationLink.*destination:\\s*EmptyView\\(\\)|NavigationLink.*destination:\\s*Text\\(\"\"\\)' --include='*.swift' . 2>/dev/null | head -5"
+    expected: empty
+    severity: high
+    on_fail: "NavigationLink 指向 EmptyView 或空 Text — 未实现功能"
+    case_refs: []
+
+review_notes_template: |
+  - All features and pages are fully functional in this build; no TODOs or placeholders remain.
+
+fix_suggestions:
+  - "把所有 TODO 改为已实现或移除对应入口"
+  - "fatalError('Not implemented') 一律替换为真实实现或隐藏入口"
+  - "UI 上的 'Coming Soon' 要么实装功能，要么删掉该入口"
+
+case_refs: []
+updated_at: "2026-04-22"

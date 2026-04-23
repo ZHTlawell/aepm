@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.59.1 (2026-04-23) — WDA tunnel RSD 探活修复（真正的 code 74 根因）[`#IJDSS3`](https://gitee.com/turningsyn/ae-pm/issues/IJDSS3)
+
+### 修复
+
+- **`wda-start.sh` tunnel 复用逻辑** — 原脚本仅凭 `ios tunnel` PID 存在就复用，不检查 RSD（remote service discovery）连接是否仍有效。go-ios userspace tunnel 长时间运行（数小时）后 RSD 会断裂，此时 `ios forward` 进程存在但本地端口无监听，xcodebuild 测试建立不了 IPC → 误报 code 74。
+- **新方案**：复用前用 `timeout 5 ios info --udid=$UDID` 探活 RSD；失败则 pkill + 重启 tunnel + forward；启动后轮询直到 RSD 就绪（最多 8 秒）。
+- **验证**：liwei (bible-app) 在 iPhone 16 + iOS 26.2 beta 真机上 `/ae-report-fix` 回流验证通过，`wda-start.sh` 立即以 `test-without-building` 成功启动。
+
+### 根因总结（覆盖 v0.57.1 初步分析）
+
+v0.57.1 加的 `-allowProvisioningUpdates` 是无害的最佳实践但不是主要根因。真正的阻塞是 tunnel 腐化后复用逻辑未探活。本版本同时保留 v0.57.1 的所有改进（Developer Mode / DDI 诊断 / 故障排查表）。
+
 ## v0.59.0 (2026-04-23) — ae-speckit-to-app 文龙 review 共识 8 条落地 + ae-git CLI 新增 commits list-comments [`#IJDSBR`](https://gitee.com/turningsyn/ae-platform/issues/IJDSBR)
 
 ### 文龙（wangwenlong_7478）commit 714e2c9 review 已达成共识 8 条落地

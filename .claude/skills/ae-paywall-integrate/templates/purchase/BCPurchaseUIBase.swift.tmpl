@@ -1,0 +1,76 @@
+//
+//  PurchaseUI{{MEMO}}ViewController.swift
+//  {{PRODUCT_NAME}}
+//
+//  来源: bible-ios-template Template/Feature/PurchaseUI/PurchaseUIBibleViewController.swift
+//  对应 04-15 comment：乐挺指导 "BCPurchaseUI_07 只是一个例子，只需要写一个子类"
+//
+//  使用方式：
+//  1. 类名严格遵循 PurchaseUI{{MEMO}}ViewController（BCPurchaseUIManager 通过 NSClassFromString 加载）
+//  2. PurchaseUIConfig.defaultMemo 改为 {{MEMO}}（如 "Bible"）
+//  3. 内部用 BCHostingController 包装 SwiftUI 的 PaywallView（来自 Locals/{{PRODUCT_NAME}}/UI/Views/PaywallView.swift）
+//  4. UIKit 层追加独立 closeBtn — 修复 SwiftUI X 按钮在 UIKit 容器 touch 不响应（见 CloseButtonHack.swift.tmpl）
+//  5. override skuIds / currentSkuId 暴露产品订阅商品
+//
+
+import UIKit
+import BCPurchaseBasicUI
+import BCUtils
+import BCStoreKit
+import SwiftUI
+import {{PRODUCT_NAME}}
+
+@objc(PurchaseUI{{MEMO}}ViewController)
+class PurchaseUI{{MEMO}}ViewController: PurchaseUIBaseViewController {
+
+    private lazy var closeBtn: UIButton = {
+        let btn = UIButton(type: .system)
+        let config = UIImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+        btn.setImage(UIImage(systemName: "xmark", withConfiguration: config), for: .normal)
+        btn.tintColor = UIColor.white.withAlphaComponent(0.5)
+        btn.backgroundColor = UIColor.white.withAlphaComponent(0.1)
+        btn.layer.cornerRadius = 16
+        btn.addTarget(self, action: #selector(close), for: .touchUpInside)
+        return btn
+    }()
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+
+        let paywallView = PaywallView(
+            paywallTitle: "{{PAYWALL_TITLE}}",
+            onDismiss: { [weak self] in self?.close() }
+        )
+        let hostingVC = BCHostingController(rootView: paywallView)
+        addChild(hostingVC)
+        view.addSubview(hostingVC.view)
+        hostingVC.view.frame = view.bounds
+        hostingVC.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        hostingVC.didMove(toParent: self)
+
+        // UIKit close button on top — SwiftUI X 按钮在 UIKit 容器 touch 传递失效
+        view.addSubview(closeBtn)
+        closeBtn.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            closeBtn.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+            closeBtn.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            closeBtn.widthAnchor.constraint(equalToConstant: 32),
+            closeBtn.heightAnchor.constraint(equalToConstant: 32),
+        ])
+    }
+
+    // 让 base class 的 closeAlpha 机制正常工作
+    override var getCloseButton: UIButton? { closeBtn }
+
+    override var skuIds: [String] {
+        [
+            "{{SKU_WEEKLY}}",
+            "{{SKU_MONTHLY}}",
+            "{{SKU_YEARLY}}"
+        ]
+    }
+
+    override var currentSkuId: String {
+        "{{SKU_YEARLY}}"  // 默认主推
+    }
+}
