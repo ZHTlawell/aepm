@@ -1,5 +1,6 @@
 ---
 description: "Speckit → 本地可用 iOS 程序：Route B 选型约束 + 代码模板包 + precheck + 调试速查，供外部 harness 驱动实现"
+last_updated: "2026-04-23"
 permissions:
   allow:
     - "Bash(pod install:*)"
@@ -55,18 +56,56 @@ PM/Agent 已经有一个 **Speckit**（产品规格包，含 6 模块：overview
 典型场景：
 - ae-speckit-brainstorm / ae-demo-to-speckit 产出完 Speckit，准备落地成代码
 - 需要 app-service stage 后端联调的产品（带 LLM / 支付 / 归因 / 埋点全套）
-- 接入 BytesCell 组件体系（非 SPM 纯 Route A Demo 路线）
+- 接入 BytesCell 组件体系
 
-**不适用**：纯前端 demo（无后端、无支付、无埋点）— 走 Route A (`/ae-app-to-testflight` 直链) 更快。
+> **所有产品必须走 Route B。** Route A（纯前端 demo 直链 TestFlight）不再作为例外保留——原因：Route A 产品无法同步用户信息和支付状态，产品成功后无法扩量；而后端 Route B 流程已成熟，接入成本可控。
 
-## 定位声明 — 薄 harness
+## 定位声明 — 薄 harness + 推荐执行顺序
 
-SKILL.md **故意不包含 Phase 1/2/3/... 的执行顺序**。原因：
-- 外部 harness 知道上下文（当前项目状态、已有资产、并行度）
-- 不同产品的阻塞项不同（有人卡在权限、有人卡在 CocoaPods、有人卡在 iOS 15 兼容），硬编排顺序反而低效
-- 本 skill 提供**约束集**（machine-checkable）+ **模板包**（copy-paste-able），harness 自行选择路径
+SKILL.md **故意不硬编排 Phase 1/2/3/...**，但给出"推荐执行顺序（默认路径）"供 harness 参考。80% 情况照走即可，剩余 20% 按实际阻塞点灵活跳步。
 
-harness 只需要保证：每条 TS-XXX 约束都被遵守、每个模板被正确对接到目标工程、precheck 全绿、done criteria 全过。
+**推荐执行顺序：**
+
+```
+1. Precheck P1/P2/P3 权限类（🛑 阻塞点，任一不过全停）
+       │
+       ▼
+2. Precheck P4 BCConfig 品牌参数
+       │
+       ▼
+3. Podfile 模板装配（templates/cocoapods/）
+       │
+       ▼
+4. Precheck P5 pod install 通过
+       │
+       ▼
+5. Work Chain 12 步骨架装配（templates/work-chain/）
+       │
+       ▼
+6. 业务代码按 TS-020/021/022/023 约束填充
+       │
+       ▼
+7. iOS 15 兼容扫描（templates/ios15-compat/）
+       │
+       ▼
+8. xcodebuild build（模拟器）
+       │
+       ▼
+9. Precheck P6 后端 stage 可达性（🛑 有后端时阻塞）
+       │
+       ▼
+10. 真机 archive 可过（🛑 codesigning 卡点）
+       │
+       ▼
+11. 推 GitLab + CI 绿（🛑 后端 stage Pipeline）
+       │
+       ▼
+12. Done Criteria D1~D5 逐项确认
+```
+
+🛑 = 可能的阻塞点，需要人工介入或外部依赖（杭州团队 / 运营 / Apple 账号）。其余步骤可并行或由 agent 自主推进。
+
+harness 只需要保证：每条 TS-XXX 约束被遵守、每个模板正确对接、precheck 全绿、done criteria 全过。**非阻塞步骤的顺序可调整**。
 
 ## 输入
 
@@ -113,7 +152,9 @@ harness 只需要保证：每条 TS-XXX 约束都被遵守、每个模板被正�
 | **TS-014** | 硬编码 API Key | 密钥只在服务端 CI 变量中，客户端不存储 | **本 skill**（安全基线）|
 | **TS-015** | `import StoreKit` 直接使用 | 通过 BCStoreKit 封装 | → 见 `/ae-paywall-integrate` |
 
-> **TS-010/011/012/015 的完整 precheck + 代码模板 + 故障排查** 由对应 integrate skill 负责。本 skill 只透传禁止项作为 linter 规则，不再维护具体实现约束。
+> **本 skill 只透传禁止项作为 linter 规则**（grep `import AdjustSdk` 等）。**接入验证不在本 skill 范围内**——完整 precheck、代码模板、接入正确性校验、故障排查由对应下游 integrate skill 负责（埋点验证 → `/ae-analytics-integrate`，支付验证 → `/ae-paywall-integrate`）。
+>
+> **Pod 版本号不在此表维护** — 替代方案涉及的 BCAdjust / BCSensor / BCStoreKit / BCNetwork 等 Pod 版本号**以 `templates/cocoapods/Podfile.tmpl` 为单一来源**，避免多处硬编码升级时漂移。
 
 ### C. 架构约束（TS-020 ~ TS-027）
 
@@ -121,7 +162,7 @@ harness 只需要保证：每条 TS-XXX 约束都被遵守、每个模板被正�
 |-------|------|------|-----------|
 | **TS-020** | UI 架构 | MVVM + Combine。SwiftUI 视图必须用 `BCHostingController` 包装到 UIKit 容器中 | **本 skill** |
 | **TS-021** | 导航 | CTMediator 跨模块通信。Tab 页必须在 `TabbarItemType` 枚举中注册 | **本 skill** |
-| **TS-022** | 启动序列 | `WorkVoidCallbackTask` 串行链 12 步：ComponentConfig → Adjust → Debug → Legal → ABTest → UserInit → Upgrade → AfterLogin → DataPreload → Welcome → ConversionPage → MainPage | **本 skill**（骨架）+ 分步实现由对应 integrate 提供 |
+| **TS-022** | 启动序列 | `WorkVoidCallbackTask` 串行链 **12 步（bible-app 参考实现）**：ComponentConfig → Adjust → Debug → Legal → ABTest → UserInit → Upgrade → AfterLogin → DataPreload → Welcome → ConversionPage → MainPage。**支持可选第 11 步 `SupportRateWork`（Capvault 模式 13 步变体）**，模板见 `templates/work-chain/11_SupportRateWork.swift.tmpl` | **本 skill**（骨架）+ 分步实现由对应 integrate 提供 |
 | **TS-023** | 账号 | 必须用 BCAccount 设备自动登录，无需用户注册。Login 在 `LaunchTransitionViewController` 中触发 | **本 skill** |
 | **TS-024** | 支付 | `BCStoreKit.setup(skus)` 初始化 → `BCPurchaseUIManager` 展示付费墙 → `BCAccount.isVip` 判断 VIP 状态 | → `/ae-paywall-integrate` |
 | **TS-025** | AB 测试 | 必须用 `BCABTest.shared.syncFetch*()` 获取服务端配置 | → `/ae-abtest-integrate` |
@@ -166,7 +207,7 @@ grep -rn 'NavigationStack\|ShareLink\|\.scrollContentBackground\|\.toolbarColorS
 
 | 模板目录 | 用途 | 文件 | 来源 |
 |---------|------|------|------|
-| `templates/work-chain/` | 12 步 Work Chain 骨架 | `README.md` + 12 个 `.swift.tmpl` | ✅ 从 bible-ios-template `Template/Core/StartupSequence/` 提取 |
+| `templates/work-chain/` | Work Chain 骨架（12 步 + 1 可选）| `README.md` + 13 个 `.swift.tmpl`（01~13，其中 `11_SupportRateWork` 为 Capvault 模式可选插入点，bible-app 未启用）| ✅ 从 bible-ios-template `Template/Core/StartupSequence/` + Capvault 对齐 |
 | `templates/config/` | BCConfig 环境切换（prod/stage/test） | `BCConfig.swift.tmpl` | ✅ 从 `Locals/BCConfig/BCConfig/BCConfig.swift` 提取 |
 | `templates/ios15-compat/` | iOS 15 API 降级速查表（9 类） | `api-downgrade-table.md` | ✅ 从 04-15 trajectory 原文提取 |
 | `templates/cocoapods/` | V1+V2 私有源 Podfile 配置 | `Podfile.tmpl` | ✅ 从 bible-ios-template `Podfile` 提取 |
@@ -219,6 +260,8 @@ security find-identity -p codesigning -v | grep -E "Apple Development|Apple Dist
 - 至少一个对应 Team ID 的证书 → 通过
 - 空 → **阻塞**：Xcode → Settings → Accounts → + Apple ID，登录后 2FA 验证（唯一人工卡点）
 
+> **执行环境限制（当前阶段）：** P3 要求在**开发者本地机器**执行（Xcode GUI 登录 + 2FA 交互），不支持 CI 自动化。**CI Mac 方案待 iOS CI 流程成熟后补充**（目前 Scale Global iOS 侧未建立 CI pipeline）。
+
 ### P4. BCConfig env 文件就位 + 品牌参数已填
 
 harness 检查 `Locals/BCConfig/BCConfig/BCConfig.swift`：
@@ -245,8 +288,14 @@ pod install --repo-update 2>&1 | tail -10
 curl -sS -o /dev/null -w "%{http_code}\n" https://app-stage.{product}.itemvaults.com/api/user/v1/initialize
 ```
 
-- 返回 401/403（缺 SIGN header）→ 通过（服务正常）
-- 返回 504 / 连接超时 → **阻塞**：查 stage EC2 服务状态（bible-app 踩坑：deploy 后 Java 服务 OOM）
+**返回码解读：**
+
+| 返回 | 含义 | 状态 |
+|------|------|------|
+| **401 / 403** | 服务在线，客户端请求缺必要参数（缺 SIGN header / userId）或参数不符合预期，属于预期响应 | ✅ 通过 |
+| **200** | 服务在线（可能存在空 GET 端点） | ✅ 通过 |
+| **5xx（500/502/503）** | 服务端异常（后端崩 / OOM / 未启动） | 🛑 阻塞：查 stage EC2 Java 进程 + 日志（bible-app 踩坑：deploy 后 OOM）|
+| **504 / 连接超时 / curl error 28** | 服务不可达（网关 timeout / DNS 解析失败 / 端口未开放） | 🛑 阻塞：查网络 + Load Balancer + EC2 安全组 |
 
 ---
 
@@ -355,7 +404,7 @@ harness 必须验证以下 5 项全过才能标记 skill 完成：
 | D2 | 模拟器编译通过 | `xcodebuild build -workspace Template.xcworkspace -scheme Template -destination "generic/platform=iOS Simulator"` | `BUILD SUCCEEDED` |
 | D3 | 真机 archive 可过 | `xcodebuild archive -workspace Template.xcworkspace -scheme Template -archivePath /tmp/{product}.xcarchive -destination 'generic/platform=iOS' -allowProvisioningUpdates CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM={TeamID}` | `** ARCHIVE SUCCEEDED **` |
 | D4 | 启动链跑通到 MainTab | 模拟器/真机启动 + `idb ui describe-all` 或手动观察 | 看到 4 个 Tab（按 Speckit 定义），非启动页白屏 |
-| D5 | stage CI 绿灯 | iOS 端推送后查 GitLab CI 页面 | Pipeline 全绿（如 iOS 无 CI 则仅检查后端 Pipeline） |
+| D5 | stage CI 绿灯 | 推送后查 GitLab CI 页面 | **当前阶段**：iOS 侧无 CI（Scale Global iOS CI pipeline 未建立），**仅检查后端 Pipeline 全绿**；iOS CI 搭建后需回来更新本条 |
 
 **任一不过 → 不 publish，不 close issue，comment 说明阻塞原因。**
 

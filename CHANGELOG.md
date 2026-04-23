@@ -1,5 +1,46 @@
 # Changelog
 
+## v0.59.0 (2026-04-23) — ae-speckit-to-app 文龙 review 共识 8 条落地 + ae-git CLI 新增 commits list-comments [`#IJDSBR`](https://gitee.com/turningsyn/ae-platform/issues/IJDSBR)
+
+### 文龙（wangwenlong_7478）commit 714e2c9 review 已达成共识 8 条落地
+
+针对 `ae-speckit-to-app/SKILL.md` 的文档改进：
+
+| 条目 | 改动 |
+|------|------|
+| **1** | 新增"推荐执行顺序（默认路径）"12 步流程图 + 标注 🛑 阻塞点；保持"非阻塞步骤可灵活跳步"原则 |
+| **2** | 删除"不适用：纯前端 demo → Route A"例外描述，改为"所有产品必须走 Route B"明确声明 + 原因说明 |
+| **4** | TS-010~015 表格下注明"本 skill 只透传 linter 规则，接入验证由对应下游 integrate skill 负责" |
+| **5** | TS-010~015 表格下注明"Pod 版本号以 `templates/cocoapods/Podfile.tmpl` 为单一来源"，避免硬编码漂移 |
+| **6** | P3 加说明"当前要求开发者本地机器执行，CI Mac 方案待 iOS CI 流程成熟后补充" |
+| **7** | P6 curl 返回码改为四档精确说明表（200/401/403 在线、5xx 异常、504/timeout 不可达）|
+| **8** | TS-022 说明"12 步（bible-app 参考实现）+ 可选第 11 步 SupportRateWork（Capvault 13 步变体）"，templates 索引同步更新为 13 个 .tmpl |
+| **13** | D5 改为"当前 iOS 侧无 CI，仅检查后端 Pipeline；iOS CI 搭建后需回来更新" |
+| **15** | frontmatter 新增 `last_updated: "2026-04-23"` |
+
+### ae-git CLI 能力增强
+
+新增 `commits list-comments` 子命令，支持拉取 commit 级 review 评论（原只能处理 issue comments）：
+
+```bash
+ae git commits list-comments --repo ae-pm --sha 714e2c9 --pretty
+```
+
+**用途：** 读取审计者在 release commit 上留下的代码 review。文龙的 15 条 review 就是通过此能力拉取的。
+
+### 待处理（条目 8 以外的待 leting 确认，iOS 部分）
+
+| 条目 | 问题 |
+|------|------|
+| 3 | iOS 15 禁止 API 列表是否内嵌到 TS-003 |
+| 9 | `{{MEMO}}` vs `{{PRODUCT_NAME}}` 占位符含义 |
+| 10 | DEBUG_SKIP grep 自检放 Precheck 还是 Done Criteria |
+| 11 | xcodeproj gem 路径写死 CocoaPods 1.16.2 是否动态查找 |
+| 12 | D4 启动链 idb 自动验证 Tab 数量可行性 |
+| 14 | F9 iOS 26 橙色相机按钮是稳定结论还是临时 workaround |
+
+需 leting 审阅后发后续版本（v0.59.1 / v0.60.0）。
+
 ## v0.58.0 (2026-04-23) — ae-speckit-to-app 主流程减肥：8 条 TS 约束 + 2 个 templates 迁出到对应 integrate [`#IJDSBR`](https://gitee.com/turningsyn/ae-platform/issues/IJDSBR)
 
 ### 减肥变更

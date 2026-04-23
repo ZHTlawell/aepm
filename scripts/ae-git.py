@@ -339,6 +339,47 @@ def cmd_issues_list_comments(args):
     output({"comments": comments[:args.per_page], "total": len(comments)}, args.pretty)
 
 
+def cmd_commits_list_comments(args):
+    """List comments on a single commit.
+
+    Gitee 标准 API（企业仓库也走标准 path，access 由 token 权限决定）：
+      GET /repos/{owner}/{repo}/commits/{ref}/comments
+    """
+    token = load_token(args.token)
+    if not token:
+        error_exit("未找到 GITEE_TOKEN，请运行 ae setup 配置", EXIT_AUTH_ERROR)
+
+    comments = []
+    page = 1
+    per_page = min(args.per_page, 100)
+
+    while True:
+        url = (f"{GITEE_API}/repos/{args.owner}/{args.repo}/commits/{args.sha}/comments"
+               f"?per_page={per_page}&page={page}")
+        batch = api_request("GET", url, token=token)
+
+        if not isinstance(batch, list):
+            break
+
+        for item in batch:
+            user = item.get("user", {})
+            comments.append({
+                "id": item.get("id", ""),
+                "author": user.get("name", "") or user.get("login", ""),
+                "created_at": item.get("created_at", ""),
+                "updated_at": item.get("updated_at", ""),
+                "path": item.get("path", ""),
+                "position": item.get("position", ""),
+                "body": item.get("body", ""),
+            })
+
+        if len(batch) < per_page or len(comments) >= args.per_page:
+            break
+        page += 1
+
+    output({"comments": comments[:args.per_page], "total": len(comments)}, args.pretty)
+
+
 def cmd_issues_close(args):
     token = load_token(args.token)
     if not token:
@@ -536,6 +577,15 @@ def build_parser():
     p.add_argument("--comment-id", required=True, help="Comment ID (from list-comments or comment response)")
     p.add_argument("--body", required=True, help="New comment body")
 
+    # ── commits ──
+    commits = sub.add_parser("commits", help="Commit operations (review comments)", parents=[global_opts])
+    commits_sub = commits.add_subparsers(dest="action")
+
+    p = commits_sub.add_parser("list-comments", help="List review comments on a commit", parents=[global_opts])
+    p.add_argument("--repo", required=True)
+    p.add_argument("--sha", required=True, help="Commit SHA (full or short)")
+    p.add_argument("--per-page", type=int, default=50)
+
     # ── upload-image ──
     p = sub.add_parser("upload-image", help="Upload image to Gitee repo", parents=[global_opts])
     p.add_argument("--repo", required=True)
@@ -559,6 +609,7 @@ COMMANDS = {
     ("issues", "close"): cmd_issues_close,
     ("issues", "edit"): cmd_issues_edit,
     ("issues", "edit-comment"): cmd_issues_edit_comment,
+    ("commits", "list-comments"): cmd_commits_list_comments,
     ("upload-image", None): cmd_upload_image,
     ("auth", "validate"): cmd_auth_validate,
     ("auth", "user"): cmd_auth_user,
