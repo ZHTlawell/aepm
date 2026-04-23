@@ -156,7 +156,6 @@ CLI 会自动加载 credentials、调用 Gitee API、返回 issue 链接。
 | Speckit → 本地可用程序 | `/ae-speckit-to-app` — Route B 选型约束 + 代码模板包（M1→M2 核心） | 🆕 v0.49.0 |
 | TestFlight 分发 | `/ae-app-to-testflight` — archive → upload → TestFlight 分发（M2→M3 主路径） | 可用 |
 | Skill 构建 | `/ae-skill-creator` — 标准化 skill 构建全流程（六段标准 + 审计模式） | 可用 |
-| 发布前预检 | `/ae-preflight` — iOS 一体化生产就绪扫描（已融入 ae-speckit-to-app 内部 precheck，仍可独立触发） | 可用 |
 | 线上项目本地化 | `/ae-prod-to-local` — 分析线上项目结构，生成可本地编译运行的配置 | 可用 |
 | Demo 转 Figma | `/ae-demo-to-figma` — 将 demo 项目的 UI 导入 Figma 设计稿 | 可用（需 Figma MCP） |
 | 审核自检 | `/ae-app-review-check` — 对照 Apple Review Guidelines + AI 审核规则自检 | 可用 |

@@ -48,9 +48,9 @@ M3  TestFlight ──────────────── 可测 Build 已
 
 | Skill | 说明 | 触发命令 |
 |-------|------|---------|
-| `/ae-speckit-to-app` 🆕 | Route B 约束 + 代码模板包，从 Speckit 生成本地可用程序 | `/ae-speckit-to-app` |
+| `/ae-speckit-to-app` | Route B 约束 + 代码模板包 + Precheck P1~P6，从 Speckit 生成本地可用程序 | `/ae-speckit-to-app` |
 
-这是 PM 产品线最核心、技术约束最密集的一段。skill 本身是**薄 harness**，只做约束透传 + 模板装配 + precheck，具体构建由外部 harness（ae-dev / Claude Code / Codex）驱动。预检已融入这个 skill 内部（不再独立 `/ae-preflight`）。
+这是 PM 产品线最核心、技术约束最密集的一段。skill 本身是**薄 harness**，只做约束透传 + 模板装配 + precheck，具体构建由外部 harness（ae-dev / Claude Code / Codex）驱动。**生产就绪预检（CocoaPods 权限 / Apple ID / BCConfig / pod install / 后端 stage）已内置**，原独立 `/ae-preflight` 已退休合并。
 
 **输出：** 可在模拟器/真机本地运行的 iOS 工程（含后端）。
 
@@ -78,15 +78,44 @@ M3  TestFlight ──────────────── 可测 Build 已
 
 ## Utility Skills
 
-下列 skill 不在主线 M0→M3 流水线上，但在日常 PM 工作中按需触发。源码仍保留在 `skills/pm/` 下。
+下列 skill 不在主线 M0→M3 流水线上，但在日常 PM 工作中按需触发。源码保留在 `skills/pm/` 下。
+
+**产品质量类：**
 
 | Skill | 一句话定位 |
 |-------|-----------|
 | `/ae-verify-app` | E2E 对比 demo vs 成品，自动归因差异 |
 | `/ae-file-bugs` | 从 verify 报告批量生成 issue 并提交 |
+| `/ae-app-review-check` | 对照 Apple Review Guidelines + AI 审核规则自检 |
+| `/ae-asc-submit` | ASC 元数据配置 + 截图上传 + Review Notes + 提交审核 |
+
+**素材/设计类：**
+
+| Skill | 一句话定位 |
+|-------|-----------|
 | `/ae-demo-to-figma` | 将 demo 原型导入 Figma 设计稿 |
 | `/ae-image-decopyrighter` | 图片 AI 重绘去版权化（Gemini Imagen 4.0） |
+
+**工程基础类：**
+
+| Skill | 一句话定位 |
+|-------|-----------|
 | `/ae-prod-to-local` | 将线上项目转为本地可编译运行的配置 |
+
+**反馈与能力请求：**
+
+| Skill | 一句话定位 |
+|-------|-----------|
+| `/ae-submit-bug` | 结构化 Bug 报告（含查重 + 验证标准）|
+| `/ae-submit-requirement` | 结构化能力需求提交 |
+| `/ae-report-fix` | 本地修复成功后结构化回流方案给 AE Team |
+| `/ae-lark-feishu` | 飞书消息读写、搜索、会议纪要 |
+
+**Meta：**
+
+| Skill | 一句话定位 |
+|-------|-----------|
+| `/ae-skill-creator` | 造 skill 的 skill（六段标准 + 审计模式） |
 
 ## 路线：Route B
 
@@ -226,16 +255,17 @@ ae doctor
 └── ...
 ```
 
-## 移出主线（另议）
+## 已退休 skill
 
-下列能力从本次 M0→M3 主线中移出，源码保留供参考，但需求和路线另议：
+下列 skill 已下线，源码目录已删除。新用户请直接使用替代方案：
 
-- **`/ae-app-review-check`** — App Store 审核自检（M3 之后另议）
-- **`/ae-asc-submit`** — ASC 元数据提交审核（M3 之后另议）
-- **`/ae-prod-data-feedback-report`** — 产品数据反馈报告（Stage 5 另议）
-- **`/ae-preflight`** — 已融入 `/ae-speckit-to-app` 内部 precheck，不再独立触发；目录暂保留供参考。
-
-**已废弃：** `/ae-superwall-setup`（Route A 遗产，已删除目录）。
+| 已退休 | 退休原因 | 替代方案 |
+|--------|---------|---------|
+| `/ae-superwall-setup` | Route A 遗产 | Route B → `/ae-speckit-to-app` |
+| `/ae-paywall-design` | 纯 UI 产出无订阅逻辑，不足端到端 | `/ae-paywall-integrate`（v0.51.0 合并）|
+| `/ae-onboarding-design` | 同上 | `/ae-onboarding-integrate`（v0.56.0 合并）|
+| `/ae-preflight` | 独立 precheck 已融入 M1→M2 核心 | `/ae-speckit-to-app` 内部 Precheck P1~P6 |
+| `/ae-prod-data-feedback-report` | 三件套不完整 + 使用频率低 | 暂无；如需产品数据分析，PM 自行 SQL 查神策 / Firebase |
 
 ## 反馈与贡献
 
@@ -269,7 +299,7 @@ ae pm submit-bug "问题标题" "问题描述"
 
 查看 [CHANGELOG.md](CHANGELOG.md) 了解完整更新记录。
 
-当前版本：**v0.60.1**
+当前版本：**v0.61.0**
 
 ## 由谁维护
 

@@ -290,7 +290,7 @@ _setup_overrides_dir() {
 创建文件 `skip-privacy-check.md`：
 
 ```
-ae-preflight 执行时，跳过隐私声明（PrivacyInfo.xcprivacy）检查项。
+ae-speckit-to-app 执行时，跳过隐私声明（PrivacyInfo.xcprivacy）检查项。
 原因：本项目暂不上架 App Store，不需要隐私声明。
 ```
 

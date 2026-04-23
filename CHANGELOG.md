@@ -1,5 +1,61 @@
 # Changelog
 
+## v0.61.0 (2026-04-23) — 整体 skill 审计 + 2 个 skill 退休 + README 后续流程重构 [`#IJD7GE`](https://gitee.com/turningsyn/ae-pm/issues/IJD7GE)
+
+### Skill 退休（2 个）
+
+| 已退休 | 退休原因 | 替代方案 |
+|--------|---------|---------|
+| `/ae-preflight` | 独立 precheck 已融入 M1→M2 核心，文档口径矛盾（一边说"融入"一边目录保留）| `/ae-speckit-to-app` 内置 Precheck P1~P6（CocoaPods 权限 / Apple ID / BCConfig / pod install / 后端 stage） |
+| `/ae-prod-data-feedback-report` | 三件套不完整（只有 SKILL.md，无 README / test-scenarios）+ 使用频率低 | 暂无；如需产品数据分析，PM 自行 SQL 查神策 / Firebase |
+
+源码目录 `skills/pm/ae-preflight/` 和 `skills/pm/ae-prod-data-feedback-report/` 已删除。
+
+### Skill 归位（2 个）
+
+原在 README "移出主线（另议）" 段的 2 个 skill 正式归入 Utility：
+
+- `/ae-app-review-check` — 产品质量类（Apple Review Guidelines 自检）
+- `/ae-asc-submit` — 产品质量类（ASC 元数据配置 + Review Notes + 提交审核）
+
+### README 重构
+
+**`templates/pm/README.md`（用户可见）：**
+
+- M1→M2 核心段描述：明确"生产就绪预检已内置 P1~P6，原 `/ae-preflight` 已退休合并"（修复文档矛盾）
+- M2→M3 发布段：主干保持 `/ae-app-to-testflight`
+- Utility Skills 表重构：从 5 行扩展为 4 分组 × 共 12 个 skill（产品质量 / 素材设计 / 工程基础 / 反馈与能力请求 / Meta）
+- 删除"移出主线（另议）"段 → 替换为"已退休 skill"表（含 5 个历史退休：superwall-setup / paywall-design / onboarding-design / preflight / prod-data-feedback-report）
+
+**`README.md`（主仓，开发者视角）：**
+
+- mermaid "发布主干" 子图：移除 ae-preflight，新增 ae-app-review-check + ae-asc-submit
+- PM Skills 表：移除 ae-preflight 行，新增 ae-app-review-check + ae-asc-submit 行
+- 发布准备链 ASCII：`speckit-to-app (含 Precheck) → testflight → review-check → asc-submit`
+- Skill 间协作关系：同步更新流程链描述
+
+**`VISION.md`**：
+
+- 独有能力表：ae-preflight 行替换为 ae-speckit-to-app（一体化预检 + 模板包），新增 ae-*-integrate 7 个 BC 生态 Pod 封装行
+
+**其他清理：**
+
+- `cli/lib/link.sh` 用户 override 示例 — ae-preflight 改为 ae-speckit-to-app
+- `scripts/generate-manifest.sh` docstring 例 — ae-preflight 改为 ae-paywall-integrate
+- `templates/pm/CLAUDE.md` 能力表：移除 ae-preflight 行
+
+### 用户影响
+
+触发 `/ae-preflight` 或 `/ae-prod-data-feedback-report` 将无法识别 skill。`ae update pm` 会自动清理失效软链接（v0.51.1 能力）。
+
+### Skill 清单（当前 v0.61.0）
+
+**PM 当前共 20 个 skill（v0.60.x 22 个，本版本退休 2 个）**：
+
+- 主流程 5：speckit-brainstorm / demo-to-speckit / app-to-speckit / speckit-to-app / app-to-testflight
+- 后置 integrate 7：analytics / paywall / notification / feedback / i18n / abtest / onboarding
+- Utility 8：verify-app / file-bugs / app-review-check / asc-submit / demo-to-figma / image-decopyrighter / prod-to-local / skill-creator
+
 ## v0.60.1 (2026-04-23) — wda-doctor E2E 实测修复 3 个阻塞 bug [`#IJDUAJ`](https://gitee.com/turningsyn/ae-pm/issues/IJDUAJ)
 
 v0.60.0 上线后在 iOS 26.3.1 真机上跑端到端验证，发现三个关键 bug 导致恢复流程无法完成。本版本修复后验证通过：tunnel 冻结 → 40s 内完成检测 + 自动恢复。

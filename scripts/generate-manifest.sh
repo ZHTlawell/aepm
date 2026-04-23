@@ -182,7 +182,7 @@ def parse_frontmatter(filepath):
     return result
 
 def skill_name_from_path(filepath):
-    \"\"\"Extract skill name from path like skills/pm/ae-preflight/SKILL.md -> ae-preflight\"\"\"
+    \"\"\"Extract skill name from path like skills/pm/ae-paywall-integrate/SKILL.md -> ae-paywall-integrate\"\"\"
     return os.path.basename(os.path.dirname(filepath))
 
 # Build skills dict
