@@ -102,29 +102,33 @@ harness 只需要保证：每条 TS-XXX 约束都被遵守、每个模板被正�
 | **TS-005** | CI/CD | 必须走 GitLab CI 自动部署。本地开发调试，远程 repo 仅用于发布 |
 | **TS-006** | 环境切换 | 必须在 BCConfig.swift 中用 `env` 属性（.prod / .stage / .test），本地调试 `.test` 指向 localhost |
 
-### B. 依赖约束（TS-010 ~ TS-015）— 禁止直接引入，必须使用 BytesCell 封装
+### B. 依赖约束（TS-010 ~ TS-015）
 
-| TS-ID | 禁止 | 替代方案 | BytesCell Pod |
-|-------|------|---------|--------------|
-| **TS-010** | `import AdjustSdk` | `BCAdjust.sendEvent(token)` | BCAdjust 1.0.1 |
-| **TS-011** | `import FirebaseAnalytics` | `BCTrack.track(event, params)` | BCSensor 1.4.1 |
-| **TS-012** | `import SuperwallKit` | BCStoreKit + BCPurchaseUI | BCStoreKit 1.4.0 |
-| **TS-013** | 直连 OpenAI API | 通过 BCNetwork 调 app-service `/api/llm/v1/chat` | BCNetwork 1.5.2 |
-| **TS-014** | 硬编码 API Key | 密钥只在服务端 CI 变量中，客户端不存储 | — |
-| **TS-015** | `import StoreKit` 直接使用 | 通过 BCStoreKit 封装 | BCStoreKit 1.4.0 |
+| TS-ID | 禁止 | 替代方案 | 归属 skill |
+|-------|------|---------|-----------|
+| **TS-010** | `import AdjustSdk` | `BCAdjust.sendEvent(token)` | → 见 `/ae-analytics-integrate` |
+| **TS-011** | `import FirebaseAnalytics` | `BCTrack.track(event, params)` | → 见 `/ae-analytics-integrate` |
+| **TS-012** | `import SuperwallKit` | BCStoreKit + BCPurchaseUI | → 见 `/ae-paywall-integrate` |
+| **TS-013** | 直连 OpenAI API | 通过 BCNetwork 调 app-service `/api/llm/v1/chat` | **本 skill**（核心 LLM 功能）|
+| **TS-014** | 硬编码 API Key | 密钥只在服务端 CI 变量中，客户端不存储 | **本 skill**（安全基线）|
+| **TS-015** | `import StoreKit` 直接使用 | 通过 BCStoreKit 封装 | → 见 `/ae-paywall-integrate` |
+
+> **TS-010/011/012/015 的完整 precheck + 代码模板 + 故障排查** 由对应 integrate skill 负责。本 skill 只透传禁止项作为 linter 规则，不再维护具体实现约束。
 
 ### C. 架构约束（TS-020 ~ TS-027）
 
-| TS-ID | 类别 | 约束 |
-|-------|------|------|
-| **TS-020** | UI 架构 | MVVM + Combine。SwiftUI 视图必须用 `BCHostingController` 包装到 UIKit 容器中 |
-| **TS-021** | 导航 | CTMediator 跨模块通信。Tab 页必须在 `TabbarItemType` 枚举中注册 |
-| **TS-022** | 启动序列 | `WorkVoidCallbackTask` 串行链 12 步：ComponentConfig → Adjust → Debug → Legal → ABTest → UserInit → Upgrade → AfterLogin → DataPreload → Welcome → ConversionPage → MainPage |
-| **TS-023** | 账号 | 必须用 BCAccount 设备自动登录，无需用户注册。Login 在 `LaunchTransitionViewController` 中触发 |
-| **TS-024** | 支付 | `BCStoreKit.setup(skus)` 初始化 → `BCPurchaseUIManager` 展示付费墙 → `BCAccount.isVip` 判断 VIP 状态 |
-| **TS-025** | AB 测试 | 必须用 `BCABTest.shared.syncFetch*()` 获取服务端配置，决定 Welcome / VIP 页面变体 |
-| **TS-026** | 埋点 | BCSensor 统一路由（神策 + Firebase），`BCTrack.track()` 为唯一入口 |
-| **TS-027** | Onboarding | 必须放在 `Locals/Welcome_XX` 本地 Pod 中，通过 AB 测试动态加载 class name |
+| TS-ID | 类别 | 约束 | 归属 skill |
+|-------|------|------|-----------|
+| **TS-020** | UI 架构 | MVVM + Combine。SwiftUI 视图必须用 `BCHostingController` 包装到 UIKit 容器中 | **本 skill** |
+| **TS-021** | 导航 | CTMediator 跨模块通信。Tab 页必须在 `TabbarItemType` 枚举中注册 | **本 skill** |
+| **TS-022** | 启动序列 | `WorkVoidCallbackTask` 串行链 12 步：ComponentConfig → Adjust → Debug → Legal → ABTest → UserInit → Upgrade → AfterLogin → DataPreload → Welcome → ConversionPage → MainPage | **本 skill**（骨架）+ 分步实现由对应 integrate 提供 |
+| **TS-023** | 账号 | 必须用 BCAccount 设备自动登录，无需用户注册。Login 在 `LaunchTransitionViewController` 中触发 | **本 skill** |
+| **TS-024** | 支付 | `BCStoreKit.setup(skus)` 初始化 → `BCPurchaseUIManager` 展示付费墙 → `BCAccount.isVip` 判断 VIP 状态 | → `/ae-paywall-integrate` |
+| **TS-025** | AB 测试 | 必须用 `BCABTest.shared.syncFetch*()` 获取服务端配置 | → `/ae-abtest-integrate` |
+| **TS-026** | 埋点 | BCSensor 统一路由（神策 + Firebase），`BCTrack.track()` 为唯一入口 | → `/ae-analytics-integrate` |
+| **TS-027** | Onboarding | 必须放在 `Locals/Welcome_XX` 本地 Pod 中，通过 AB 测试动态加载 class name | → `/ae-onboarding-integrate` |
+
+> Work Chain 12 步中，**ComponentConfig / UserInit / Upgrade / AfterLogin / DataPreload / MainPage** 由本 skill 负责骨架；**Adjust / ABTest / Welcome / ConversionPage** 四步的具体实现由对应 integrate skill 注入（未接入对应 integrate 时这些 step 应为 no-op）。
 
 ### D. 后端约束（TS-030 ~ TS-038）
 
@@ -142,14 +146,16 @@ harness 只需要保证：每条 TS-XXX 约束都被遵守、每个模板被正�
 
 ### harness 的约束检查建议
 
-```bash
-# TS-010~TS-015 扫描
-grep -rn 'import AdjustSdk\|import FirebaseAnalytics\|import SuperwallKit' --include="*.swift" Locals/
-grep -rn 'sk-proj-\|sk-live-' --include="*.swift"                # TS-014
-grep -rn 'import StoreKit$' --include="*.swift" Locals/         # TS-015
+本 skill 只负责"核心功能 + 工程基础"的 linter 规则。integrate 层的 TS 约束由对应 skill 自查：
 
-# TS-003 iOS 15 兼容扫描（见 templates/ios15-compat/api-downgrade-table.md）
-grep -rn 'NavigationStack\|ShareLink\|\.scrollContentBackground\|\.toolbarColorScheme' --include="*.swift" Locals/
+```bash
+# 本 skill 负责：
+grep -rn 'sk-proj-\|sk-live-' --include="*.swift"                # TS-014 API Key 安全
+grep -rn 'NavigationStack\|ShareLink\|\.scrollContentBackground\|\.toolbarColorScheme' --include="*.swift" Locals/  # TS-003 iOS 15 兼容
+
+# TS-010/011/012/015 的 grep 检查由对应 integrate skill 负责：
+# /ae-analytics-integrate: AdjustSdk + FirebaseAnalytics 直接引入扫描
+# /ae-paywall-integrate:   SuperwallKit + 原生 StoreKit 直接引入扫描
 ```
 
 ---
@@ -161,11 +167,13 @@ grep -rn 'NavigationStack\|ShareLink\|\.scrollContentBackground\|\.toolbarColorS
 | 模板目录 | 用途 | 文件 | 来源 |
 |---------|------|------|------|
 | `templates/work-chain/` | 12 步 Work Chain 骨架 | `README.md` + 12 个 `.swift.tmpl` | ✅ 从 bible-ios-template `Template/Core/StartupSequence/` 提取 |
-| `templates/purchase/` | BCPurchaseUI 子类 + UIKit close button hack | `BCPurchaseUIBase.swift.tmpl` + `CloseButtonHack.swift.tmpl` | ✅ 从 `PurchaseUIBibleViewController.swift` 提取（04-16 comment 踩坑） |
 | `templates/config/` | BCConfig 环境切换（prod/stage/test） | `BCConfig.swift.tmpl` | ✅ 从 `Locals/BCConfig/BCConfig/BCConfig.swift` 提取 |
 | `templates/ios15-compat/` | iOS 15 API 降级速查表（9 类） | `api-downgrade-table.md` | ✅ 从 04-15 trajectory 原文提取 |
-| `templates/analytics-bootstrap/` | GoogleService-Info 替换点标注 | `GoogleService-Info-placeholder.md` | ✅ 从 04-15 trajectory 提取（埋点 skill 接手） |
 | `templates/cocoapods/` | V1+V2 私有源 Podfile 配置 | `Podfile.tmpl` | ✅ 从 bible-ios-template `Podfile` 提取 |
+
+> **已迁出**（v0.58.0 主流程减肥）：
+> - `templates/purchase/` → `skills/pm/ae-paywall-integrate/templates/purchase/`
+> - `templates/analytics-bootstrap/` → `skills/pm/ae-analytics-integrate/templates/analytics-bootstrap/`
 
 ### 模板使用约定
 
@@ -215,10 +223,11 @@ security find-identity -p codesigning -v | grep -E "Apple Development|Apple Dist
 
 harness 检查 `Locals/BCConfig/BCConfig/BCConfig.swift`：
 - `appId` / `teamId` / `supportEmail` / `awsBucket` / `mainHost(prod/stage)` 非占位
-- `AdjustToken` 枚举内所有 token 非占位
-- `appProductId` 非占位
+- `appProductId` 非占位（AB 测试 key 前缀 + Adjust 归属依赖）
 
-有任一占位 → **阻塞**：向 PM / 运营索要实际值（Adjust token 通常需要运营申请）
+有任一占位 → **阻塞**：向 PM / 运营索要实际值。
+
+> **`AdjustToken` 枚举 token 的非占位检查** 由 `/ae-analytics-integrate` Phase 1 前置负责（属于埋点/归因领域）。
 
 ### P5. `pod install` 通过
 
@@ -361,13 +370,14 @@ harness 必须验证以下 5 项全过才能标记 skill 完成：
 | F1 | `pod install` 最后一个 Pod 404 | V1 group 权限缺失 | precheck P1 |
 | F2 | Archive 报 `No account for team` | Xcode 未登录对应 Apple ID | precheck P3 |
 | F3 | 真机启动卡在启动页（白屏） | UserInitWork login 卡住，stage 后端不可达 | precheck P6 / 临时 DEBUG_SKIP |
-| F4 | 付费墙展示内容错误（植物主题） | `BCPurchaseUI_07` 仍在 plant/07 分支 | 改 Podfile 指向 `{product}/07` 分支 或写 `PurchaseUI{{MEMO}}ViewController` 子类（templates/purchase/） |
-| F5 | 付费墙关闭按钮无响应 | SwiftUI 的 X 按钮在 UIKit 容器里 touch 传递失效 | 用 templates/purchase/CloseButtonHack — UIKit 层独立 closeBtn + override `getCloseButton` |
 | F6 | 编译报 `NavigationStack` 等不可用 | iOS 15 不支持 iOS 16+ API | 按 templates/ios15-compat/api-downgrade-table.md 降级 |
-| F7 | 跨模块引用 View 报 `cannot find 'XxxView' in scope` | Pray 模块内 struct 默认 internal | 所有跨模块 View 必须 `public struct` + `public var body` + `public init()` |
+| F7 | 跨模块引用 View 报 `cannot find 'XxxView' in scope` | Pod 模块内 struct 默认 internal | 所有跨模块 View 必须 `public struct` + `public var body` + `public init()` |
 | F8 | `/api/llm/v1/chat` 500 | OPENAI_API_KEY 空 / system_prompt 文件名不匹配 | 4.3 调试速查 |
 | F9 | iOS 26 模拟器多一个橙色相机按钮 | `TabBarController.setupControllers()` 的 `IOS26 {}` 分支加了 identify tab | 注释掉 IOS26 分支的 EmptySearchViewController 添加 |
 | F10 | `pod install` 成功但主工程报 `No such module 'XXX'` | Podfile 改动后没重新打开 workspace | `killall Xcode && open Template.xcworkspace` |
+
+> **已迁出**（v0.58.0 主流程减肥）：
+> - F4 付费墙主题错误 / F5 关闭按钮 touch 传递失效 → `/ae-paywall-integrate` 故障排查
 
 ---
 
@@ -377,18 +387,29 @@ harness 必须验证以下 5 项全过才能标记 skill 完成：
 Speckit 输入
     │
     ▼
-/ae-speckit-to-app ──→ 本地可编译 + 启动链通 + stage CI 绿  (本 skill)
+/ae-speckit-to-app ──→ 本地可编译 + 启动链通 + stage CI 绿（本 skill 瘦身版）
     │
-    ├── /ae-analytics-integrate ──→ Firebase + Adjust 接入（templates/analytics-bootstrap 接手点）
+    │  ── 核心功能 + 工程基础（保留在本 skill）：
+    │     Work Chain 骨架 / BCConfig / CocoaPods V1+V2 / iOS15 降级 /
+    │     LLM (TS-013) / API Key 安全 (TS-014) / UI 架构 (TS-020~021) /
+    │     账号 (TS-023) / 后端约束 (TS-030~038)
     │
-    ├── /ae-paywall-integrate ──→ 付费墙 UI + BCStoreKit 订阅封装 + 沙盒验证（替代原 /ae-paywall-design，合并为端到端 integrate）
+    ├── 后置 integrate 能力（按需接入，不影响主流程）：
+    │   ├── /ae-analytics-integrate ──→ TS-010/011/026 埋点 + 归因 (templates/analytics-bootstrap)
+    │   ├── /ae-paywall-integrate ───→ TS-012/015/024 Paywall + BCStoreKit (templates/purchase)
+    │   ├── /ae-notification-integrate → 本地通知
+    │   ├── /ae-feedback-integrate ───→ 用户反馈
+    │   ├── /ae-i18n-integrate ───────→ 多语言
+    │   ├── /ae-abtest-integrate ─────→ TS-025 AB 测试
+    │   └── /ae-onboarding-integrate ─→ TS-027 Welcome_XX + 评分引导
     │
-    ├── /ae-preflight ──→ 生产就绪扫描（App Icon / PrivacyInfo / Bundle ID 等）
-    │
-    └── /ae-app-to-testflight ──→ Apple 注册 → 签名 → Archive → TestFlight
+    └── 发布路径：
+        └── /ae-app-to-testflight ──→ 签名 → Archive → TestFlight
 ```
 
 **Route B 走本 skill**（Route A `/ae-superwall-setup` 已废弃，独立 StoreKit 2 + Superwall 不依赖 BytesCell 体系）。
+
+**v0.58.0 主流程减肥** — 原 38 条 TS 约束中 TS-010/011/012/015/024/025/026/027 共 8 条迁出到对应 integrate skill，本 skill 保留 30 条核心约束 + 4 个工程基础模板（原 6 个模板中 purchase / analytics-bootstrap 迁出）。
 
 ## 复用说明
 

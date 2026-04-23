@@ -235,8 +235,11 @@ if bid: print(f'WDA_BUNDLE_ID={bid}')
 " 2>/dev/null || true)"
 fi
 
-# Build xcodebuild command with signing params if available
-XC_ARGS=(-project "$WDA_PROJECT" -scheme WebDriverAgentRunner -destination "id=$UDID")
+# Build xcodebuild command with signing params if available.
+# -allowProvisioningUpdates lets xcodebuild refresh automatic-signing profiles
+# from the CLI — without it, Xcode 26 beta drops the test runner mid-bootstrap
+# (exit code 74) when the profile needs any update. Safe on iOS 17/18 too.
+XC_ARGS=(-project "$WDA_PROJECT" -scheme WebDriverAgentRunner -destination "id=$UDID" -allowProvisioningUpdates)
 if [[ -n "$WDA_TEAM_ID" ]]; then
     XC_ARGS+=(DEVELOPMENT_TEAM="$WDA_TEAM_ID")
     log "Team ID: $WDA_TEAM_ID"
@@ -306,19 +309,42 @@ dump_diagnostics() {
     err "--- 错误日志 (最后 30 行) ---"
     tail -30 "$XCB_LOG" >&2 2>/dev/null || true
     err "--- 完整日志: cat $XCB_LOG ---"
+
+    # code-74-specific hints: test runner launched then died before IPC.
+    # Usually signing/provisioning, Developer Mode, or DDI mismatch — not a WDA code bug.
+    if grep -q "code 74\|exited with code 74\|code '74'" "$XCB_LOG" 2>/dev/null; then
+        err ""
+        err "=== exit code 74 可能根因（按概率排序）==="
+        err "1. 签名 profile 需要刷新 — 本脚本已带 -allowProvisioningUpdates，如仍失败：打开"
+        err "   WebDriverAgent.xcodeproj 在 Xcode GUI 里 Run 一次，让 Xcode 交互式完成签名"
+        err "2. Developer Mode 未开启（iOS 16+）— iPhone 设置 → 隐私与安全性 → 开发者模式"
+        err "3. DDI 未挂载或版本不匹配 — ios image list --udid=$UDID"
+        err "   手动挂载: ios image auto --udid=$UDID"
+        err "4. WDA 未被信任 — 免费 Apple ID 需要 设置 → 通用 → VPN 与设备管理 手动信任"
+        err "   (付费开发者账号的 Apple Development 证书不会出现在此列表中，属正常现象)"
+    fi
+
     if [[ -n "$IOS_MAJOR" && "$IOS_MAJOR" -ge 26 ]]; then
         err ""
-        err "=== iOS $IOS_VERSION 诊断建议 ==="
-        err "1. 确认 Xcode 版本支持 iOS $IOS_VERSION（Xcode beta 可能需要更新）"
-        err "2. 在 Xcode GUI 中: 打开 WebDriverAgent.xcodeproj → Product → Test 查看详细错误"
-        err "3. 检查 WDA 版本: 尝试从 appium/WebDriverAgent main 分支重新 clone 最新代码"
-        err "4. 备选方案: pymobiledevice3 (pip install pymobiledevice3) 支持 iOS 26 XCTest 启动"
-        err "5. 跟踪上游: https://github.com/appium/WebDriverAgent/issues"
+        err "=== iOS $IOS_VERSION beta 已知上游问题 ==="
+        err "- appium/appium#21347 (iOS 26 × Xcode 26 兼容性总追踪)"
+        err "- go-ios#631 (ios runwda 在 iOS 26 tunnel 连接失败)"
+        err "- WDA 12.0.0 为 Xcode 26 加了 -Wno-reserved-identifier；如用更早版本请升到 12.0.0+"
         err ""
-        err "请将以下信息反馈给 AE Team:"
-        err "  cat $XCB_LOG | tail -50"
+        err "=== 备选启动路径（绕过 xcodebuild）==="
+        err "A. Xcode GUI 跑一次: 打开 $WDA_PROJECT → Product → Test (⌘+U)"
+        err "   成功后本脚本的 test-without-building 通常也能跑通"
+        err "B. pymobiledevice3: pip install pymobiledevice3"
+        err "   sudo pymobiledevice3 remote start-tunnel        # 替代 ios tunnel"
+        err "   pymobiledevice3 developer dvt launch <bundle-id>"
+        err "C. 回退稳定版: iOS 18.x + Xcode 16.x 已验证可用"
+        err ""
+        err "反馈给 AE Team 时请一并附："
         err "  xcodebuild -version"
         err "  ios version"
+        err "  ios info --udid=$UDID 2>&1 | grep -i 'developer\\|product'"
+        err "  ios image list --udid=$UDID 2>&1 | head -5"
+        err "  tail -80 $XCB_LOG"
     fi
 }
 

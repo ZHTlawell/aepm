@@ -1,5 +1,63 @@
 # Changelog
 
+## v0.58.0 (2026-04-23) — ae-speckit-to-app 主流程减肥：8 条 TS 约束 + 2 个 templates 迁出到对应 integrate [`#IJDSBR`](https://gitee.com/turningsyn/ae-platform/issues/IJDSBR)
+
+### 减肥变更
+
+按 "主流程薄、integrate 厚" 原则（见 `feedback_integrate_skill_principle`），从 ae-speckit-to-app 主流程迁出 integrate 能力：
+
+**TS 约束迁出（8/38）：**
+
+| 原 TS-ID | 类别 | 迁到 |
+|---------|------|------|
+| TS-010 | `import AdjustSdk` 禁用 | `/ae-analytics-integrate` |
+| TS-011 | `import FirebaseAnalytics` 禁用 | `/ae-analytics-integrate` |
+| TS-012 | `import SuperwallKit` 禁用 | `/ae-paywall-integrate` |
+| TS-015 | `import StoreKit` 直接使用禁用 | `/ae-paywall-integrate` |
+| TS-024 | 支付（BCStoreKit + BCPurchaseUIManager） | `/ae-paywall-integrate` |
+| TS-025 | AB 测试（BCABTest.syncFetch*）| `/ae-abtest-integrate` |
+| TS-026 | 埋点（BCSensor 统一路由）| `/ae-analytics-integrate` |
+| TS-027 | Onboarding（Welcome_XX Pod AB 动态加载） | `/ae-onboarding-integrate` |
+
+**代码模板迁出（2/6）：**
+
+- `templates/purchase/`（BCPurchaseUIBase + CloseButtonHack）→ `skills/pm/ae-paywall-integrate/templates/purchase/`
+- `templates/analytics-bootstrap/`（GoogleService-Info-placeholder）→ `skills/pm/ae-analytics-integrate/templates/analytics-bootstrap/`
+
+**本 skill 保留（30/38）：**
+
+- 工程约束 TS-001~006（CocoaPods / iOS 15+ / 模块化 / CI / 环境切换）
+- 核心功能 TS-013/014（LLM + API Key 安全）
+- 架构骨架 TS-020/021/022/023（UI / 导航 / Work Chain 12 步 / BCAccount 账号）
+- 后端约束 TS-030~038（Spring Boot / 分层 / 加密 / 存储 / migration / CI 密钥）
+
+### 其他更新
+
+- `harness 约束检查建议` 段：移除已迁出 TS 的 grep 示例
+- Precheck P4：`AdjustToken 非占位` 检查迁到 `/ae-analytics-integrate` 前置
+- 常见失败模式 F4/F5（付费墙相关）迁到 `/ae-paywall-integrate` 故障排查
+- 与其他 skill 关系图：补齐 7 个 integrate 全景 + 核心/后置分层标识
+
+### 设计原则
+
+本 skill 保持**薄 harness** 定位：只透传"核心产品功能 + 工程基础"约束 + 代码模板，integrate 能力按需装。PM/Agent 做 M1→M2 主流程不被 integrate 细节打扰。
+
+## v0.57.1 (2026-04-23) — WDA iOS 26 code 74 诊断改进 [`#IJDSS3`](https://gitee.com/turningsyn/ae-pm/issues/IJDSS3)
+
+### 修复
+
+- **`wda-start.sh`** — xcodebuild 启动加 `-allowProvisioningUpdates`，修复 Xcode 26 beta 下自动签名 profile 未刷新导致 test runner bootstrap 失败（exit code 74）。iOS 17/18 上同样安全。
+- **`mobile-precheck.sh`** — 新增 Developer Mode 状态检测（iOS 16+）和 DDI 挂载状态检测（iOS 17+），code 74 的两个高频根因现可一键确认。
+
+### 文档
+
+- **`wda-start.sh` dump_diagnostics()** — code 74 场景下输出 4 条根因排序（签名/Developer Mode/DDI/证书信任），并区分付费账号和免费 Apple ID 的 VPN & 设备管理差异
+- **ae-mobile-setup SKILL.md** — 故障排查表新增 code 74 条目 + iOS 26 beta 全系失败条目，关联上游 appium/appium#21347、go-ios#631
+
+### 未完成
+
+- iOS 26.2 beta + Xcode 26.4 beta 组合上游仍在修复中，本次为诊断 + 缓解改进。待 PM 在真机上验证后发布确认。
+
 ## v0.57.0 (2026-04-23) — 下线 `ae-paywall-design` + `ae-onboarding-design`（合并到对应 integrate 后下线）[`#IJDSBR`](https://gitee.com/turningsyn/ae-platform/issues/IJDSBR)
 
 ### 移除
