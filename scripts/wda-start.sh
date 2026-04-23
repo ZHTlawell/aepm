@@ -178,9 +178,23 @@ fi
 # See issue #IJDSS3 for the failure mode.
 log "Step 3: 启动 userspace tunnel..."
 tunnel_rsd_alive() {
-    # Probe with a short timeout; ios info returns non-zero on RSD failure.
-    # 用 perl alarm 而非 timeout（macOS 默认无 GNU coreutils）
-    perl -e 'alarm 5; exec @ARGV' ios info --udid="$UDID" >/dev/null 2>&1
+    # RSD 探活：用 ios tunnel ls 检查 tunnel daemon 是否响应且本 UDID 已注册。
+    # 不用 ios info / ios image list——这俩部分字段走 lockdown 不需 RSD，
+    # 即使 tunnel 腐化也可能误报成功。
+    # ios tunnel ls 自带 5s 内部超时，无需外部包装。
+    local out
+    out=$(ios tunnel ls 2>&1)
+    [[ $? -ne 0 ]] && return 1
+    printf '%s' "$out" | python3 -c "
+import sys, json, re
+txt = sys.stdin.read()
+m = re.search(r'\[.*\]', txt, re.DOTALL)
+if not m: sys.exit(1)
+try: arr = json.loads(m.group(0))
+except Exception: sys.exit(1)
+udids = [x.get('udid', '') for x in arr if isinstance(x, dict)]
+sys.exit(0 if '$UDID' in udids else 1)
+" 2>/dev/null
 }
 EXISTING_TUNNEL_PID=$(pgrep -f "ios tunnel" | head -1 || true)
 NEED_START_TUNNEL=true

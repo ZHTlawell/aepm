@@ -135,10 +135,30 @@ notify_mac() {
     osascript -e "display notification \"$msg\" with title \"$title\"" 2>/dev/null || true
 }
 
-# RSD 探活：5s 超时，ios info 失败即判定死
-# 用 perl alarm 而非 timeout/gtimeout（macOS 默认不带 GNU coreutils）
+# RSD 探活：用 ios tunnel ls 列出 tunnel daemon 注册的 RSD 地址，
+# 输出 JSON 必须含本 UDID 才算健康。
+#   - healthy: <1s 返回 exit 0，JSON 含 UDID
+#   - frozen / RSD 断连: 5s 后 exit 1（go-ios 内部 context deadline）
+# 为什么不用 ios info：ios info 部分字段走 lockdown 不需要 RSD，
+# 即使 tunnel 腐化也可能返回成功，无法检测。
+# 为什么不加外部 timeout：ios tunnel ls 自带 5s 超时，够用；
+# bash 的 "$(cmd &)" 模式因 $() 会等所有后代进程而无效（已踩坑）。
 probe_rsd() {
-    perl -e 'alarm 5; exec @ARGV' ios info --udid="$UDID" >/dev/null 2>&1
+    local out
+    out=$(ios tunnel ls 2>&1)
+    [[ $? -ne 0 ]] && return 1
+    printf '%s' "$out" | python3 -c "
+import sys, json, re
+txt = sys.stdin.read()
+m = re.search(r'\[.*\]', txt, re.DOTALL)
+if not m: sys.exit(1)
+try:
+    arr = json.loads(m.group(0))
+except Exception:
+    sys.exit(1)
+udids = [x.get('udid', '') for x in arr if isinstance(x, dict)]
+sys.exit(0 if '$UDID' in udids else 1)
+" 2>/dev/null
 }
 
 # 获取 mkdir 锁（atomic on POSIX，兼容 macOS）
@@ -146,6 +166,7 @@ probe_rsd() {
 acquire_lock() {
     local timeout_sec="${1:-30}"
     local waited=0
+    local stale_cleared=false
     while ! mkdir "$LOCKDIR" 2>/dev/null; do
         # 检查锁是否 stale
         if [[ -d "$LOCKDIR" ]]; then
@@ -153,8 +174,13 @@ acquire_lock() {
             # stat -f %m on macOS, stat -c %Y on Linux — 两个都试
             lock_age=$(($(date +%s) - $(stat -f %m "$LOCKDIR" 2>/dev/null || stat -c %Y "$LOCKDIR" 2>/dev/null || echo $(date +%s))))
             if [[ $lock_age -gt $LOCK_STALE_SEC ]]; then
-                log_event "WARN" "检测到 stale 锁（${lock_age}s），接管"
-                rmdir "$LOCKDIR" 2>/dev/null || true
+                # 防止重复日志刷屏：stale 只清理一次
+                if ! $stale_cleared; then
+                    log_event "WARN" "检测到 stale 锁（${lock_age}s），接管"
+                    stale_cleared=true
+                fi
+                # 锁目录里有 owner 文件——必须 rm -rf 而非 rmdir
+                rm -rf "$LOCKDIR" 2>/dev/null || true
                 continue
             fi
         fi
@@ -188,15 +214,17 @@ restart_tunnel() {
         return 0
     fi
 
-    pkill -f "ios tunnel" 2>/dev/null || true
-    pkill -f "ios forward" 2>/dev/null || true
+    # 用 SIGKILL（-9）而非默认 SIGTERM——腐化 tunnel 可能卡在系统调用或
+    # STOP 状态，TERM 信号可能被吞或排队不处理。KILL 保证立即结束。
+    pkill -KILL -f "ios tunnel start" 2>/dev/null || true
+    pkill -KILL -f "ios forward" 2>/dev/null || true
     sleep 2
     ios tunnel start --userspace &>/dev/null &
     local tunnel_pid=$!
 
-    # 轮询 RSD 就绪，最多 10s
+    # 轮询 RSD 就绪，最多 30s（probe_rsd 本身最多 5s/次，所以 ~6 次尝试）
     local recovered=false
-    for _ in $(seq 1 10); do
+    for _ in $(seq 1 30); do
         sleep 1
         if probe_rsd; then
             log_event "INFO" "tunnel 重启成功 (tunnel_pid=$tunnel_pid)"
@@ -212,7 +240,7 @@ restart_tunnel() {
     if $recovered; then
         return 0
     fi
-    log_event "ERROR" "tunnel 重启后 RSD 仍不可达（10s 超时）"
+    log_event "ERROR" "tunnel 重启后 RSD 仍不可达（30s 超时）"
     notify_mac "WDA Doctor" "tunnel 恢复失败，请手动检查 (udid=${UDID:0:8}..)"
     return 1
 }

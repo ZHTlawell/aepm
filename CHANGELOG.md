@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.60.1 (2026-04-23) — wda-doctor E2E 实测修复 3 个阻塞 bug [`#IJDUAJ`](https://gitee.com/turningsyn/ae-pm/issues/IJDUAJ)
+
+v0.60.0 上线后在 iOS 26.3.1 真机上跑端到端验证，发现三个关键 bug 导致恢复流程无法完成。本版本修复后验证通过：tunnel 冻结 → 40s 内完成检测 + 自动恢复。
+
+### 修复
+
+- **probe_rsd 改用 `ios tunnel ls`** — v0.60.0 用 `ios info`，但该命令部分字段走 lockdown 不依赖 RSD，tunnel 腐化时仍可能返回成功，探活失灵。改用 `ios tunnel ls` 直接查 tunnel daemon 状态 + 解析 JSON 确认本 UDID 已注册。
+- **移除坏掉的 perl alarm / run_with_timeout** — `perl -e 'alarm N; exec @ARGV'` 在 exec 后 alarm 即失效；bash 自写的 `run_with_timeout` 在 `$(...)` 里被命令替换阻塞。改为依赖 `ios tunnel ls` 自带的 5s 内部超时。
+- **acquire_lock 清理改 `rm -rf`** — `rmdir` 无法删除含 owner 文件的 stale 锁目录，加 `|| true` 后吞掉错误导致无限循环刷屏日志。
+- **tunnel 重启用 `pkill -KILL`** — 原 `pkill -TERM` 对卡死/挂起的 tunnel 进程无效（信号可能被吞或排队），改 SIGKILL 保证清理。
+- **重启后轮询延长到 30s** — userspace tunnel 冷启动最多 6-8s，原 10s 超时过紧。
+
+### 验证
+
+真机 iOS 26.3.1 (iPhone 15 Pro Max)：
+```
+15:11:37 doctor 启动
+15:11:52 RSD 探活失败 (1 次)
+15:12:07 RSD 探活失败 (2 次) → 尝试重启
+15:12:17 tunnel 重启成功
+```
+冻结到完全恢复 40 秒。
+
 ## v0.60.0 (2026-04-23) — 新增 `wda-doctor.sh`：长会话 tunnel 在途健康守护 [`#IJDUAJ`](https://gitee.com/turningsyn/ae-pm/issues/IJDUAJ)
 
 ### 新增
