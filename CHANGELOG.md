@@ -1,5 +1,39 @@
 # Changelog
 
+## v0.55.0 (2026-04-23) — 新增 `ae-abtest-integrate`：iOS AB 测试全流程 skill（BCABTest + SensorsABTesting 路线）[`#IJDSBR`](https://gitee.com/turningsyn/ae-platform/issues/IJDSBR)
+
+### 新增
+
+- **`ae-abtest-integrate`** — Scale Global 生态 iOS AB 测试全流程：
+  - `ABTestType` 枚举定义（case / key / defaultValue / shouldPreload 四件套）
+  - key 命名约定 `{productId}_{biz}_{version}`
+  - Work Chain `ABTestLoadWork` 位置约束（startupSequence 第 5 步）
+  - 同步读（preload + syncFetchType）vs 异步读（fetchType async）决策
+  - 代码 defaultValue 和神策 control 组对齐策略
+
+### 技术路线
+
+基于 bible-ios-template + plant-app 实战审计，走 **4 层架构**：
+- Layer 0 — 神策 `SensorsABTesting` 底层 SDK
+- Layer 1 — `BCSensor Pod` 内的 `BCABTest`（**BCABTest 不是独立 Pod，是 BCSensor 子模块**）
+- Layer 2 — 项目 `Template/Core/AppConfig/ABTest/ABTestConfig.swift` 的 `ABTestType` 枚举 + Extensions
+- Layer 3 — Work Chain `ABTestLoadWork` + 业务调用点（`syncFetchVip` / `syncFetchWecome` 等）
+
+沉淀 **7 条硬性规则 + 8 条反模式 + 7 条故障排查 + 10 条已验证约束**。
+
+### A 类 integrate 系列进度
+
+- [x] ae-paywall-integrate v0.51.0
+- [x] ae-notification-integrate v0.52.0
+- [x] ae-feedback-integrate v0.53.0
+- [x] ae-i18n-integrate v0.54.0
+- [x] **ae-abtest-integrate v0.55.0**（本版本）
+- [ ] ae-onboarding-integrate（最后一个）
+
+### 待审计
+
+5 条 P0 阻塞项：ABTestType 枚举的 AE Team 通用工具化 / 神策白名单设备 ID 获取方式 / 实验结束后代码清理流程 / 多实验依赖建模 / Work Chain preload 弱网 timeout 策略。
+
 ## v0.54.0 (2026-04-23) — 新增 `ae-i18n-integrate`：iOS 多语言全流程 skill（CL10nKit + BCLocalization 路线）[`#IJDSBR`](https://gitee.com/turningsyn/ae-platform/issues/IJDSBR)
 
 ### 新增
