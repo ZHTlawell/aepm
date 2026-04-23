@@ -154,80 +154,14 @@ PYEOF
 
 # Register ~/.ae/<role>/.claude/skills in Claude Code global settings so
 # skills are available in every workspace without per-project symlinks.
+# Delegates to install.sh:_register_global_skills which handles:
+#   - additionalDirectories in ~/.claude/settings.json
+#   - skill permission merging
+#   - ~/.claude/skills/<name> symlink creation + stale-link pruning
 _register_link_global_skills() {
     local role="$1"
-    local skills_dir="$AE_HOME/$role/.claude/skills"
-
-    [[ -d "$skills_dir" ]] || return 0
-
-    # --- 1. additionalDirectories (file access permissions) ---
-    local settings_file="$HOME/.claude/settings.json"
-    mkdir -p "$HOME/.claude"
-
-    local result
-    result=$(python3 - "$skills_dir" "$settings_file" <<'PYEOF'
-import sys, os, json
-
-skills_dir, settings_file = sys.argv[1], sys.argv[2]
-
-settings = {}
-if os.path.isfile(settings_file):
-    try:
-        with open(settings_file) as f:
-            settings = json.load(f)
-    except:
-        pass
-
-dirs = settings.setdefault("permissions", {}).setdefault("additionalDirectories", [])
-if skills_dir not in dirs:
-    dirs.append(skills_dir)
-    with open(settings_file, "w") as f:
-        json.dump(settings, f, indent=2, ensure_ascii=False)
-        f.write("\n")
-    print("added")
-else:
-    print("exists")
-PYEOF
-    ) || return 0
-
-    if [[ "$result" == "added" ]]; then
-        ok "  已注册 ae-$role skills 到 Claude Code 全局设置"
-    fi
-
-    # --- 2. Global skill discovery via ~/.claude/skills/ ---
+    source_lib "install"
     _register_global_skills "$role"
-}
-
-# Symlink ae-<role> skills into ~/.claude/skills/ so they are discoverable
-# from any working directory via /ae-xxx slash commands.
-_register_global_skills() {
-    local role="$1"
-    local skills_src="$AE_HOME/$role/.claude/skills"
-    local global_skills="$HOME/.claude/skills"
-
-    mkdir -p "$global_skills"
-
-    local linked=0
-    for skill_dir in "$skills_src/"*/; do
-        [[ -f "$skill_dir/SKILL.md" ]] || continue
-        local name
-        name=$(basename "$skill_dir")
-        local target="$global_skills/$name"
-
-        # Skip if already correctly linked
-        if [[ -L "$target" ]] && [[ "$(readlink "$target")" == "$skill_dir" ]]; then
-            continue
-        fi
-
-        # Remove stale link or directory, create fresh symlink
-        rm -rf "$target"
-        ln -sf "$skill_dir" "$target"
-        ((linked++))
-    done
-
-    if [[ $linked -gt 0 ]]; then
-        ok "  已注册 ${linked} 个 ae-$role skill 到全局 ~/.claude/skills/"
-    fi
 }
 
 # Record a (role, project_dir) pair in ~/.ae/.linked-projects so that

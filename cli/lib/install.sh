@@ -131,8 +131,11 @@ _refresh_cli_symlink() {
 
 # Register ~/.ae/<role>/.claude/skills in Claude Code global settings so
 # skills are available in every workspace without per-project ae link.
-# Also merges all skill permissions into global allow list so users never
-# see permission approval popups for ae skills.
+# Also:
+# - merges all skill permissions into global allow list so users never see
+#   permission approval popups for ae skills
+# - creates ~/.claude/skills/<name> symlinks for each skill and prunes
+#   stale links pointing to removed/renamed skills in this role
 _register_global_skills() {
     local role="$1"
     local role_dir="$AE_HOME/$role"
@@ -213,11 +216,63 @@ PYEOF
         ok "  合并了 ${result} 条 skill 权限到全局 settings.json"
     fi
 
+    # Sync ~/.claude/skills/<name> symlinks for this role
+    _sync_global_skill_symlinks "$role"
+
     # Also register hooks (once per session, guarded by flag)
     if [[ -z "${_AE_HOOKS_REGISTERED:-}" ]]; then
         _register_update_hook
         _register_feedback_hook
         _AE_HOOKS_REGISTERED=1
+    fi
+}
+
+# Create ~/.claude/skills/<name> symlinks for every skill in the given role,
+# and prune any symlinks that point to removed/renamed skills within this
+# role. Safe to call repeatedly — idempotent.
+_sync_global_skill_symlinks() {
+    local role="$1"
+    local skills_dir="$AE_HOME/$role/.claude/skills"
+    local global_skills="$HOME/.claude/skills"
+
+    [[ -d "$skills_dir" ]] || return 0
+    mkdir -p "$global_skills"
+
+    local linked=0
+    local skill_dir name target
+    for skill_dir in "$skills_dir"/*/; do
+        [[ -f "$skill_dir/SKILL.md" ]] || continue
+        name=$(basename "$skill_dir")
+        target="$global_skills/$name"
+
+        # Skip if a valid symlink already exists — shared skills (e.g.
+        # ae-lark-feishu exists in both pm/ and go/) dedup to whichever
+        # role linked first rather than flapping between roles.
+        if [[ -L "$target" && -e "$target" ]]; then
+            continue
+        fi
+
+        rm -rf "$target"
+        ln -sf "$skill_dir" "$target"
+        ((linked++))
+    done
+
+    # Prune stale symlinks pointing to this role's skills dir
+    local pruned=0
+    local link t
+    while IFS= read -r -d '' link; do
+        t=$(readlink "$link" 2>/dev/null)
+        if [[ "$t" == "$skills_dir"/* ]] && [[ ! -e "$t" ]]; then
+            rm -f "$link"
+            ((pruned++))
+        fi
+    done < <(find "$global_skills" -maxdepth 1 -type l -name 'ae-*' -print0 2>/dev/null)
+
+    if (( linked > 0 )); then
+        ok "  链接了 ${linked} 个 ae-$role skill 到 ~/.claude/skills/"
+    fi
+    if (( pruned > 0 )); then
+        ok "  清理了 ${pruned} 个 ae-$role 失效链接"
     fi
 }
 

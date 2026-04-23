@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.51.1 (2026-04-23) — 修复 `ae update` 未同步 `~/.claude/skills/` 全局软链接 [`#IJDQWD`](https://gitee.com/turningsyn/ae-pm/issues/IJDQWD)
+
+### 修复
+
+- **`ae update` 不再遗漏新 skill 的全局软链接** — 以前 `~/.ae/<role>/.claude/skills/` 下新增的 skill（如 `ae-speckit-brainstorm` / `ae-speckit-to-app` / `ae-app-to-testflight` / `ae-paywall-integrate`）不会被 symlink 到 `~/.claude/skills/`，导致 `/ae-xxx` 斜杠命令不可用。现在 `ae update` 会对所有已安装 role 统一刷新全局软链接，并清理指向已删除/重命名 skill 的失效链接（如 `ae-analytics-setup` / `ae-superwall-setup` / `ae-testflight-publish`）。
+- **统一 skill 注册逻辑** — `install.sh` 与 `link.sh` 各有一份同名 `_register_global_skills` 实现（行为不一致），容易根据加载顺序产生不同结果。合并为 `install.sh` 中一份标准实现，`ae install` / `ae link` / `ae update` 均使用同一路径。
+- **共享 skill 不再抖动** — `ae-lark-feishu` 等同时存在于多个 role 的 skill，不再随每次 `ae update` 在 pm/go 之间来回切换指向。
+
+### 验证
+
+- `~/.ae/pm/.claude/skills/` 下缺失的 `ae-speckit-brainstorm` / `ae-speckit-to-app` / `ae-paywall-integrate` / `ae-app-to-testflight` / `ae-analytics-integrate` 全部在 `ae update` 后自动 symlink 到 `~/.claude/skills/`
+- 失效链接 `ae-analytics-setup` / `ae-superwall-setup` / `ae-testflight-publish` 自动清理
+- 重复运行 `ae update` 幂等（静默 no-op）
+
 ## v0.51.0 (2026-04-23) — 新增 `ae-paywall-integrate`：iOS Paywall 全流程 skill（BCStoreKit 路线）[`#IJDREM`](https://gitee.com/turningsyn/ae-platform/issues/IJDREM)
 
 ### 新增

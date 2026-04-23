@@ -34,6 +34,15 @@ ae_update() {
     _discover_untracked_projects
     _refresh_linked_projects
 
+    # Always refresh global ~/.claude/skills/ symlinks for every installed
+    # role — repairs missing links (new skills) and prunes stale links
+    # (removed/renamed skills) even when git pull reported 已是最新.
+    source_lib "install"
+    for role in go pm dev; do
+        [[ -d "$AE_HOME/$role/.claude/skills" ]] || continue
+        _sync_global_skill_symlinks "$role"
+    done
+
     # Check for pending feedback and offer to upload
     source_lib "feedback"
     _check_and_upload_feedback
