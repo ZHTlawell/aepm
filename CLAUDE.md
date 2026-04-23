@@ -150,6 +150,7 @@ CLI 会自动加载 credentials、调用 Gitee API、返回 issue 链接。
 | Paywall 全流程 | `/ae-paywall-integrate` — UI + BCStoreKit 订阅封装 + 沙盒验证（Scale Global 生态，合并原 `ae-paywall-design`）| 🆕 v0.51.0 草稿 |
 | 本地通知 | `/ae-notification-integrate` — BCUserNotification + BCPermission 本地通知全流程（权限/schedule/点击 dispatch/Group remove）| 🆕 v0.52.0 草稿 |
 | 用户反馈 | `/ae-feedback-integrate` — BCFeedback + Template/Feature/Feedback 业务嵌入反馈 + 可选弹窗 survey（Scale Global 生态）| 🆕 v0.53.0 草稿 |
+| 多语言 | `/ae-i18n-integrate` — CL10nKit + BCLocalization 4 层生态（文案分层 / 批量语言扩展 / InfoPlist / 埋点英文一致性）| 🆕 v0.54.0 草稿 |
 | 埋点接入 | `/ae-analytics-integrate` — Firebase Analytics + Adjust SDK 双轨埋点（M2→M3 optional，杭州团队协作） | 可用 |
 | Speckit 头脑风暴 | `/ae-speckit-brainstorm` — 多 speckit 联合设计（merge 或 reference 双模式） | 🆕 v0.49.0 |
 | Speckit → 本地可用程序 | `/ae-speckit-to-app` — Route B 选型约束 + 代码模板包（M1→M2 核心） | 🆕 v0.49.0 |

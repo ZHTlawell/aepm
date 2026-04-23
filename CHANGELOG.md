@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.54.0 (2026-04-23) — 新增 `ae-i18n-integrate`：iOS 多语言全流程 skill（CL10nKit + BCLocalization 路线）[`#IJDSBR`](https://gitee.com/turningsyn/ae-platform/issues/IJDSBR)
+
+### 新增
+
+- **`ae-i18n-integrate`** — Scale Global 生态 iOS 多语言全流程：
+  - 文案 key 分层决策树（CL10nKit 通用 / 项目业务 / Pod 专属）
+  - 批量多语言 `.lproj` 扩展（项目主 + 所有 Locals Pod 同步覆盖）
+  - InfoPlist.strings 系统权限文案本地化
+  - 埋点英文一致性保证（事件名 / parameter key 硬编码英文，不走 `Language.xxx`）
+  - `remove_unused_localized_keys.py` 通用化建议
+
+### 技术路线
+
+基于 bible-ios-template + plant-app 实战审计，走 Scale Global **4 层 i18n 生态**：
+- Layer 0 — `Localize_Swift`（开源底层）
+- Layer 1 — `BCLocalization 1.6.1`（LocaleInfo / BCAppLanguage / Locale/Date/Number 扩展）
+- Layer 2 — `CL10nKit 1.10.2`（`Language.text/enText` API + 310+ 通用 `ctext_xxx` 静态属性）
+- Layer 3 — 项目 / 各 Locals Pod 的 Language extension + `.lproj/Localizable.strings`
+
+**Scale Global 标准支持 10 语言**：en / de / es / fr / it / ja / nl / pt-BR / zh-Hans / zh-Hant。
+
+沉淀 **7 条硬性规则 + 9 条反模式 + 8 条故障排查 + 10 条已验证约束**。
+
+### A 类 integrate 系列进度
+
+- [x] ae-paywall-integrate v0.51.0
+- [x] ae-notification-integrate v0.52.0
+- [x] ae-feedback-integrate v0.53.0
+- [x] **ae-i18n-integrate v0.54.0**（本版本）
+- [ ] ae-abtest-integrate（下一个）
+- [ ] ae-onboarding-integrate
+
+### 待审计
+
+5 条 P0 阻塞项：`.xcstrings` 是否引入 / App 内运行时切语言标准化 / remove_unused_localized_keys.py 通用化 PR / 通用文案加入 CL10nKit Pod 流程 / Welcome_XX AB 变体语言覆盖规范。
+
 ## v0.53.0 (2026-04-23) — 新增 `ae-feedback-integrate`：iOS 用户反馈全流程 skill（BCFeedback 路线）[`#IJDSBR`](https://gitee.com/turningsyn/ae-platform/issues/IJDSBR)
 
 ### 新增
