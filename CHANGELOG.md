@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.52.0 (2026-04-23) — 新增 `ae-notification-integrate`：iOS 本地通知全流程 skill（BCUserNotification + BCPermission 路线）[`#IJDS76`](https://gitee.com/turningsyn/ae-platform/issues/IJDS76)
+
+### 新增
+
+- **`ae-notification-integrate`** — Scale Global 生态 iOS 本地通知全流程：
+  - NotificationService.swift 业务薄封装（enableReminders / disableReminders / syncWithSystem + schedule 模板）
+  - AppDelegate 点击 dispatch extension（identifier 前缀 branch + BCTrack 埋点约定）
+  - SettingsViewModel toggle（权限请求时机：用户主动触发）
+
+### 技术路线
+
+基于 WePray 实战代码审计，走 Scale Global 内部 **BCUserNotification 1.0.2 + BCPermission 1.1.0** 生态（非纯 Apple UN*API）：
+- schedule 走 `BCUserNotificationManager`（identifier dedup + Group remove 支持）
+- 权限请求走 `BCPermission.requestNotificationPermission(force:)`（统一埋点 + force 策略）
+- Identifier 前缀域约定：`{domain}_reminder_{suffix}`（WePray 示例：`vip_cancel_reminder_` / `daily_verse_reminder` / `care_reminder_`）
+- 点击 dispatch 在 AppDelegate `didReceive` 按前缀打 `BCTrack.track("notification_xxxreminder", type: .click)`
+
+沉淀 **6 条硬性规则 + 7 条反模式 + 7 条故障排查 + 8 条已验证约束**，来自 WePray AppDelegate/NotificationService/SettingsViewModel + BCUserNotification/BCPermission Pods 源码审计。
+
+### 范围边界
+
+**仅本地通知**（UNCalendar 定时 / UNTimeInterval 相对时间 / 业务事件触发）。**不含远程推送**：bible-ios-template 有 `didRegisterForRemoteNotificationsWithDeviceToken → BCAdjust` 回调但从未调 `registerForRemoteNotifications()`，且 Scale Global 生态目前无 BCPush 封装 + 无服务端推送端点。远程推送留给未来 `ae-remote-push-integrate`（B 类 skill）。
+
+### 待审计
+
+本版本为**草稿版**，`test-scenarios.md` 末尾 4 条阻塞项待龙哥补充（WePray NotificationService 是否迁移、BCUserNotification dedup 语义、BCPermission force 参数语义、deep link 路由 pattern），8 个用户场景待在真实新项目跑通。
+
+### A 类 integrate 系列进度
+
+- [x] ae-paywall-integrate (v0.51.0)
+- [x] **ae-notification-integrate**（本版本）
+- [ ] ae-feedback-integrate（下一个）
+- [ ] ae-i18n-integrate
+- [ ] ae-abtest-integrate
+- [ ] ae-onboarding-integrate（升级原 ae-onboarding-design）
+
 ## v0.51.1 (2026-04-23) — 修复 `ae update` 未同步 `~/.claude/skills/` 全局软链接 [`#IJDQWD`](https://gitee.com/turningsyn/ae-pm/issues/IJDQWD)
 
 ### 修复
