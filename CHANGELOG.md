@@ -1,5 +1,47 @@
 # Changelog
 
+## v0.56.0 (2026-04-23) — 新增 `ae-onboarding-integrate`：iOS Onboarding 全流程 skill（合并 ae-onboarding-design + Welcome_XX Pod + AB 变体）[`#IJDSBR`](https://gitee.com/turningsyn/ae-platform/issues/IJDSBR)
+
+### 新增 + 合并
+
+- **`ae-onboarding-integrate`** —— **合并原 `ae-onboarding-design`**（HTML/CSS/JS 设计阶段）+ 新增 Welcome_XX Pod 打包 + AB 变体注册 + Work Chain 集成 + 评分引导联动：
+  - Phase 2 HTML 原型（继承原 ae-onboarding-design）
+  - Phase 3 Welcome_XX Pod 生成（Podspec / VC / SwiftUI / ViewModel / Language / Localizable 全套模板）
+  - Phase 4 ABTestType.welcome 变体注册 + 神策后台协同
+  - Phase 5 Work Chain `WelcomeWork` 动态加载验证
+  - Phase 6 `BCAppReviewPrompt` 评分引导接入
+
+### 技术路线
+
+基于 bible-ios-template + plant-app 实战审计：
+- **命名严格约定**：Pod = `Welcome_XX`，VC class = `Welcome_XXViewController`（`NSClassFromString` 动态加载依赖字符串）
+- **variant = 独立 Pod**：每个变体完全独立（UI/VM/Model/Language），通过 `BCABTest.shared.syncFetchWecome()` 分流
+- **`BCCache hasShownKey` 跨 variant 共享**：用户一生看一次 onboarding
+- **评分引导严格时机**：用户完成 onboarding 后 + completion 前调 `seekGoodReview`
+
+沉淀 **7 条硬性规则 + 8 条反模式 + 7 条故障排查 + 10 条已验证约束**。
+
+### 与原 ae-onboarding-design 关系
+
+合并（技术路线升级）：
+- 保留 HTML 原型能力（PM 视觉审视阶段）
+- 废弃 Superwall Flow / WebView 渲染路线（和 Scale Global SwiftUI 架构不符）
+- 新增完整集成链：Pod 打包 → AB 注册 → Work Chain → 评分引导
+- **原 `ae-onboarding-design` 保留，等龙哥审计本 skill 通过后再下线**（同 `ae-paywall-design` 处理方式）
+
+### A 类 integrate 系列完成
+
+- [x] ae-paywall-integrate v0.51.0
+- [x] ae-notification-integrate v0.52.0
+- [x] ae-feedback-integrate v0.53.0
+- [x] ae-i18n-integrate v0.54.0
+- [x] ae-abtest-integrate v0.55.0
+- [x] **ae-onboarding-integrate v0.56.0**（本版本，完成全部 6 个）
+
+**下一步（等龙哥审计）：**
+- ae-speckit-to-app 主流程减肥（TS-010/011/012/015/024/025/026/027 迁出到对应 integrate skill）
+- ae-paywall-design + ae-onboarding-design 下线
+
 ## v0.55.0 (2026-04-23) — 新增 `ae-abtest-integrate`：iOS AB 测试全流程 skill（BCABTest + SensorsABTesting 路线）[`#IJDSBR`](https://gitee.com/turningsyn/ae-platform/issues/IJDSBR)
 
 ### 新增
