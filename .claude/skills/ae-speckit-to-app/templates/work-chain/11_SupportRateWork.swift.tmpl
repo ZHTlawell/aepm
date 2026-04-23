@@ -1,0 +1,23 @@
+//
+//  SupportRateWork.swift
+//  {{PRODUCT_NAME}}
+//
+//  Work Chain 第 11 步 (Capvault 启动链存在；bible-ios-template 当前未显式分离，如需请参照)
+//  评分引导弹窗 — BCAppReviewPrompt 触发
+//
+//  ⏳ 待从 Capvault / bible-ios-template 提取实际代码
+//  （bible-app 的 WelcomeWork 中调了 BCAppReviewPrompt.tryToSystemScore，
+//    如无独立 SupportRate Work，可合并到 WelcomeWork 或 AfterLogin）
+//
+
+import Foundation
+import BCUtils
+import BCAppReviewPrompt
+
+class SupportRateWork: WorkVoidCallbackTask {
+    func work(_ callback: @escaping VoidCallback) {
+        // TODO: 根据产品需求决定是否在此处触发 BCAppReviewPrompt
+        // 参考：BCAppReviewPrompt.tryToSystemScore(onboarding: false, "launch")
+        callback()
+    }
+}

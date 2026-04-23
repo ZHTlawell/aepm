@@ -1,0 +1,48 @@
+guideline: "4.2"
+chapter: "4-Design"
+title: "Minimum Functionality — 最低功能性"
+severity: high
+official_text: |
+  Your app should include features, content, and UI that elevate it beyond a
+  repackaged website. If your app is not particularly useful, unique, or
+  "app-like," it doesn't belong on the App Store. If your App doesn't provide
+  some sort of lasting entertainment value or adequate utility, it may not be
+  accepted.
+
+  4.2.2: Other than catalogs, apps shouldn't primarily be marketing materials,
+  advertisements, web clippings, content aggregators, or a collection of links.
+official_url: "https://developer.apple.com/app-store/review/guidelines/#4.2"
+
+triggers:
+  - "App 主要是 WebView 包装"
+  - "原生 View 数量很少"
+  - "App 主要是链接聚合或 marketing 页面"
+
+auto_checks:
+  - id: "4.2-not-webview-wrapper"
+    type: shell
+    command: "WV=$(grep -rEn 'WKWebView|SFSafariViewController|WebView\\(' --include='*.swift' . 2>/dev/null | wc -l); NV=$(grep -rEn 'struct\\s+\\w+\\s*:\\s*View\\b' --include='*.swift' . 2>/dev/null | wc -l); echo \"webview_refs=$WV native_views=$NV\"; if [ $WV -gt 5 ] && [ $NV -lt $WV ]; then echo 'WEBVIEW_WRAPPER'; fi"
+    expected: no_match
+    match_pattern: "WEBVIEW_WRAPPER"
+    severity: high
+    on_fail: "WebView 引用明显多于 Native View — 可能被判为 WebView 包装（4.2.2 repackaged website）"
+    case_refs: []
+
+  - id: "4.2-has-sufficient-views"
+    type: shell
+    command: "NV=$(grep -rEn 'struct\\s+\\w+\\s*:\\s*View\\b' --include='*.swift' . 2>/dev/null | wc -l); if [ $NV -lt 3 ]; then echo \"ONLY_${NV}_VIEWS\"; fi"
+    expected: empty
+    severity: medium
+    on_fail: "原生 View 少于 3 个 — 可能被判为功能不足"
+    case_refs: []
+
+review_notes_template: |
+  - The app provides substantive native features beyond merely wrapping a website.
+  - List of primary native features: <list 3-5>.
+
+fix_suggestions:
+  - "若 App 主要是 WebView，补充原生功能（本地收藏 / 推送 / 离线阅读 / 设置）"
+  - "每个主要功能至少对应 1 个独立 Native View"
+
+case_refs: []
+updated_at: "2026-04-22"

@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.57.0 (2026-04-23) — 下线 `ae-paywall-design` + `ae-onboarding-design`（合并到对应 integrate 后下线）[`#IJDSBR`](https://gitee.com/turningsyn/ae-platform/issues/IJDSBR)
+
+### 移除
+
+- **`ae-paywall-design`** — 已合并到 `ae-paywall-integrate` v0.51.0，源码目录删除
+- **`ae-onboarding-design`** — 已合并到 `ae-onboarding-integrate` v0.56.0，源码目录删除
+
+### 替代关系
+
+| 旧 skill | 新 skill | 能力差异 |
+|---------|---------|---------|
+| `/ae-paywall-design` | `/ae-paywall-integrate` | 新增 BCStoreKit 订阅封装 + 沙盒验证；废弃 HTML WebView + Superwall 路线 |
+| `/ae-onboarding-design` | `/ae-onboarding-integrate` | 新增 Welcome_XX Pod 打包 + AB 变体注册 + Work Chain 集成 + 评分引导；保留 HTML 原型阶段 |
+
+### 其他更新
+
+- `ae-speckit-to-app/SKILL.md` 第 384 行引用更新：`/ae-paywall-design` → `/ae-paywall-integrate`
+- `templates/pm/README.md` M0→M1 表格移除两个 design skill（这些不是 speckit 产出阶段能力）
+- `templates/pm/README.md` M2→M3 "可选 integrate 能力"小节新增，归拢全部 7 个 integrate skill
+- `templates/pm/CLAUDE.md` 能力表移除"待下线"行
+
+### 用户影响
+
+- 触发 `/ae-paywall-design` / `/ae-onboarding-design` 将无法识别 skill，改用对应 `*-integrate`
+- 现有项目 `.claude/skills/` 的软链接在 `ae update pm` 后自动清理失效链接（v0.51.1 已修复 update 机制）
+
 ## v0.56.0 (2026-04-23) — 新增 `ae-onboarding-integrate`：iOS Onboarding 全流程 skill（合并 ae-onboarding-design + Welcome_XX Pod + AB 变体）[`#IJDSBR`](https://gitee.com/turningsyn/ae-platform/issues/IJDSBR)
 
 ### 新增 + 合并

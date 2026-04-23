@@ -381,7 +381,7 @@ Speckit 输入
     │
     ├── /ae-analytics-integrate ──→ Firebase + Adjust 接入（templates/analytics-bootstrap 接手点）
     │
-    ├── /ae-paywall-design ──→ 付费墙视觉（对接 PurchaseUI{{MEMO}}ViewController.swift 里的 PaywallView）
+    ├── /ae-paywall-integrate ──→ 付费墙 UI + BCStoreKit 订阅封装 + 沙盒验证（替代原 /ae-paywall-design，合并为端到端 integrate）
     │
     ├── /ae-preflight ──→ 生产就绪扫描（App Icon / PrivacyInfo / Bundle ID 等）
     │

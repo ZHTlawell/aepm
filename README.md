@@ -40,9 +40,7 @@ M3  TestFlight ──────────────── 可测 Build 已
 |-------|------|---------|
 | `/ae-app-to-speckit` | 从已上架 App 逆向提取 speckit（iPhone + USB + WDA） | `/ae-app-to-speckit` |
 | `/ae-demo-to-speckit` | 从 demo 源码自动提取 6 模块 Speckit | `/ae-demo-to-speckit` |
-| `/ae-onboarding-design` | 生成 Onboarding 幻灯片规格（HTML/CSS/JS） | `/ae-onboarding-design` |
-| `/ae-paywall-design` | 生成 Paywall 付费墙规格（HTML 或 Native StoreKit 2） | `/ae-paywall-design` |
-| `/ae-speckit-brainstorm` 🆕 | 从零开始与 PM 对话共创 Speckit（无 demo / 无参考 App） | `/ae-speckit-brainstorm` |
+| `/ae-speckit-brainstorm` | 从零开始与 PM 对话共创 Speckit（无 demo / 无参考 App） | `/ae-speckit-brainstorm` |
 
 **输出：** `speckit/` 目录，人类可审阅。
 
@@ -58,10 +56,23 @@ M3  TestFlight ──────────────── 可测 Build 已
 
 ### M2 → M3：发布段
 
-| Skill | 说明 | 触发命令 | 标记 |
-|-------|------|---------|------|
-| `/ae-app-to-testflight` | 签名 → Archive → Upload → TestFlight 分发（原 `ae-testflight-publish` 改名） | `/ae-app-to-testflight` | — |
-| `/ae-analytics-integrate` | Firebase Analytics + Adjust SDK 双轨埋点（原 `ae-analytics-setup` 改名） | `/ae-analytics-integrate` | optional |
+**主干：**
+
+| Skill | 说明 | 触发命令 |
+|-------|------|---------|
+| `/ae-app-to-testflight` | 签名 → Archive → Upload → TestFlight 分发 | `/ae-app-to-testflight` |
+
+**可选 integrate 能力（按产品需要后置补入，不影响主流程）：**
+
+| Skill | 说明 | 依赖 Pod |
+|-------|------|---------|
+| `/ae-analytics-integrate` | Firebase Analytics + Adjust 双轨埋点 | BCSensor / BCAdjust / BCTrack |
+| `/ae-paywall-integrate` | Paywall UI + BCStoreKit 订阅封装 + 沙盒验证 | BCStoreKit + BCAccount |
+| `/ae-notification-integrate` | 本地通知全流程（schedule / 权限 / 点击追踪） | BCUserNotification + BCPermission |
+| `/ae-feedback-integrate` | 业务嵌入反馈 + 弹窗式 survey | BCFeedback |
+| `/ae-i18n-integrate` | 多语言文案 + InfoPlist + 埋点英文一致性 | CL10nKit + BCLocalization |
+| `/ae-abtest-integrate` | AB 实验注册 + preload + 神策后台协同 | BCSensor (BCABTest) |
+| `/ae-onboarding-integrate` | HTML 原型 + Welcome_XX Pod + AB 变体 + 评分引导 | Welcome + BCAppReviewPrompt |
 
 **输出：** TestFlight 可测 Build。
 
@@ -258,7 +269,7 @@ ae pm submit-bug "问题标题" "问题描述"
 
 查看 [CHANGELOG.md](CHANGELOG.md) 了解完整更新记录。
 
-当前版本：**v0.56.0**
+当前版本：**v0.57.0**
 
 ## 由谁维护
 
