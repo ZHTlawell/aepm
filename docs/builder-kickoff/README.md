@@ -67,10 +67,10 @@
 
 **3a. 建 repo**
 
-`ae git` CLI 不支持创建 repo，走以下其中一条：
+`ae git` CLI 不支持创建 repo，走以下流程：
 
-- 我在 `turningsyn` 组织**有建 repo 权限**：打开 Gitee 企业版网页手动建仓库 → 命名 `product-{name}`（英文短名，小写 + 连字符，例如 `product-noteflow`）→ 初始化为空 repo
-- 我**没有建 repo 权限**：在 `turningsyn/ae-platform` 提 issue（标题 `[申请] 新建 product-{name} repo`），等 AE Team 建好后把 clone URL 发我
+- 默认打开 Gitee 企业版网页（turningsyn 组织下）手动建仓库 → 命名 `product-{name}`（英文短名，小写 + 连字符，例如 `product-noteflow`）→ 初始化为空 repo
+- 如果提示没有建 repo 权限 → 去 `turningsyn/ae-pm` 提 issue（标题 `[权限] 申请 turningsyn 组织建仓权限`），AE Team 会开通
 
 repo 建好后本地初始化：
 
@@ -83,12 +83,18 @@ git commit -m "init: {产品名} M0 idea 一页纸"
 git push -u origin master
 ```
 
-**3b. 建主 tracking issue**
+**3b. 建主 tracking issue（开在 `turningsyn/ae-pm`）**
+
+主 tracking issue **开在 `turningsyn/ae-pm`**，不是 product repo。aepm 是 AE Team 的中央看板，所有 builder 的迭代记录集中在这里便于统一跟踪。
 
 - 读同目录 `issue-template.md` 的 Part A 骨架
-- 把 A2 的字段代入 body，推进状态的 checkbox 全空
-- `ae git issues create --repo turningsyn/product-{name} --title "[Tracking] {产品名} → TestFlight" --body "..."` 创建
-- 记下返回的 issue URL，后续每次 push 都回写 Wave 评论（硬纪律，不是建议）
+- 把 A2 的字段代入 body，推进状态 checkbox 全空；"代码仓库"字段填 `turningsyn/product-{name}`
+- 用命令创建：
+  ```
+  ae git issues create --repo ae-pm --title "[Builder][product-{name}] {产品名} → TestFlight" --body "..."
+  ```
+- 记下返回的 issue URL，后续每次 push 都回写 Wave 评论到这个 aepm 上的 issue（硬纪律，不是建议）
+- 产品自己的 bug / feature 子 issue 可以开在 product repo，但 **M0→M3 主线进度永远在 aepm 的主 tracking issue**
 
 ### Stage A4 — M0→M1: /ae-speckit-brainstorm
 
@@ -246,9 +252,7 @@ TestFlight 时点之前必须逐项确认：
 
 | 卡点类型 | 去哪 | 例子 |
 |---------|------|------|
-| ae-pm skill 报错 / 行为不符预期 | `turningsyn/ae-pm` | `/ae-speckit-to-app` 生成的工程 build 失败 |
-| 中台能力缺失（没有对应 skill） | `turningsyn/ae-platform` | 想一键接 Adjust 但没对应 skill |
-| iOS 工程生成质量 bug | `turningsyn/ae-go` | 生成的 Xcode 工程 Bundle ID 字段丢失 |
+| 所有 AE 工具链 / skill / 中台能力 / 工程生成相关问题 | `turningsyn/ae-pm`（AE Team 内部路由，builder 不用自己分类） | `/ae-speckit-to-app` 报错 / 想一键接 Adjust / 生成的 Bundle ID 字段丢失 |
 | 签名 / ASC / Privacy URL / 订阅商品 | 项目群问，通知对应 owner | DEVELOPMENT_TEAM 复用哪个 |
 | 产品方向 / 竞品定位疑问 | 项目群问，通知产品负责人 | 想换参考 App |
 

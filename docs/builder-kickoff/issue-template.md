@@ -1,6 +1,6 @@
 # 产品推进 Issue 模板
 
-> **纪律**：每个产品 repo 建一个主 tracking issue，body 定范围，**评论按 Wave 记录进度**。每次 push 回写一条评论，不是"做完再写"。参考范式：[turningsyn/ae-platform#II8RAE](https://gitee.com/turningsyn/ae-platform/issues/II8RAE)
+> **纪律**：每个产品一个主 tracking issue 开在 `turningsyn/ae-pm`（AE Team 中央看板，所有 builder 的迭代记录集中在这里），body 定范围，**评论按 Wave 记录进度**。每次 push 回写一条评论到主 issue，不是"做完再写"。
 
 ---
 
@@ -11,7 +11,7 @@
 ```markdown
 ## 目标
 
-把 {产品名} 从 idea → 可上架 TestFlight 状态。本 issue 是该产品的主 tracking issue。
+把 {产品名} 从 idea → 可上架 TestFlight 状态。本 issue 是该产品的主 tracking issue（开在 `turningsyn/ae-pm`，AE Team 中央看板）。
 
 ## 背景
 
@@ -158,16 +158,14 @@ commit `{hash}`, push 到 main/{branch}。{TestFlight 状态，例如 EXPORT SUC
 2. **每次 push 必须回写 Wave 评论**，这是纪律不是建议
 3. **编号连贯**：修复项用连续字母（R/S/T/U/V...）跨 Wave 不重置，方便追溯
 4. **验证状态用固定词**：`FIXED High` / `PARTIAL` / `INVESTIGATION` / `REGRESSION`
-5. **中台卡点另开 issue**：skill 用不顺、能力缺失不写在产品 issue，另提到 `turningsyn/ae-platform` / `ae-pm` / `ae-go`
+5. **中台卡点不写在产品 repo 子 issue**：所有 skill 用不顺 / 能力缺失 / 工程生成 bug 一律提到 `turningsyn/ae-pm`，AE Team 在 ae-pm 内部路由到对应源仓
 
 ## 产品 issue vs 中台反馈 issue 的分流
 
 | 类型 | 去向 | 示例 |
 |------|------|------|
-| 产品 bug / UX / 文案 | 产品 repo（本 issue 的子 issue） | "Paywall 按钮点击无响应" |
+| 产品 bug / UX / 文案 | 产品 repo（子 issue） | "Paywall 按钮点击无响应" |
 | 产品功能需求 | 产品 repo | "需要加聊天记录导出" |
-| skill 用不顺 / 文档不清 | `turningsyn/ae-pm` | "ae-pm 生成 speckit 时某个字段含义不清" |
-| 中台能力缺失 | `turningsyn/ae-platform` | "没有 skill 能一键配 Adjust" |
-| iOS 生成能力 bug | `turningsyn/ae-go` | "生成的 Xcode 工程 Bundle ID 字段丢失" |
+| 所有 AE 工具链 / skill / 中台能力 / 工程生成反馈 | `turningsyn/ae-pm`（AE Team 内部路由，builder 不用自己分类） | "/ae-speckit-to-app 生成工程 build 失败" / "想一键接 Adjust 但没 skill" / "生成的 Xcode Bundle ID 字段丢失" |
 
 中台反馈 issue 用简单模板：**场景 / 期望 / 实际 / 现有 workaround**。

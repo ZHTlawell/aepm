@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.50.3 (2026-04-23) — builder-kickoff 规则调整：反馈统一到 ae-pm，主 tracking issue 中央化
+
+来源：Scale Builder 群 2026-04-23 真实用户卡点反馈（胡印斌走 Stage A3 被引导去 `turningsyn/ae-platform` 申请建仓权限，实际无 ae-platform 权限 Gitee 返回 404 阻塞）+ 后续规则更新。内部 docs 微调，不开独立 issue 跟踪。
+
+### 改动
+
+- **`docs/builder-kickoff/README.md` Stage A3 3a**：默认 builder 自己在 turningsyn 组织建 product repo；遇权限不足 → 去 `turningsyn/ae-pm` 提（不再是 `turningsyn/ae-platform`）
+- **`docs/builder-kickoff/README.md` Stage A3 3b**：**主 tracking issue 开在 `turningsyn/ae-pm`**（不再是 product repo），标题前缀 `[Builder][product-{name}]`。product repo 只放产品自己的 bug / feature 子 issue，M0→M3 主线进度在 aepm
+- **`docs/builder-kickoff/README.md` Stage B4 卡点路由表**：5 行合并为 3 行，所有工具链 / skill / 中台能力 / 工程生成相关问题一律 `turningsyn/ae-pm`，AE Team 内部路由
+- **`docs/builder-kickoff/issue-template.md`**：顶部纪律明确主 issue 开在 ae-pm + Part A body 加"开在 `turningsyn/ae-pm`" + 使用规则第 5 点改写 + 分流表 5 行合并为 3 行 + 删顶部"参考范式 `turningsyn/ae-platform#II8RAE`"引用
+- **`docs/builder-kickoff/ae-pm-flow.md`**：clone 403 求助 repo `ae-platform` → `ae-pm`
+
+### 设计原则
+
+builder 视角对源仓（ae-platform / ae-go）透明，只需要知道"遇到问题找 `turningsyn/ae-pm`"一个入口。AE Team 在 ae-pm 内部评审后路由到对应源仓。
+
+### 验证
+
+- `grep -rn 'ae-platform\|ae-go' templates/pm/docs/builder-kickoff/` → 无匹配
+- `bash scripts/build.sh pm` → `dist/pm/docs/builder-kickoff/` 三份文件齐备
+
 ## v0.50.2 (2026-04-22) — builder-kickoff 扁平化：合并单一 README + 资源，去装机 + 去 ~/.ae 路径 [`#IJDCIQ`](https://gitee.com/turningsyn/ae-pm/issues/IJDCIQ)
 
 ### 改动

@@ -123,4 +123,4 @@ bash ~/.ae/pm/cli/install.sh
 ae setup
 ```
 
-前置：Gitee 企业版 git 凭证已配好（SSH key 或 token 已有 turningsyn 组织读权限）。clone 403 去 `turningsyn/ae-platform` 提 issue 找 AE Team 开权限。
+前置：Gitee 企业版 git 凭证已配好（SSH key 或 token 已有 turningsyn 组织读权限）。clone 403 去 `turningsyn/ae-pm` 提 issue 找 AE Team 开权限。
