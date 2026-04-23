@@ -1,5 +1,6 @@
 ---
 description: "iOS Paywall 全流程 — UI 设计 + BCStoreKit 订阅封装 + 沙盒验证（杭州团队 BCStoreKit/BCAccount 生态）"
+last_updated: "2026-04-23"
 permissions:
   allow:
     - "Bash(xcodebuild *)"
@@ -29,7 +30,12 @@ smoke_test:
 
 ## 核心原则
 
-> **你是 Paywall 工程师。** 基于产品核心功能和订阅方案，产出可直接嵌入 iOS App 的 SwiftUI Paywall 页面 + `SubscriptionService` 封装层。关键约束：**ASC IAP 产品（订阅组 + Product IDs + Sandbox 测试账号）必须在触发本 skill 前由杭州团队创建完成**；BCStoreKit 内部已自动上报 Adjust 订阅事件（`vip/weekly/monthly/yearly/subscribe/purchase`），业务代码**禁止重复调用** `AdjustService` 对应方法。
+> **你是 Paywall 工程师。** 基于产品核心功能和订阅方案，产出：① `SkuType` 枚举（所有 SKU 统一注册）；② 继承 `PurchaseUIBaseViewController` 的产品子类（命名 `PurchaseUI{memo}ViewController`）；③ `SubscriptionService` 封装层。关键约束：
+>
+> 1. **ASC IAP 产品（订阅组 + Product IDs + Sandbox 测试账号）必须在触发本 skill 前由杭州团队创建完成**
+> 2. **所有 SKU 必须在 `public enum SkuType: String, CaseIterable {}` 中声明**（raw value = ASC product identifier），**禁止硬编码字符串**
+> 3. **转化页必须继承 `PurchaseUIBaseViewController`**，基类启动时自动遍历 `SkuType.allCases` 拉取 Products，子类不重复实现 product 加载
+> 4. **BCStoreKit 内部已自动上报 Adjust 订阅事件**（vip/weekly/monthly/yearly/subscribe/purchase），业务代码**禁止重复调用** `AdjustService` 对应方法
 
 ## 触发条件
 
@@ -126,7 +132,45 @@ grep -rn "BCStoreKit\|BCAccount" --include="*.swift" Template/ App/ 2>/dev/null 
 
 ## Phase 2: 代码生成
 
-**目标：** 生成 3 个核心文件：`SubscriptionService.swift` / `PaywallView.swift` / 补全 `AdjustService.swift`（如 ae-analytics-integrate 未包含订阅段）。
+**目标：** 生成 4 个核心文件：`SkuType.swift` / `PurchaseUI{memo}ViewController.swift` / `SubscriptionService.swift` / `PaywallView.swift`（+ 补全 `AdjustService.swift` 订阅段）。
+
+### Step 2.0: `SkuType` 枚举 + `PurchaseUI{memo}ViewController` 命名（前置约束）
+
+**SKU 统一注册**（杭州审计确认 P0-1）。路径：`<Project>/Classes/Config/SkuType.swift`
+
+```swift
+import Foundation
+
+public enum SkuType: String, CaseIterable {
+    case weekly  = "com.{product}.weekly"
+    case monthly = "com.{product}.monthly"
+    case yearly  = "com.{product}.yearly"
+    // 新增 SKU → 必须加到此枚举；禁止在业务代码硬编码 product identifier 字符串
+}
+```
+
+**转化页子类命名约定**（杭州审计确认 P0-23）。
+
+- 项目转化页继承 `PurchaseUIBaseViewController`（BCStoreKit Pod 提供）
+- 类名格式：**`PurchaseUI{memo}ViewController`**（memo 是 AB 变体 String，无长度/字符硬性限制，由 `ABTestType.vip` 返回决定）
+- 基类启动时自动遍历 `SkuType.allCases` 拉取 Products，**子类不重复实现 product 加载**（P0-2）
+- 示例（memo = "07"）：
+
+```swift
+import UIKit
+import BCStoreKit
+
+public class PurchaseUI07ViewController: PurchaseUIBaseViewController {
+    // 不重写 product 加载 —— 基类已自动用 SkuType.allCases 预拉
+    // 只负责 UI（选 SKU / CTA / 关闭 / Restore）
+    public override func viewDidLoad() {
+        super.viewDidLoad()
+        setupUI()
+    }
+}
+```
+
+**动态加载**：Work Chain ConversionPageWork 根据 `BCABTest.shared.syncFetchVip()` 返回的 memo，`NSClassFromString("PurchaseUI\(memo)ViewController")` 动态加载对应子类。
 
 ### Step 2.1: SubscriptionService.swift（薄封装 ~70 行）
 
@@ -452,11 +496,14 @@ Bundle ID：{bundle_id}
 ## 硬性规则
 
 1. **ASC IAP 不自行创建** — 订阅组 + Product IDs + Sandbox 账号全部由杭州团队创建，Agent 不使用 ASC API 自行配置。
-2. **BCStoreKit 订阅事件禁止手动调** — `BCStoreKit` 内部 `ServiceManager.swift` 已自动 `BCAdjust.sendEvent`（vip/weekly/monthly/yearly/subscribe）+ `sendSubscription`，业务代码重复调会双倍计数。
-3. **`BCStoreKit.restore` 必须 `withCheckedContinuation`** — 原 callback API，直接包 `async func` 会立即返回，`await` 无效。
-4. **`PaymentResult` 五分支必须全处理** — `.success/.cancelled/.appstorefailed/.networkError/.serverError`，`.cancelled` 静默，其他三失败必须弹用户态 alert。
-5. **`VIP` 状态走 `BCAccount.isVip`，不用 `Transaction.currentEntitlements`** — BCAccount 是服务端判定，和 StoreKit 可能短暂不同步，监听 `.accountUserChanged` 通知刷新。
-6. **Apple 合规三要素不可省** — 右上角 ✕ 关闭按钮 + Privacy/Terms/Apple Subscription Terms 三链接 + Restore 按钮。缺任一 ASC 审核 Guideline 4.0 / 3.1.2 拒。
+2. **所有 SKU 在 `SkuType` 枚举统一注册** — `public enum SkuType: String, CaseIterable {}`，raw value = ASC product identifier。**禁止在业务代码硬编码 product identifier 字符串**。（杭州审计 P0-1）
+3. **转化页继承 `PurchaseUIBaseViewController`** — 类名必须 `PurchaseUI{memo}ViewController`；基类已用 `SkuType.allCases` 自动预拉 Products，**子类不重复实现 product 加载**。（P0-2/23）
+4. **VIP 状态延迟等待阈值 = 3s** — `BCAccount.isVip` 服务端验证典型 1-2s，阈值设 3s，超时后调 `get_vip_info` 重拉，不阻塞主流程。（P0-3）
+5. **BCStoreKit 订阅事件禁止手动调** — `BCStoreKit` 内部 `ServiceManager.swift` 已自动 `BCAdjust.sendEvent`（vip/weekly/monthly/yearly/subscribe）+ `sendSubscription`，业务代码重复调会双倍计数。
+6. **`BCStoreKit.restore` 必须 `withCheckedContinuation`** — 原 callback API，直接包 `async func` 会立即返回，`await` 无效。
+7. **`PaymentResult` 五分支必须全处理** — `.success/.cancelled/.appstorefailed/.networkError/.serverError`，`.cancelled` 静默，其他三失败必须弹用户态 alert。
+8. **`VIP` 状态走 `BCAccount.isVip`，不用 `Transaction.currentEntitlements`** — BCAccount 是服务端判定，和 StoreKit 可能短暂不同步，监听 `.accountUserChanged` 通知刷新。
+9. **Apple 合规三要素不可省** — 右上角 ✕ 关闭按钮 + Privacy/Terms/Apple Subscription Terms 三链接 + Restore 按钮。缺任一 ASC 审核 Guideline 4.0 / 3.1.2 拒。
 
 ---
 
@@ -492,7 +539,7 @@ Bundle ID：{bundle_id}
 | `BCStoreKit.product(of: pid) == nil` | (1) ASC 产品未 Ready to Submit (2) Bundle ID 不匹配 (3) 未登录 Sandbox 账号 (4) Tax/Banking/Agreements 未签 | 按顺序排查：ASC 后台状态 → Bundle ID → Settings → App Store → Sandbox Account → 杭州确认 agreements |
 | `purchase result=appstorefailed` | 未登录 Sandbox / Sandbox 账号失活 / 账号地区不覆盖产品定价 | 重新登录 Sandbox；若账号已激活无效，找杭州重建 |
 | `await subscriptionService.restore()` 立即返回 | 未用 `withCheckedContinuation` 包 callback | 用 Step 2.1 模板中的 `withCheckedContinuation` 写法 |
-| `purchase result=success` 但 `isSubscribed=false` | `BCAccount.isVip` 服务端 flag 延迟 | 正常现象，通常 1-2 秒内通过 `.accountUserChanged` 刷新；若长时间不同步联系杭州检查服务端 |
+| `purchase result=success` 但 `isSubscribed=false` | `BCAccount.isVip` 服务端收据验证延迟（典型 1-2s，server 转 Apple 验证） | 等待阈值 **3s**，超时后调 `BCAccount.get_vip_info` 重拉 VIP 状态，不阻塞主流程；若 3s 后仍不同步，背景 retry 或让用户手动 Restore |
 | Adjust Dashboard 无订阅事件 | 查了 Production 视图 / Sandbox 事件延迟 | 切 Sandbox 视图；等 5-30 分钟 |
 | Adjust 订阅事件数翻倍 | 业务代码手动调了 AdjustService.trackVip/trackWeekly 等 | 删除业务代码的手动调用，只保留 AdjustService.trackShare/trackDiscount 等非订阅事件 |
 | 购买卡住不 return（无 result 日志） | BCStoreKit 挂在 StoreKit 等待 | 检查 ASC 产品状态；检查真机是否卡在待家长同意；检查 Scheme 是否启用了 `.storekit` 配置文件（Sandbox 真机不需要） |

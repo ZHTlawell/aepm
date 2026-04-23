@@ -144,9 +144,9 @@
   - 非 Plant 产品自定义 BCFeedbackData 模板是否合理
   - 通用 4 文件 copy 模式是否 OK（还是应该做成 Template Pod）
 
-## 已知阻塞项（等龙哥审计）
+## 已解决阻塞项（杭州 Martinlehb 审计 2026-04-23，IJD7GE #note_49775397）
 
-- [ ] `Template/Feature/Feedback/` 4 通用文件每个项目都要 copy，是否应该升级为 `BCFeedbackTemplate` Pod 内置？
-- [ ] `BCFeedbackData` 预定义是否应为非 Plant 产品扩充（比如 `.chatResponse` / `.paintResult` 等通用场景）？
-- [ ] `FeedbackDataManager` 的 `MLModelCacheManager` 泛型参数 `[FeedbackResult]` 在不同产品枚举不同时会 archive/decode 失败吗？（`FeedbackResult` 含 `FeedbackSource` enum，enum case 不一致会破坏 Codable）
-- [ ] BCFeedback.survey 在启动早期（splash 未完）调用行为是什么（文档无说明）
+- [x] **P0-8 BCFeedbackTemplate Pod 可行但需单独设计**：能力可行，现有组件不直接覆盖，**需单独出方案**。SKILL.md 标注"按需接入、设计先行"，本 skill 当前保持 `Template/Feature/Feedback/` 4 通用文件 copy 模式。
+- [x] **P0-9 BCFeedbackData 完全可定制**：展示内容数据可定制，**各项目按需配置文案、选项、结构**。硬性规则 3 已改写为"Pod 预定义只是 Plant 样例，各项目按业务自定义"。
+- [x] **P0-10 解析失败不崩溃**：字段缺失或类型不匹配时整个数据对象返回 **nil**，调用方按 optional 处理。硬性规则 4 已声明"nil 兜底"。
+- [x] **P0-11 survey 不在启动早期**：调用链由**用户行为驱动**，不纳入启动流程。硬性规则 5 已声明。

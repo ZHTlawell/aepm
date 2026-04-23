@@ -1,5 +1,6 @@
 ---
 description: "iOS 用户反馈全流程 — BCFeedback 弹窗 + FeedbackSource 业务枚举 + 本地持久化 + BCTrack 埋点（Scale Global 生态）"
+last_updated: "2026-04-23"
 permissions:
   allow:
     - "Bash(xcodebuild *)"
@@ -391,10 +392,12 @@ Firebase DebugView / 神策 Debug 看 `feedback` 事件：
 
 1. **业务代码不直接 `BCTrack.track("feedback", ...)`** — 必须走 `FeedbackHelper.feedback(data:yes:)`。原因：直接 BCTrack 会漏持久化（FeedbackDataManager）+ 漏 Thanks UI 展示。
 2. **FeedbackSource 每个 case 必须在 Ext 补完 3 个映射** — `source` / `parameters` / `feedbackData`。漏补 `feedbackData` 会在 survey+feedback 链路 runtime crash。
-3. **非 Plant 类产品必须自定义 `BCFeedbackData` static var** — Pod 预定义的 `.identifyResult` / `.diagnoseResult` / `.plantFinder` 只适用 Plant 类。用错会让选项文案和业务场景不匹配。
-4. **所有 feedback_xxx 文案 key 必须在 Localizable 中** — `BCFeedbackOption(key:)` 内部用 `Language.text(for: key)` 查表，key 缺失会显示裸 key 串。
-5. **FeedbackView 嵌入位置 = 业务结果展示之后** — 不是按钮旁 / 页面顶部。典型模式：ScrollView 最底部"用这个结果有用吗？"。
-6. **同一 source 不重复展示 Thanks View** — FeedbackHelper 每次调用都会 `FeedbackThanksView.show()`，业务侧如有防抖需求自行控制（或接受"快速多次点击 yes/no 时会弹多次 thanks"这一行为）。
+3. **`BCFeedbackData` 内容完全可定制**（杭州审计 P0-9）— Pod 预定义 `.identifyResult` / `.diagnoseResult` / `.plantFinder` 只是 Plant 类样例；**各项目按业务需要配置文案、选项、结构**。非 Plant 类产品必须自定义 static var。
+4. **解析失败走 nil 兜底**（杭州审计 P0-10）— `FeedbackResult` 字段缺失或类型不匹配时 **返回 nil，不会崩溃**；调用方统一按 optional 处理做空值兜底，不强行 force-unwrap。
+5. **`BCFeedback.survey` 调用由用户行为驱动**（杭州审计 P0-11）— 不纳入启动流程，不在 splash / rootVC 未就位阶段调用；只在用户完成特定操作后触发（如完成结果页、关闭 paywall、连续使用 N 次）。
+6. **所有 feedback_xxx 文案 key 必须在 Localizable 中** — `BCFeedbackOption(key:)` 内部用 `Language.text(for: key)` 查表，key 缺失会显示裸 key 串。
+7. **FeedbackView 嵌入位置 = 业务结果展示之后** — 不是按钮旁 / 页面顶部。典型模式：ScrollView 最底部"用这个结果有用吗？"。
+8. **同一 source 不重复展示 Thanks View** — FeedbackHelper 每次调用都会 `FeedbackThanksView.show()`，业务侧如有防抖需求自行控制（或接受"快速多次点击 yes/no 时会弹多次 thanks"这一行为）。
 
 ---
 

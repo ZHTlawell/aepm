@@ -159,10 +159,10 @@
   - Pod 专属文案归属（Welcome_XX 的 key 放 Pod 自己的 Language）
   - remove_unused_localized_keys.py 通用化是否采纳
 
-## 已知阻塞项（等龙哥审计）
+## 已解决阻塞项（杭州 Martinlehb 审计 2026-04-23，IJD7GE #note_49775397）
 
-- [ ] `.xcstrings` 是否应引入（Xcode 15+ 新格式，但生态全是老 .strings，迁移风险）
-- [ ] 运行时 App 内切语言是否应作为标准能力（当前生态不支持，Localize_Swift 可做但成本高）
-- [ ] `remove_unused_localized_keys.py` 通用化（加 argparse）是否应提 PR 到 ae-platform scripts/
-- [ ] 新通用文案加到 CL10nKit Pod 的 PR 流程（杭州团队 vs AE Team 谁 review）
-- [ ] Welcome_XX Pod 的 AB 变体是否应同步语言覆盖（当前 Welcome_01 / Welcome_02 只有 en，ae-onboarding-integrate 可能需要规范）
+- [x] **P0-12 格式锁定 `.strings`**：维持 `.strings`，不切换到 `.stringsdict` / `.xcstrings`。硬性规则 1 已锁定。
+- [x] **P0-13 运行时切语言为未来扩展**：第一版跟随系统语言即可。运行时切语言仅用于"App 不支持用户系统语言需 fallback"场景（如系统泰语用户懂法语）。硬性规则 10 已声明。
+- [x] **P0-14 脚本各产品自维护**：`remove_unused_localized_keys.py` 按产品定位分类维护（内容型一套、工具型一套），**不集中到 ae-platform**。原"PR 通用化到 ae-platform"建议已撤销，硬性规则 11 已改写。
+- [x] **P0-15 公共词条手动判断**：无自动提取，开发手动判断将通用词条收录公共词条库避免重复翻译。硬性规则 3 已声明。
+- [x] **P0-16 Welcome_XX en-only**：欢迎页各自独立，第一版仅英文；某 variant 高转化再投多语。硬性规则 8 已声明，ae-onboarding-integrate 同步落地。

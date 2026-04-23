@@ -136,9 +136,9 @@
   - WePray 现有 NotificationService 是否需迁移到 BCUserNotificationManager
   - 权限请求时机策略（用户主动触发）是否需调整
 
-## 已知阻塞项（等龙哥审计）
+## 已解决阻塞项（杭州 Martinlehb 审计 2026-04-23，IJD7GE #note_49775397）
 
-- [ ] WePray `NotificationService.swift` 未用 `BCUserNotificationManager`，直接用 `UNUserNotificationCenter.current()` — 是历史代码漏迁移，还是设计上保留原生调用？（SKILL.md 模板按"推荐用 BC 封装"给出，但与 WePray 现状不一致）
-- [ ] BCUserNotification `addNotification` 的 dedup 是"先到先得"还是"后到覆盖"？需要读源码确认或龙哥解释（Pods 源码看是 check-then-add，先到先得）
-- [ ] `BCPermission.requestNotificationPermission(force: true)` 和 `force: false` 行为差异？（源码里没详细解释 force 语义）
-- [ ] 是否已有推送落地路由/deep link 的 pattern？如果有需要在 AppDelegate didReceive 里加 `response.notification.request.content.userInfo` 的 URL 处理
+- [x] **P0-4 WePray NotificationService 是历史遗留**：新项目统一使用 `BCUserNotificationPermission`，覆盖"首次请求"和"用户拒绝后二次请求"两种场景。SKILL.md 硬性规则 2 已标注。
+- [x] **P0-5 推送服务去重**：`addNotification` 内部先检查已注册则跳过，**可放心多次调用**。硬性规则 1 改为明确"可放心多次调用"语义。
+- [x] **P0-6 force 参数语义**：作用于"首次拒绝后二次申请"场景 — `force: true` 跳转系统 Settings 让用户开权限开关；`force: false` 不跳转静默处理。硬性规则 2 已补充。
+- [x] **P0-7 deep link 未来扩展**：当前 Scale Global 生态无通用 deep link pattern，作为未来扩展点注明。硬性规则 6 已声明。

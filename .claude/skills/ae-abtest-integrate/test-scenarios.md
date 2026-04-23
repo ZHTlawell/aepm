@@ -147,10 +147,10 @@
   - defaultValue 和神策 control 组对齐策略合理
   - Work Chain 顺序约束（ABTestLoadWork 第 5 步）是否硬编码 OK，还是应该给更灵活的约束
 
-## 已知阻塞项（等龙哥审计）
+## 已解决阻塞项（杭州 Martinlehb 审计 2026-04-23，IJD7GE #note_49775397）
 
-- [ ] `ABTestType` 枚举的通用性 —— 每个产品都要定义自己的枚举，AE Team 是否应该提供基类 / 通用工具
-- [ ] 神策白名单设备的 ID 格式（IDFV / distinctId / 其他）+ PM 怎么获取
-- [ ] 实验结束后的代码清理流程（case 删除 / defaultValue 切 winning / 影响其他 case index 问题）
-- [ ] 多实验依赖（如 experiment B 的变体取决于 experiment A 的结果）的建模方式
-- [ ] Work Chain preload 在弱网 / 断网时的 timeout 策略（当前 `force: true` 可能长时间卡住）
+- [x] **P0-17 ABTestType 枚举用途**：实验 key 是 String，产品在神策后台随机配置；**枚举定义为编译期校验目的**（避免硬编码字符串拼错）。每个产品自己定义，AE Team 不强求统一基类。硬性规则 1 已标注。
+- [x] **P0-18 白名单用 distinctId**：神策提供 debug 入口，**设备扫码后可见 distinctId**。Phase 6 Step 6.3 + 硬性规则说明已补充操作路径。
+- [x] **P0-19 实验结束删 case**：直接删除对应枚举 case 和相关分支代码，**不保留兜底逻辑**。硬性规则 9 已声明。
+- [x] **P0-20 AB 能力 BCSensor Pod 封装**：接入方只需外部配置 abtest 请求地址，其他逻辑由 Pod 内部封装；多实验依赖由 Pod 内部处理，业务不介入。硬性规则 11 已标注。
+- [x] **P0-21 preload 超时 + 兜底**：需补充超时机制，合理 timeout 后走兜底（defaultValue）不阻塞启动。硬性规则 10 已声明（建议 3-5s）。

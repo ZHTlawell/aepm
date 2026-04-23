@@ -120,10 +120,9 @@
 - 所有 ❌ / ⏳ 必须有明确的阻塞原因和修复 PR
 - 龙哥审计通过，确认技术路线 + 代码模板符合 Scale Global 生态约定
 
-## 已知阻塞项
+## 已解决阻塞项（杭州 Martinlehb 审计 2026-04-23，IJD7GE #note_49775397）
 
-（龙哥审计前预留）
-
-- [ ] `BCStoreKit` 初始化位置未在 WePray Pray target 找到显式调用，需龙哥确认是否在 Template / BCAccount 内部自动初始化，如需显式 configure 要加 Phase 3 Step
-- [ ] `BCStoreKit.product(of:)` 的 product 加载时机（启动时自动？还是首次访问 paywall 时？）需龙哥确认，如需预加载要加 Phase 3 Step
-- [ ] BCAccount 服务端收据验证耗时典型值（用于"VIP flag 延迟"的合理等待阈值）待龙哥补充
+- [x] **P0-1 SKU 统一注册**：所有 SKU 在 `public enum SkuType: String, CaseIterable {}` 声明，raw value = ASC product identifier，禁止硬编码字符串 → 已写入 SKILL.md Step 2.0 + 硬性规则 2
+- [x] **P0-2 转化页基类**：继承 `PurchaseUIBaseViewController`（BCStoreKit Pod 提供），基类自动遍历 `SkuType.allCases` 拉取 Products，子类不重复加载 → 已写入 SKILL.md Step 2.0 + 硬性规则 3
+- [x] **P0-3 VIP flag 延迟**：典型 1-2s，等待阈值设 3s，超时后 `get_vip_info` 重拉，不阻塞主流程 → 已写入 SKILL.md 故障排查 + 硬性规则 4
+- [x] **P0-23 memo 命名**：memo 是 String 无长度/字符限制，转化页类名 `PurchaseUI{memo}ViewController`（动态加载通过 `BCABTest.shared.syncFetchVip()` 的 memo）→ 已写入 SKILL.md Step 2.0

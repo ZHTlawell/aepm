@@ -1,5 +1,6 @@
 ---
 description: "iOS 本地通知全流程 — BCUserNotification + BCPermission 封装下的调度、权限、点击追踪（Scale Global 生态）"
+last_updated: "2026-04-23"
 permissions:
   allow:
     - "Bash(xcodebuild *)"
@@ -395,19 +396,19 @@ xcodebuild build \
 
 ## 硬性规则
 
-1. **schedule 必须通过 `BCUserNotificationManager`** — 业务代码不直接 `UNUserNotificationCenter.current().add(_:)`。原因：BCUserNotificationManager 有 identifier dedup，避免重复通知。
-2. **权限请求必须通过 `BCPermission.requestNotificationPermission`** — 不直接 `center.requestAuthorization`。原因：BCPermission 统一 force 策略 + 埋点（`BCAnalyticsPage`）。
+1. **schedule 必须通过 `BCUserNotificationManager`** — 业务代码不直接 `UNUserNotificationCenter.current().add(_:)`。**Add 去重语义（杭州审计 P0-5）**：`addNotification` 内部先检查系统是否已注册对应的推送服务，存在则跳过添加，**可放心多次调用**不会重复注册。
+2. **权限请求必须通过 `BCPermission.requestNotificationPermission`** — 不直接 `center.requestAuthorization`。**`force` 参数语义（杭州审计 P0-6，作用于"用户首次拒绝后再次申请"场景）**：`force: true` → 跳转系统 Settings 页面让用户直接打开权限开关；`force: false` → 不跳转仅静默处理。新项目**统一使用 `BCUserNotificationPermission`**（P0-4 确认，原 `NotificationService.swift` 是历史遗留代码）。
 3. **Identifier 必须有前缀域 + 业务后缀** — 如 `vip_cancel_reminder_<timestamp>`、`daily_verse_reminder_<userId>`。前缀域用于点击 dispatch + Group remove，不能用 UUID 或无前缀。
 4. **点击 dispatch 必须在 AppDelegate `didReceive` 里按前缀打 BCTrack** — 新增场景 → 在 extension 加 `else if` 分支，不依赖 `default` 兜底。
 5. **权限请求时机 = 用户主动触发（toggle / 功能首次使用）** — 禁止在 Onboarding 强制弹。Apple 审核 Guideline 4.5.4 + iOS 投放转化率反指标（拒授率 > 50%）。
-6. **本 skill 不激活远程推送** — 不调 `UIApplication.shared.registerForRemoteNotifications()`，不上传 deviceToken 到业务服务器。AppDelegate 已有的 `didRegisterForRemoteNotificationsWithDeviceToken → BCAdjust` 回调保留（为后续 ae-remote-push-integrate 铺垫）。
+6. **本 skill 不激活远程推送 + 无 deep link 路由**（杭州审计 P0-7）— 当前阶段 Scale Global 生态**不支持通知落地 deep link**，作为未来扩展点注明，不在本 skill 范围内实现。AppDelegate 已有的 `didRegisterForRemoteNotificationsWithDeviceToken → BCAdjust` 回调保留（为后续 `ae-remote-push-integrate` 铺垫）。
 
 ---
 
 ## 反模式
 
 ❌ **业务代码直接 `UNUserNotificationCenter.current().add(request)`**
-→ 没有 dedup，同 identifier 多次 add 会触发多次通知。用 `BCUserNotificationManager.shared.addNotification(_:)` 替代。
+→ 绕开 BCUserNotificationManager 的去重逻辑。用 `BCUserNotificationManager.shared.addNotification(_:)`（已内置"已注册跳过"保护，可放心多次调用）。
 
 ❌ **业务代码直接 `center.requestAuthorization(options: [.alert, .badge, .sound])`**
 → 绕开 BCPermission 的统一埋点和 force 策略。用 `BCPermission.requestNotificationPermission(force: false)` 替代。

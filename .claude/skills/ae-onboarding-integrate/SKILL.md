@@ -1,5 +1,6 @@
 ---
-description: "iOS Onboarding 全流程 — HTML 原型 + Welcome_XX Pod 打包 + AB 变体注册 + BCAppReviewPrompt 评分引导（Scale Global 生态）"
+description: "iOS Onboarding 全流程 — SwiftUI 原生 Welcome 模块 + AB 变体注册 + BCAppReviewPrompt 评分引导（Scale Global 生态）"
+last_updated: "2026-04-23"
 permissions:
   allow:
     - "Bash(xcodebuild *)"
@@ -27,18 +28,21 @@ smoke_test:
 
 # Skill: Onboarding 全流程 (ae-onboarding-integrate)
 
-> **经 bible-ios-template + plant-app 实战验证。** 合并原 `ae-onboarding-design`（HTML/CSS/JS 设计）能力 + 新增 `Welcome_XX` Pod 打包 + AB 变体注册 + Work Chain 集成 + 评分引导联动全流程。
+> **经 bible-ios-template + plant-app 实战验证 + 杭州 Martinlehb 审计 2026-04-23。** Welcome 变体 SwiftUI 原生实现 + AB 变体注册 + Work Chain 集成 + 评分引导联动全流程。
+>
+> **重大变更（v0.63.0）：** 原 HTML 原型设计阶段（继承自 ae-onboarding-design）**已删除** — 杭州审计确认全部原生实现，不使用 HTML / WebView 方案。
 
 ## 核心原则
 
-> **你是 Onboarding 工程师。** 基于 PM 提供的产品定位 + 核心 feature 清单，产出：① **设计阶段** — HTML/CSS/JS 原型（用于 PM 审视视觉）；② **集成阶段** — `Welcome_XX` Pod（SwiftUI/UIKit 实现，严格遵守命名约定）；③ ABTestType.welcome 变体注册；④ Work Chain `WelcomeWork` 集成；⑤ 多语言 + 评分引导联动。
+> **你是 Onboarding 工程师。** 基于 PM 提供的产品定位 + 核心 feature 清单，产出：① Welcome 变体 SwiftUI 原生实现（可选独立 Pod 或业务仓库内模块）；② ABTestType.welcome 变体注册；③ Work Chain `WelcomeWork` 集成；④ 评分引导联动。
 >
-> **关键约束：**
-> 1. **命名严格约定**：Pod 名 = `Welcome_XX`（两位数 memo），VC class 名 = `Welcome_XXViewController`（动态加载依赖字符串匹配）
-> 2. **Welcome 基础 Pod 必须存在**：提供 `WelcomeViewController` 父类 + `WelcomeDelegate` 协议，所有变体 inherit
-> 3. **一次性展示**：BCCache 标记 `hasShowCacheKey`，用户完成后不再展示（否则用户每次启动都被打扰）
-> 4. **与 AB 测试联动**：variant = 独立 Pod，通过 `BCABTest.shared.syncFetchWecome()` 决定加载哪个
-> 5. **完成后评分引导**：`BCAppReviewPrompt.tryToSystemScore(onboarding: true, "welcome")`
+> **关键约束（杭州审计确认）：**
+> 1. **实现严格原生 SwiftUI**（P0-25）— 不使用 HTML / WebView 方案
+> 2. **命名约定**：VC class 名 = `Welcome_{memo}ViewController`（memo 是 String 无硬性长度/字符限制，P0-23）；动态加载通过 `BCABTest.shared.syncFetchWecome()` + `NSClassFromString`
+> 3. **欢迎页之间不抽象共性逻辑**（P0-22）— 唯一接口：实现 `WorkVoidCallbackTask` 协议。**各项目欢迎页可放业务仓库内，不强制独立 Pod 仓库**
+> 4. **`hasShownKey` 不可清除或重置**（P0-26）— 欢迎页在 App 全生命周期**只弹一次**，通过 `WelcomeHasShownCacheKey` 持久化标记；AB 新变体上线不清除老用户 key，只影响新用户
+> 5. **与 AB 联动**：variant 由 `BCABTest.shared.syncFetchWecome()` 返回 memo String 决定，对应加载 `Welcome_{memo}ViewController`
+> 6. **完成后评分引导**：`BCAppReviewPrompt.tryToSystemScore(onboarding: true, "welcome")`（频控全局统一，未开放项目级配置，P0-24）
 
 ## 触发条件
 
@@ -139,62 +143,32 @@ ls Locals/ | grep "^Welcome_" | head -10
 
 ---
 
-## Phase 2: HTML 原型设计（设计阶段）
+## Phase 2: Welcome 变体 SwiftUI 实现
 
-### Step 2.1: 生成 `onboarding/` 目录（沿用原 ae-onboarding-design）
+> **范围变更说明（v0.63.0，杭州审计 P0-25）：** 原 Phase 2 "HTML 原型设计阶段" 已删除。杭州确认所有转化页/欢迎页**全部原生 SwiftUI 实现**，不使用 HTML / WebView 方案。视觉设计若需 PM 预审，走 Figma / Sketch 稿，不在本 skill 范围。
 
-```
-onboarding/
-├── index.html          # 主容器（swipe + pagination + CTA）
-├── styles.css          # 渐变背景 + 卡片 + 按钮
-└── script.js           # 滑动逻辑 + CTA 回调
-```
+### Step 2.1: 目录骨架（独立 Pod 或业务仓库内均可）
 
-**设计规范** — Bevel Carousel 模式：
+**两种组织方式**（P0-22 杭州审计：不强制独立仓库）：
 
-```
-┌─────────────────────────┐
-│     [Feature Title]     │  ← 大标题
-│  [One-line value prop]  │  ← 副标题
-│  ┌───────────────────┐  │
-│  │  Widget Card 1    │  │  ← 圆角卡片，展示 feature
-│  └───────────────────┘  │
-│       ● ○ ○             │  ← 分页圆点
-│  ┌───────────────────┐  │
-│  │    Continue →      │  │  ← CTA
-│  └───────────────────┘  │
-└─────────────────────────┘
-```
-
-### Step 2.2: 本地预览给 PM 看
+**方式 A — 业务仓库内模块**（推荐，减少 Pod 维护成本）：
 
 ```bash
-open onboarding/index.html
+MEMO="03"  # 由 BCABTest.shared.syncFetchWecome() 返回的变体标识决定
+mkdir -p <Project>/Classes/Feature/Welcome_${MEMO}/{UI/Controller,UI/Page,UI/View,ViewModel,Model}
 ```
 
-**PM 在浏览器设备模拟中审视视觉、文案、流程**。改几轮后再进入 Phase 3 的 iOS 实现（避免实现后再推翻）。
-
-### Step 2.3: 输出设计产出
-
-确认文件：
-- `onboarding/index.html` + styles.css + script.js
-- 每页的 feature 文案（1-3 页）
-- 主色 + 字体 + 插图资源清单
-
----
-
-## Phase 3: Welcome_XX Pod 生成
-
-### Step 3.1: Pod 目录骨架
+**方式 B — 独立 Pod**（跨产品复用场景才考虑）：
 
 ```bash
-MEMO="03"  # PM 提供
 mkdir -p Locals/Welcome_${MEMO}/Welcome_${MEMO}/Classes/{UI/Controller,UI/Page,UI/View,ViewModel,Model}
 mkdir -p Locals/Welcome_${MEMO}/Welcome_${MEMO}/Localizable/en.lproj
 mkdir -p Locals/Welcome_${MEMO}/Welcome_${MEMO}/Assets.xcassets
 ```
 
-### Step 3.2: Podspec
+默认走方式 A；仅当该变体确需跨产品复用时升级为方式 B（需额外维护 Podspec + pod install）。
+
+### Step 2.2: Podspec（仅方式 B 独立 Pod 需要）
 
 路径：`Locals/Welcome_${MEMO}/Welcome_${MEMO}.podspec`
 
@@ -367,22 +341,15 @@ public extension Language {
 "welcome_03_page3_desc"  = "Track your Bible study streak and reflect.";
 ```
 
-**⚠️ 如 `ae-i18n-integrate` 已完成**，Phase 3.8 同步扩展所有语言（`de.lproj` / `zh-Hans.lproj` 等，每个 Welcome_XX Pod 独立 Localizable）。
+### Step 3.8: 多语言策略（P0-16 杭州审计）
 
-### Step 3.8: 多语言扩展（同 ae-i18n-integrate Phase 3.2）
+**第一版 Welcome 变体只适配英文（en-only）。** 杭州审计确认：
 
-```bash
-TARGET_LANGS=("de" "es" "fr" "it" "ja" "nl" "pt-BR" "zh-Hans" "zh-Hant")
-SOURCE="Locals/Welcome_${MEMO}/Welcome_${MEMO}/Localizable/en.lproj/Localizable.strings"
+- 欢迎页各自独立，**不做统一多语言化**
+- **只有当某 variant 数据表现好**（转化率达预期）时，再单独为该 variant 投入多语言化
+- 避免过早在低价值 variant 上消耗翻译成本
 
-for lang in "${TARGET_LANGS[@]}"; do
-    target="Locals/Welcome_${MEMO}/Welcome_${MEMO}/Localizable/${lang}.lproj"
-    mkdir -p "$target"
-    cp "$SOURCE" "$target/Localizable.strings"
-done
-```
-
-**复制 en 作为占位**，通知 PM 组织翻译。
+因此 Welcome_{memo}/Localizable/ 默认**仅生成 `en.lproj/`**，不批量建其他语言目录。若 variant 验证胜出后需补多语言，再单独走 `/ae-i18n-integrate` 对该 variant 执行批量扩展。
 
 ---
 
@@ -572,26 +539,31 @@ Work Chain：
 
 ## 硬性规则
 
-1. **Pod 名 + VC class 名严格约定** — Pod = `Welcome_XX`，VC = `Welcome_XXViewController`，否则 `NSClassFromString` 找不到，fallback 到默认 variant。
-2. **Welcome_XX 的 VC 必须 inherit Welcome 基础 Pod 的 `WelcomeViewController`** — 否则 WelcomeWork 的 `as? WelcomeViewController.Type` 转换失败。
-3. **`BCCache` key `WelcomeHasShownCacheKey` 跨变体共享** — 用户看过任一 Welcome 变体后都不再展示其他变体。不要给每个 variant 单独 key（会让切换变体的用户被打扰二次）。
-4. **完成时先 `seekGoodReview` 后 `completion`** — 顺序错乱（先 completion 后 seekGoodReview）会让评分弹窗无法挂到 rootVC（VC 已销毁）。
-5. **AB defaultValue 和神策 control 组严格对齐** — 参考 ae-abtest-integrate 硬性规则 4。新 variant 上线前先和 PM 对齐两边 default。
-6. **Welcome_XX Pod 独立多语言 Localizable** — 每个 Pod 自带 `.lproj` 目录，不共享主项目的 Localizable.strings（避免 Pod 分发时文案缺失）。
-7. **HTML 原型和 SwiftUI 实现必须视觉一致** — HTML 是 PM 审视阶段产出，SwiftUI 是真实实现，两者文案 + 配色 + 布局必须对齐（否则 PM 审过的和用户看到的不一样）。
+1. **实现必须 SwiftUI 原生**（P0-25）— 不使用 HTML / WebView 方案，不使用 Superwall 托管。
+2. **VC class 名严格约定** — `Welcome_{memo}ViewController`（memo 是 String，无长度/字符限制），否则 `NSClassFromString` 找不到，fallback 到默认 variant。
+3. **Welcome VC 实现 `WorkVoidCallbackTask` 协议**（P0-22）— 欢迎页之间不抽象共性逻辑，唯一接口约束是该协议（`func work(_ callback: @escaping VoidCallback)`）；可放独立 Pod 也可放业务仓库。
+4. **`hasShownKey` 不可清除或重置**（P0-26）— `WelcomeHasShownCacheKey` 跨变体共享，用户全生命周期只弹一次。新 variant 上线只影响新用户，不清除老用户 key 让他们重看。
+5. **完成时先 `seekGoodReview` 后 `completion`** — 顺序错乱会让评分弹窗无法挂到 rootVC（VC 已销毁）。
+6. **AB defaultValue 和神策 control 组严格对齐** — 参考 ae-abtest-integrate 硬性规则 4。新 variant 上线前先和 PM 对齐两边 default。
+7. **第一版 Welcome 只适配英文**（P0-16）— 欢迎页各自独立，不做统一多语言化；variant 数据表现好（高转化）再单独投入多语言。
+8. **Welcome 若独立 Pod，Pod 自带 `.lproj`** — 不共享主项目的 Localizable.strings（避免 Pod 分发时文案缺失）；若放业务仓库内，文案随业务走。
+9. **评分引导频控不开放项目级配置**（P0-24）— `BCAppReviewPrompt` 内置全局频控规则，所有项目共用，不试图定制。
 
 ---
 
 ## 反模式
 
-❌ **VC class 名不按 `Welcome_XXViewController` 格式（如叫 `OnboardingVC`）**
+❌ **VC class 名不按 `Welcome_{memo}ViewController` 格式（如叫 `OnboardingVC`）**
 → `NSClassFromString("Welcome_\(memo)ViewController")` 找不到 → 加载失败 fallback 默认 variant → 本次 AB 无效。
 
-❌ **Welcome_XX VC 不 inherit `WelcomeViewController`（直接继承 UIViewController）**
-→ `as? WelcomeViewController.Type` 转换失败 → 和上条一样 fallback。
+❌ **用 HTML / WebView 方案实现欢迎页**（P0-25 审计禁止）
+→ 杭州生态强制 SwiftUI 原生，走 WebView 会和 Work Chain / BCAccount / BCABTest 集成脱节。
 
 ❌ **为每个 variant 独立 `hasShowCacheKey`**
-→ 用户切换变体后重复看 onboarding，体验崩。必须共享 key（用户一生只看一次 onboarding）。
+→ 用户切换变体后重复看 onboarding，体验崩。必须共享 `WelcomeHasShownCacheKey`（用户一生只看一次 onboarding）。
+
+❌ **新 variant 上线想"让老用户重新看"而清除 hasShownKey**（P0-26 审计禁止）
+→ 破坏"一生只弹一次"承诺，用户体验崩。新 variant 只对新用户生效。
 
 ❌ **在 Welcome VC `viewDidLoad` 里调 `seekGoodReview`**
 → 打开 onboarding 就弹评分，用户没看产品就评分 → SKStoreReviewController 概率更低 + 审核 Guideline 5.6.1 风险。必须在用户**完成** onboarding 后调。
@@ -599,13 +571,13 @@ Work Chain：
 ❌ **完成时 completion 在 seekGoodReview 之前**
 → VC 已 dismiss，`BCAppReviewPrompt.tryToSystemScore` 挂不到 rootVC，评分弹窗不显示。
 
-❌ **Welcome_XX Pod 文案写到项目主 Localizable.strings**
-→ 违反 i18n 分层（参考 ae-i18n-integrate 反模式第 9 条）。Pod 独立分发时文案丢失。
+❌ **强制欢迎页做成独立 Pod 仓库**（P0-22 审计：不强制）
+→ 增加 Pod 维护成本。默认放业务仓库内即可，仅跨产品复用才升级独立 Pod。
 
-❌ **HTML 原型和 SwiftUI 实现文案/视觉不一致**
-→ PM 审视 HTML 通过后，SwiftUI 实现"简化"了文案或改了颜色 → 上线后 PM 发现"和我审的不一样"要返工。
+❌ **第一版 Welcome 变体就批量建 10 语言 `.lproj`**（P0-16 审计）
+→ 先适配英文验证转化，variant 数据好再投入多语言，避免翻译浪费。
 
-❌ **新 variant 上线前未在神策配置 control 组默认值为 "03"**
+❌ **新 variant 上线前未在神策配置 control 组默认值对齐**
 → 代码改 default 为 "03"，神策 control 组返回 "01"，实验 control 组 vs variant 组行为不对照。
 
 ---

@@ -1,5 +1,76 @@
 # Changelog
 
+## v0.63.0 (2026-04-23) — 文龙/Martinlehb 审计 26 条 P0 全部落地（5 个 integrate skill 批量修订）[`#IJD7GE`](https://gitee.com/turningsyn/ae-pm/issues/IJD7GE) note 49775397
+
+### 背景
+
+2026-04-23 杭州架构师 Martinlehb 在 [IJD7GE comment 49775397](https://e.gitee.com/turningsyn/repos/turningsyn/ae-pm/issues/table?issue=IJD7GE#note_49775397) 逐条回复了 AE Team 提出的 26 条 P0 阻塞项。本版本批量落地全部 26 条到 5 个 integrate skill，其中 3 条是**实质设计变更**，其他 23 条是澄清补充。
+
+### 实质设计变更（3 条）
+
+| 条 | Skill | 变更 |
+|---|-------|------|
+| **P0-25** | ae-onboarding-integrate | **删除 Phase 2 HTML 原型阶段** — 杭州确认全部原生 SwiftUI，不用 HTML/WebView 方案；原 Phase 2 → 改为 SwiftUI 目录骨架 |
+| **P0-22** | ae-onboarding-integrate | **独立 Pod 变可选** — 欢迎页不抽象共性，唯一接口 `WorkVoidCallbackTask`；默认放业务仓库内模块，仅跨产品复用才升级独立 Pod |
+| **P0-26** | ae-onboarding-integrate | **`hasShownKey` 不可清除** — 新 variant 上线不清除老用户 key 让重看；欢迎页全生命周期只弹一次 |
+| **P0-14** | ae-i18n-integrate | **`remove_unused_localized_keys.py` 各产品自维护** — 不集中到 ae-platform，按产品定位分类（原建议通用化 PR 撤销）|
+
+### ae-paywall-integrate（P0-1/2/3/23）
+
+- **P0-1 SkuType 统一注册** — 新增 Step 2.0：`public enum SkuType: String, CaseIterable {}`，raw value = ASC product identifier，禁止硬编码
+- **P0-2 PurchaseUIBase 基类模式** — 转化页继承 `PurchaseUIBaseViewController`，基类自动 `SkuType.allCases` 预拉 Products，子类不重复加载
+- **P0-23 `PurchaseUI{memo}ViewController` 命名** — memo 是 String 无长度/字符限制，动态加载通过 `BCABTest.shared.syncFetchVip()`
+- **P0-3 VIP 验证 3s 阈值** — 典型 1-2s，超时 `get_vip_info` 重拉不阻塞主流程
+
+### ae-notification-integrate（P0-4/5/6/7）
+
+- **P0-4 NotificationService 是历史代码** — 新项目统一 `BCUserNotificationPermission`
+- **P0-5 add 去重语义** — 已注册则跳过，**可放心多次调用**
+- **P0-6 `force` 参数语义** — 仅作用于"首次拒绝后二次申请"；`true` 跳系统 Settings，`false` 静默
+- **P0-7 deep link 未来扩展** — 当前生态无通用 pattern，标注为未来扩展
+
+### ae-feedback-integrate（P0-8/9/10/11）
+
+- **P0-8 BCFeedbackTemplate Pod 可行但需单独设计** — 保持现有 4 通用文件 copy 模式
+- **P0-9 `BCFeedbackData` 完全可定制** — Pod 预定义只是 Plant 样例，各项目自定义文案/选项/结构
+- **P0-10 解析失败返回 nil** — 不崩溃，调用方空值兜底
+- **P0-11 survey 由用户行为驱动** — 不纳入启动流程
+
+### ae-i18n-integrate（P0-12/13/14/15/16）
+
+- **P0-12 格式锁 `.strings`** — 不切换 `.xcstrings`
+- **P0-13 运行时切语言为未来扩展** — 第一版跟随系统
+- **P0-14 脚本各产品自维护** — 不集中到 ae-platform（反转原建议）
+- **P0-15 公共词条手动判断** — 无自动提取，开发判断入库避免重复翻译
+- **P0-16 Welcome 第一版 en-only** — 不做统一多语，高转化 variant 再单独投
+
+### ae-abtest-integrate（P0-17/18/19/20/21）
+
+- **P0-17 ABTestType 编译期校验目的** — 避免硬编码字符串拼错；每产品自定义，不统一基类
+- **P0-18 神策白名单用 distinctId** — debug 入口扫码获取
+- **P0-19 实验下线删 case 不留兜底** — 代码库只保留当前在跑的实验
+- **P0-20 AB 能力 BCSensor Pod 封装** — 接入方只配请求地址，多实验依赖 Pod 内部处理
+- **P0-21 preload 超时 + 兜底** — 合理 timeout 3-5s，超时走 defaultValue
+
+### ae-onboarding-integrate（P0-22/23/24/25/26）
+
+- **P0-22 独立仓库非强制** — 默认业务仓库模块，跨产品复用才独立 Pod
+- **P0-23 memo 无硬性限制** — String，VC 命名 `Welcome_{memo}ViewController`
+- **P0-24 评分引导频控全局统一** — `BCAppReviewPrompt` 不开放项目级配置
+- **P0-25 全部原生 SwiftUI** — 删除 Phase 2 HTML 原型阶段
+- **P0-26 hasShownKey 不可清除** — 全生命周期一次性展示
+
+### 修改文件清单（5 个 integrate × 2 文件 = 10 个）
+
+- `skills/pm/ae-paywall-integrate/SKILL.md` + `test-scenarios.md`
+- `skills/pm/ae-notification-integrate/SKILL.md` + `test-scenarios.md`
+- `skills/pm/ae-feedback-integrate/SKILL.md` + `test-scenarios.md`
+- `skills/pm/ae-i18n-integrate/SKILL.md` + `test-scenarios.md`
+- `skills/pm/ae-abtest-integrate/SKILL.md` + `test-scenarios.md`
+- `skills/pm/ae-onboarding-integrate/SKILL.md` + `test-scenarios.md`
+
+所有 SKILL.md frontmatter 加 `last_updated: "2026-04-23"`；test-scenarios.md 末尾 "已知阻塞项" 改为 "已解决阻塞项（杭州审计）"。
+
 ## v0.62.0 (2026-04-23) — 新增 `/ae-legal-generate` 法务三件套生成 skill [`#IJD7GE`](https://gitee.com/turningsyn/ae-pm/issues/IJD7GE)
 
 ### 背景

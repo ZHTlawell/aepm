@@ -164,10 +164,11 @@
   - 评分引导时机（completion 前）
   - 和 ae-paywall-design / ae-onboarding-design 的合并下线策略
 
-## 已知阻塞项（等龙哥审计）
+## 已解决阻塞项（杭州 Martinlehb 审计 2026-04-23，IJD7GE #note_49775397）
 
-- [ ] Welcome_XX Pod 是否应放 `Locals/` 本地，还是迁 GitLab 独立仓库（类似 BCStoreKit / BCSensor）
-- [ ] variant memo 超过 99（如 `100`）时是否有隐藏问题（`NSClassFromString` 字符串匹配应无问题，但习惯）
-- [ ] `BCAppReviewPrompt.tryToSystemScore` 的内部频控规则（每年 3 次 + 自有规则）是否可配
-- [ ] HTML 原型阶段产出 `onboarding/` 是否应保留（上线后可删 vs 作为设计资产保留）
-- [ ] 新 variant 上线"一次性清除老用户 hasShownKey" 的流程（App Upgrade work 清除）
+- [x] **P0-22 独立仓库非强制**：欢迎页之间不抽象共性逻辑，唯一接口 `WorkVoidCallbackTask` 协议；**可放业务仓库内，不强制独立 Pod 仓库**。SKILL.md Step 2.1 已提供两种组织方式（业务仓库模块 A / 独立 Pod B）。
+- [x] **P0-23 memo 无长度限制**：memo 是 String，对长度/字符无硬性限制，用于拼接 VC 类名。SKILL.md 硬性规则 2 已标注。
+- [x] **P0-24 频控全局统一**：`BCAppReviewPrompt` 频控规则所有项目共用，未开放项目级自定义配置，作为未来扩展点。SKILL.md 硬性规则 9 已标注。
+- [x] **P0-25 HTML 全部删除**：杭州确认所有转化页/欢迎页**全部原生 SwiftUI 实现**，不使用 HTML / WebView 方案。原 Phase 2 HTML 原型阶段已删除，改为 Step 2.1 SwiftUI 目录骨架。反模式新增"用 HTML / WebView 方案"禁令。
+- [x] **P0-26 hasShownKey 不可清除**：欢迎页在 App 全生命周期**只弹一次**，该 key 不可清除或重置。SKILL.md 硬性规则 4 + 反模式"清除 hasShownKey 让老用户重看"禁令已加。
+- [x] **P0-16 第一版 en-only**：欢迎页各自独立，第一版仅 `en.lproj/`，variant 转化好再投多语。Step 3.8 多语言策略段已改写。

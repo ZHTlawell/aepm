@@ -1,5 +1,6 @@
 ---
 description: "iOS 多语言全流程 — CL10nKit + BCLocalization + 项目/Pod 级 Language extension + InfoPlist.strings（Scale Global 生态）"
+last_updated: "2026-04-23"
 permissions:
   allow:
     - "Bash(xcodebuild *)"
@@ -442,13 +443,17 @@ for d in os.listdir(base):
 
 ## 硬性规则
 
-1. **通用 UI 文案先查 CL10nKit 的 310+ `ctext_xxx`，不重复定义** — 重复等于 Pod 和项目各写一份，未来更新不同步会出问题。
-2. **新增通用 ctext_ 不在项目加，要 PR 到 CL10nKit Pod** — 项目 Language extension 只放业务专属 key（带产品前缀）。
-3. **埋点事件名 / parameter key / 枚举 value 必须英文硬编码** — 不走 `Language.xxx`。埋点后台跨地区用户数据要可比，本地化 event name 会让 BI 无法聚合。
-4. **所有 static var 对应 key 必须在 en.lproj/Localizable.strings 有条目** — 缺失会显示裸 key。
-5. **新加语言必须覆盖项目主 + 所有 Locals Pod** — 部分覆盖会"半翻译"（主界面翻了，onboarding 英文）。
-6. **InfoPlist.strings 每种语言都必须完整** — iOS 系统权限弹窗在缺失翻译时行为不可控（可能空字符串或英文）。
-7. **禁止业务代码直接用 `NSLocalizedString` 或硬编码字符串** — 统一走 `Language.xxx`（业务 key）或 `Language.ctext_xxx`（通用）。
+1. **文件格式锁定 `.strings`**（杭州审计 P0-12）— 不切换到 `.stringsdict` / `.xcstrings`。生态全是老 `.strings`，迁移成本高不值得。
+2. **通用 UI 文案先查 CL10nKit 的 310+ `ctext_xxx`，不重复定义** — 重复等于 Pod 和项目各写一份，未来更新不同步会出问题。
+3. **公共词条由开发手动判断入库**（杭州审计 P0-15）— **无自动提取机制**，开发判断某条文案通用后手动收录到公共词条库，避免各项目重复翻译相同文案。判断标准由开发把控。
+4. **埋点事件名 / parameter key / 枚举 value 必须英文硬编码** — 不走 `Language.xxx`。埋点后台跨地区用户数据要可比，本地化 event name 会让 BI 无法聚合。
+5. **所有 static var 对应 key 必须在 en.lproj/Localizable.strings 有条目** — 缺失会显示裸 key。
+6. **新加语言必须覆盖项目主 + 所有 Locals Pod** — 部分覆盖会"半翻译"（主界面翻了，onboarding 英文）。
+7. **InfoPlist.strings 每种语言都必须完整** — iOS 系统权限弹窗在缺失翻译时行为不可控（可能空字符串或英文）。
+8. **Welcome_XX 欢迎页第一版 en-only**（杭州审计 P0-16）— 各欢迎页独立，第一版只适配英文；某 variant 数据表现好（高转化）再单独投入多语言，**不做统一多语化**。
+9. **禁止业务代码直接用 `NSLocalizedString` 或硬编码字符串** — 统一走 `Language.xxx`（业务 key）或 `Language.ctext_xxx`（通用）。
+10. **运行时切语言为未来扩展**（杭州审计 P0-13）— 第一版**跟随系统语言**即可。运行时切语言仅用于"App 不支持用户系统语言，需 fallback 其他语言"的场景（如系统泰语但用户懂法语），暂不作为标准能力。
+11. **`remove_unused_localized_keys.py` 各产品自维护**（杭州审计 P0-14）— 按产品定位分类（内容型一套、工具型一套），**不集中到 ae-platform/scripts**。PR 通用化建议取消。
 
 ---
 

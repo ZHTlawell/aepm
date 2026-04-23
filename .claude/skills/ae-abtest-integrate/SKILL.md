@@ -1,5 +1,6 @@
 ---
 description: "iOS AB 测试全流程 — BCABTest + 神策 SensorsABTesting + ABTestType 枚举 + Work Chain preload（Scale Global 生态）"
+last_updated: "2026-04-23"
 permissions:
   allow:
     - "Bash(xcodebuild *)"
@@ -436,7 +437,7 @@ print("🔬 [ABTest] syncFetchWecome=\(BCABTest.shared.syncFetchWecome())")
 
 ### Step 6.3: 神策后台验证
 
-1. 在神策后台把当前设备 ID 加入白名单（强制进入特定变体）
+1. 在神策后台把当前设备 **`distinctId`** 加入白名单（强制进入特定变体）。**`distinctId` 获取方式**（杭州审计 P0-18）：神策提供 **debug 入口**，设备扫码后即可看到当前 distinctId
 2. 重启 App
 3. Console 看 `syncFetchWecome` 返回的 variant 是否和白名单一致
 
@@ -476,13 +477,17 @@ Work Chain 位置：第 5 步 ABTestLoadWork
 
 ## 硬性规则
 
-1. **每个 ABTestType 必须有 defaultValue** — 冷启 / 断网 / 神策未 launch 时走默认值保证功能能跑。不能只 case 无默认。
-2. **同步读 = 必须 preload** — `syncFetchType` 从缓存读，没 preload 就取默认值。启动路径读的 type 必须 `shouldPreload = true`。
-3. **key 命名 `{productId}_{biz}_{version}`** — 多产品隔离 + 版本演进。不带前缀会和其他产品 key 冲突。
-4. **代码 defaultValue 和神策 control 组默认值必须严格一致** — 实验未 launch 时的行为等于 control 组行为。不一致 = 无法 AB 对照。
-5. **ABTestLoadWork 在 startupSequence 中必须早于所有依赖 AB 的 Work** — WelcomeWork / ConversionPageWork / PurchaseUI 之前。
-6. **版本演进加版本号不改旧 key** — 旧 `{biz}_1` 保持不动（还有用户在旧实验），新变体用 `{biz}_2`。
-7. **BCABTestResult 类型要和神策后台值类型严格对齐** — int / bool / string / json 四种，代码和神策同步。
+1. **`ABTestType` 枚举用途 = 编译期校验**（杭州审计 P0-17）— 实验 key 是 String 类型，**产品在神策后台随机配置**；代码侧定义为枚举是为了避免开发硬编码字符串时拼错，获得编译期校验。每个产品自己定义 ABTestType 枚举，AE Team 不强求统一基类。
+2. **每个 ABTestType 必须有 defaultValue** — 冷启 / 断网 / 神策未 launch 时走默认值保证功能能跑。不能只 case 无默认。
+3. **同步读 = 必须 preload** — `syncFetchType` 从缓存读，没 preload 就取默认值。启动路径读的 type 必须 `shouldPreload = true`。
+4. **key 命名 `{productId}_{biz}_{version}`** — 多产品隔离 + 版本演进。不带前缀会和其他产品 key 冲突。
+5. **代码 defaultValue 和神策 control 组默认值必须严格一致** — 实验未 launch 时的行为等于 control 组行为。不一致 = 无法 AB 对照。
+6. **ABTestLoadWork 在 startupSequence 中必须早于所有依赖 AB 的 Work** — WelcomeWork / ConversionPageWork / PurchaseUI 之前。
+7. **版本演进加版本号不改旧 key** — 旧 `{biz}_1` 保持不动（还有用户在旧实验），新变体用 `{biz}_2`。
+8. **BCABTestResult 类型要和神策后台值类型严格对齐** — int / bool / string / json 四种，代码和神策同步。
+9. **实验结束删 case 不留兜底**（杭州审计 P0-19）— 实验下线后**直接删除对应枚举 case 和相关分支代码**，不保留兜底逻辑。代码库只保留当前在跑的实验。
+10. **preload 必须有 timeout + 兜底路径**（杭州审计 P0-21）— Work Chain preload 弱网 / 断网场景需设置合理 timeout（建议 3-5s），超时后走 `defaultValue` 兜底不阻塞启动。SKILL 模板已包含 timeout 分支。
+11. **AB 能力由 BCSensor Pod 封装**（杭州审计 P0-20）— 接入方只需**外部配置 abtest 请求地址**（神策后台），其他逻辑由 Pod 内部封装；多实验依赖场景由 Pod 内部处理，业务代码不介入。
 
 ---
 
