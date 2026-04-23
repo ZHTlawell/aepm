@@ -1,5 +1,42 @@
 # Changelog
 
+## v0.53.0 (2026-04-23) — 新增 `ae-feedback-integrate`：iOS 用户反馈全流程 skill（BCFeedback 路线）[`#IJDSBR`](https://gitee.com/turningsyn/ae-platform/issues/IJDSBR)
+
+### 新增
+
+- **`ae-feedback-integrate`** — Scale Global 生态 iOS 用户反馈全流程：
+  - 业务嵌入反馈（`FeedbackView` + `FeedbackHelper` 三件事：持久化 + 埋点 + Thanks UI）
+  - 可选弹窗式 survey（`BCFeedback.survey` 链 `BCFeedback.feedback` 详情）
+  - 产品特定 `FeedbackSource` 枚举 + Ext 三映射（source / parameters / feedbackData）
+  - 非 Plant 产品自定义 `BCFeedbackData` 模板
+
+### 技术路线
+
+基于 Loopcraft + bible-ios-template 实战审计，走 Scale Global 内部 **BCFeedback 1.6.0 + Template/Feature/Feedback/** 两层封装：
+- Pod 层：`BCFeedback.survey/.feedback` API + `BCSurveyData/BCFeedbackData/BCFeedbackItemData` Models
+- Template 层：`FeedbackHelper/FeedbackDataManager/FeedbackView/FeedbackThanksView` 4 通用文件（可直接 copy）
+- 产品特定：`FeedbackSource` enum + Ext 每 case 三映射必须全补
+- BCTrack 事件：`"feedback"` + `type: .click` + parameters（含 `resource` + `eparam1`）
+
+沉淀 **6 条硬性规则 + 7 条反模式 + 7 条故障排查 + 8 条已验证约束**，来自 Template/Feature/Feedback + BCFeedback Pods 源码审计。
+
+### 属于 umbrella issue
+
+本版本作为 A 类 integrate 系列拆分的一环，统一跟踪在 `#IJDSBR`（ae-speckit-to-app 插件瘦身），不另开独立 issue。
+
+### A 类 integrate 系列进度
+
+- [x] ae-paywall-integrate v0.51.0
+- [x] ae-notification-integrate v0.52.0
+- [x] **ae-feedback-integrate v0.53.0**（本版本）
+- [ ] ae-i18n-integrate（下一个）
+- [ ] ae-abtest-integrate
+- [ ] ae-onboarding-integrate
+
+### 待审计
+
+4 条 P0 阻塞项：`Template/Feature/Feedback` 4 文件是否应升级为 `BCFeedbackTemplate` Pod / `BCFeedbackData` 预定义是否应扩充非 Plant 场景 / `FeedbackResult` Codable 跨产品 enum 差异 / `BCFeedback.survey` 启动早期调用行为。
+
 ## v0.52.0 (2026-04-23) — 新增 `ae-notification-integrate`：iOS 本地通知全流程 skill（BCUserNotification + BCPermission 路线）[`#IJDS76`](https://gitee.com/turningsyn/ae-platform/issues/IJDS76)
 
 ### 新增
