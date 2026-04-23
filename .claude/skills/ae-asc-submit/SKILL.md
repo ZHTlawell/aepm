@@ -72,9 +72,25 @@ ae asc testflight builds --app-id <APP_ID> --pretty
 
 # 4. /ae-app-review-check 已通过
 cat publish-state.yaml | grep "app_review_check" -A 2
+
+# 5. 法务三件套就位（必检，缺失 = 拒审风险）
+ls legal/privacy-policy.html legal/terms-of-use.html legal/hosting.md 2>&1
+# 付费 app 额外检查
+ls legal/paywall-copy.md 2>&1
 ```
 
 任一项不满足则阻止执行，提示 PM 先完成对应步骤。
+
+**法务三件套检查明细**（对应 `legal/` 目录产出，由 `/ae-legal-generate` 生成）：
+
+| 检查项 | 通过标准 | 不通过时 |
+|--------|---------|---------|
+| `legal/privacy-policy.html` 存在 | 文件存在 + 无 `{{...}}` 残留 + 无历史品牌残留（CapVault / 错误产品名）| 🛑 阻塞 — Apple 5.1.1 拒审风险 |
+| `legal/terms-of-use.html` 存在 | 文件存在 + 含 Schedule 2 subscription terms 段落（付费 app）| 🛑 阻塞 — Developer Program Schedule 2 违约 |
+| `legal/hosting.md` 最终 URL 可达 | `curl -o /dev/null -w "%{http_code}" <URL>` 返回 200 | 🛑 阻塞 — Privacy Policy URL 404 = 3.1.2a 拒审 |
+| 付费 app：`legal/paywall-copy.md` 7 要素齐全 | 7 个必填文案关键词全部命中 | 🛑 阻塞 — 付费墙文案不全 = 3.1.2a 拒审 |
+
+**FAIL 时**：指引 PM 先跑 `/ae-legal-generate`，不允许直接 `ae-asc-submit`。
 
 ## 执行流程
 
@@ -104,7 +120,7 @@ grep -A 1 "CFBundleDisplayName\|CFBundleShortVersionString" */Info.plist
 | 描述 | speckit 综合 | 4000 字符以内，前 3 行最重要 |
 | 关键词 | speckit/scenarios.md | 100 字符以内，逗号分隔 |
 | 分类 | speckit/product-positioning.md | 主分类 + 次分类 |
-| Privacy Policy URL | 项目配置 | 必须是可访问的 HTTPS URL |
+| Privacy Policy URL | `legal/hosting.md`（由 `/ae-legal-generate` 产出）| 必须是可访问的 HTTPS URL |
 | Support URL | 项目配置 | 必须是可访问的 HTTPS URL |
 
 **展示完整草稿给 PM，等待确认或修改后继续。**

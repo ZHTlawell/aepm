@@ -1,5 +1,66 @@
 # Changelog
 
+## v0.62.0 (2026-04-23) — 新增 `/ae-legal-generate` 法务三件套生成 skill [`#IJD7GE`](https://gitee.com/turningsyn/ae-pm/issues/IJD7GE)
+
+### 背景
+
+伍新奎在 #IJD7GE 补充指出：当前 app 模板只挂"协议链接占位"而不生成协议本身，缺失 Apple 必需的 3 份法务文档 —— **Privacy Policy（5.1.1）/ Terms of Use（3.1.2a）/ Subscription Terms（Developer Program Schedule 2）**，任一缺失即触发拒审或违约。
+
+### 新增 skill：`/ae-legal-generate`
+
+**定位：** 上架前合规资产生成器，属于**发布准备链**（与 `/ae-app-review-check` + `/ae-asc-submit` 同组），**不影响主流程**（主流程即 `/ae-speckit-to-app`，本地/真机跑通不需要真实协议）。
+
+**输入：**
+
+- 全局配置 `~/.ae/legal/company.json`（公司主体 / email / jurisdiction，跨产品复用）
+- speckit：`product-positioning.md` + `data-sharing.md`（采集字段 + 第三方 SDK）+ `paywall.md`（SKU，付费 app 必填）
+
+**输出（写到项目 `legal/`）：**
+
+| 文件 | 用途 |
+|------|------|
+| `legal/privacy-policy.html` | 可直接托管的 Privacy Policy |
+| `legal/terms-of-use.html` | 含 Schedule 2 subscription terms 段落 |
+| `legal/paywall-copy.md` | 付费墙 7 要素文案片段（供 `/ae-paywall-integrate` 消费）|
+| `legal/hosting.md` | 托管方案（Vercel / 公司官网 / CDN 3 选 1）+ 最终 URL |
+| `legal/consistency-check.md` | 与 `PrivacyInfo.xcprivacy` + Nutrition Label 的一致性报告 |
+
+**核心原则：**
+
+- 纯模板替换，不让 LLM 重写条款（合规风险）
+- 公司主体跨产品复用（`~/.ae/legal/company.json` 一次配置）
+- 一致性自检：采集字段 / 第三方 SDK / 品牌残留扫描 / 付费墙 7 要素关键词命中
+
+### 联动改动
+
+**`/ae-asc-submit` 前置检查新增"法务三件套就位"（阻塞项）：**
+
+- `legal/privacy-policy.html` 存在 + 无 `{{...}}` 残留 + 无历史品牌残留 → 🛑 缺失 = 5.1.1 拒审
+- `legal/terms-of-use.html` 存在 + 含 Schedule 2 段落 → 🛑 缺失 = Schedule 2 违约
+- `legal/hosting.md` 最终 URL `curl 200`（不是 404）→ 🛑 URL 404 = 3.1.2a 拒审
+- 付费 app：`legal/paywall-copy.md` 7 要素齐全 → 🛑 缺失 = 3.1.2a 拒审
+
+Phase 1 "Privacy Policy URL" 来源从"项目配置"改为"`legal/hosting.md`（由 `/ae-legal-generate` 产出）"。
+
+### 用户影响
+
+- 上架前必须先跑 `/ae-legal-generate`，否则 `/ae-asc-submit` 阻塞
+- 首次使用需配置 `~/.ae/legal/company.json`（一次性，跨产品复用）
+- 非付费 app：只需 Privacy Policy + Terms of Use，跳过 Subscription Terms 段落
+- TestFlight internal testing **不受影响**（internal 不要求 Privacy Policy URL）
+
+### 后续工作（未进本版本）
+
+- `/ae-paywall-integrate` 的 ConversionPage 步骤改为引用 `legal/paywall-copy.md`（v0.62.1）
+- `/ae-app-review-check` 知识库补一条"3 份协议缺一 = 拒审"case（v0.62.1）
+- 法务模板律师审阅（由公司法务/合作律师完成，非 skill 内职责）
+
+### 用户更新命令
+
+`ae update pm` 拉到 v0.62.0
+
+---
+
 ## v0.61.0 (2026-04-23) — 整体 skill 审计 + 2 个 skill 退休 + README 后续流程重构 [`#IJD7GE`](https://gitee.com/turningsyn/ae-pm/issues/IJD7GE)
 
 ### Skill 退休（2 个）

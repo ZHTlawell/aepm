@@ -1,0 +1,93 @@
+<!--
+  Terms of Use 模板 — ae-legal-generate
+  含 Schedule 2 subscription terms 段落（付费 app 必需）
+
+  ⚠️ 重要：首次使用前应由公司法务/律师审阅。本模板基于 Apple Developer Program License Agreement
+  Schedule 2 要求起草，非律师起草。
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Terms of Use — {{product.name}}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 760px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #222; }
+    h1 { border-bottom: 1px solid #eee; padding-bottom: 10px; }
+    h2 { margin-top: 36px; color: #333; }
+    .last-updated { color: #888; font-size: 14px; }
+    .subscription-terms { background: #f8f8f8; padding: 20px; border-left: 4px solid #0a84ff; margin: 24px 0; }
+  </style>
+</head>
+<body>
+
+<h1>Terms of Use</h1>
+<p class="last-updated">Last Updated: {{last_updated}}</p>
+
+<p>Welcome to <strong>{{product.name}}</strong>. By downloading or using this app, these terms will automatically apply to you — please read them carefully before using the app.</p>
+
+<h2>1. License</h2>
+
+<p>{{company.subject_en}} grants you a non-transferable, non-exclusive, revocable license to use the Service subject to these Terms.</p>
+
+<h2>2. Acceptable Use</h2>
+
+<p>You agree not to:</p>
+<ul>
+  <li>Copy, modify, or create derivative works of the Service</li>
+  <li>Reverse engineer or attempt to extract source code</li>
+  <li>Use the Service for any illegal or unauthorized purpose</li>
+</ul>
+
+{{#paywall.sku}}
+<h2>3. Subscription Terms</h2>
+
+<div class="subscription-terms">
+  <p><strong>Subscription Information</strong></p>
+
+  <p>{{product.name}} offers auto-renewable subscriptions to unlock premium features. The following terms apply:</p>
+
+  <ul>
+    {{#paywall.sku}}
+    <li><strong>{{title}}</strong> — {{duration}} at {{price}} ({{per_period_equivalent}})</li>
+    {{/paywall.sku}}
+  </ul>
+
+  <p><strong>Payment:</strong> Payment will be charged to your iTunes Account at confirmation of purchase.</p>
+
+  <p><strong>Auto-renewal:</strong> Your subscription automatically renews unless auto-renew is turned off at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period at the rate of the selected plan.</p>
+
+  <p><strong>Managing / Cancelling:</strong> You can manage subscriptions and turn off auto-renewal by going to your Account Settings in the App Store after purchase. Cancellation of the current active subscription period is not allowed.</p>
+
+  <p><strong>Free Trial:</strong> {{#paywall.free_trial}}Any unused portion of a free trial period will be forfeited when you purchase a subscription, where applicable.{{/paywall.free_trial}}</p>
+
+  <p><strong>Privacy and Terms:</strong> Please see our <a href="{{hosting.privacy_policy_url}}">Privacy Policy</a> and these Terms of Use for details about how we handle your data.</p>
+</div>
+{{/paywall.sku}}
+
+<h2>{{#paywall.sku}}4{{/paywall.sku}}{{^paywall.sku}}3{{/paywall.sku}}. Changes to Terms</h2>
+
+<p>We reserve the right to modify these Terms at any time. Continued use of the Service after changes constitutes acceptance of the new Terms.</p>
+
+<h2>{{#paywall.sku}}5{{/paywall.sku}}{{^paywall.sku}}4{{/paywall.sku}}. Disclaimer of Warranties</h2>
+
+<p>The Service is provided "AS IS" without warranty of any kind, express or implied.</p>
+
+<h2>{{#paywall.sku}}6{{/paywall.sku}}{{^paywall.sku}}5{{/paywall.sku}}. Limitation of Liability</h2>
+
+<p>To the maximum extent permitted by law, {{company.subject_en}} shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of the Service.</p>
+
+<h2>{{#paywall.sku}}7{{/paywall.sku}}{{^paywall.sku}}6{{/paywall.sku}}. Governing Law</h2>
+
+<p>These Terms shall be governed by the laws of {{company.jurisdiction}}, without regard to its conflict of laws principles.</p>
+
+<h2>{{#paywall.sku}}8{{/paywall.sku}}{{^paywall.sku}}7{{/paywall.sku}}. Contact</h2>
+
+<p>Questions about the Terms? Contact us:</p>
+<ul>
+  <li>Email: <a href="mailto:{{company.email}}">{{company.email}}</a></li>
+  <li>Company: {{company.subject_en}}</li>
+</ul>
+
+</body>
+</html>

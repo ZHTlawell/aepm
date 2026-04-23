@@ -1,0 +1,98 @@
+# 付费墙文案片段 — {{product.name}}
+
+> 本文件由 `ae-legal-generate` 产出，供 `ae-paywall-integrate` 的 ConversionPage 引用。
+> Apple 要求付费墙**在付费墙本身或其链接的 Terms of Use 内**明确以下 7 要素，缺一即违反 Schedule 2 + Guideline 3.1.2(a)。
+
+## 7 要素文案（直接复制到 SwiftUI 或 NSLocalizedString）
+
+### 1. Subscription Title
+
+```
+{{#paywall.sku}}
+{{title}}
+{{/paywall.sku}}
+```
+
+### 2. Duration（时长）
+
+```
+{{#paywall.sku}}
+{{duration}}
+{{/paywall.sku}}
+```
+
+### 3. Per-Period Price（单位时长单价）
+
+```
+{{#paywall.sku}}
+{{title}}: {{price}} ({{per_period_equivalent}})
+{{/paywall.sku}}
+```
+
+> 例：$39.99/year ≈ $3.33/month；此字段从 SKU 自动换算。
+
+### 4. Payment Charged to iTunes Account（付款由 iTunes 账号收取）
+
+```
+Payment will be charged to your iTunes Account at confirmation of purchase.
+```
+
+中文：
+```
+订阅费用将在确认购买时由您的 iTunes 账号收取。
+```
+
+### 5. Auto-Renewal（自动续期，到期前 24 小时未关闭则续费）
+
+```
+Subscription automatically renews unless auto-renew is turned off at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period.
+```
+
+中文：
+```
+订阅将自动续期，除非在当前周期结束前至少 24 小时关闭自动续订。您的账号将在当前周期结束前 24 小时内被收取续订费用。
+```
+
+### 6. Cancellation Path（取消路径）
+
+```
+You can manage your subscription and turn off auto-renewal in your iTunes Account Settings after purchase.
+```
+
+中文：
+```
+购买后，您可以在 iTunes 账户设置中管理订阅并关闭自动续订。
+```
+
+### 7. Privacy Policy + Terms of Use 链接
+
+```
+Privacy Policy: {{hosting.privacy_policy_url}}
+Terms of Use:   {{hosting.terms_of_use_url}}
+```
+
+SwiftUI 建议：
+
+```swift
+HStack(spacing: 8) {
+    Link("Privacy Policy", destination: URL(string: "{{hosting.privacy_policy_url}}")!)
+    Text("·")
+    Link("Terms of Use", destination: URL(string: "{{hosting.terms_of_use_url}}")!)
+}
+.font(.caption)
+.foregroundColor(.secondary)
+```
+
+---
+
+## 7 要素自检 checklist（`ae-paywall-integrate` 的 ConversionPage 必须全部就位）
+
+- [ ] 1. Subscription title 在付费墙显示
+- [ ] 2. Duration 显示（weekly / monthly / yearly）
+- [ ] 3. Per-period price 显示（价格 + 单位时长单价）
+- [ ] 4. "Payment charged to iTunes" 文案在付费墙 footer
+- [ ] 5. "Auto-renewable" 文案在付费墙 footer
+- [ ] 6. "Cancel in iTunes Account Settings" 文案
+- [ ] 7. Privacy Policy + Terms of Use 链接（可点击）
+
+> **任一缺失 → Apple 拒审（Guideline 3.1.2a）**

@@ -87,6 +87,7 @@ M3  TestFlight ──────────────── 可测 Build 已
 | `/ae-verify-app` | E2E 对比 demo vs 成品，自动归因差异 |
 | `/ae-file-bugs` | 从 verify 报告批量生成 issue 并提交 |
 | `/ae-app-review-check` | 对照 Apple Review Guidelines + AI 审核规则自检 |
+| `/ae-legal-generate` | 法务三件套生成（Privacy Policy + Terms of Use + Subscription Terms 7 要素）|
 | `/ae-asc-submit` | ASC 元数据配置 + 截图上传 + Review Notes + 提交审核 |
 
 **素材/设计类：**
@@ -299,7 +300,7 @@ ae pm submit-bug "问题标题" "问题描述"
 
 查看 [CHANGELOG.md](CHANGELOG.md) 了解完整更新记录。
 
-当前版本：**v0.61.0**
+当前版本：**v0.62.0**
 
 ## 由谁维护
 
