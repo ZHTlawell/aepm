@@ -131,25 +131,35 @@ Agent 读 `templates/privacy-policy.html.tmpl` + `templates/terms-of-use.html.tm
 6. **取消路径** — "iTunes Account Settings"
 7. **Privacy Policy + Terms of Use 链接** — 用 `hosting.md` 中占位的托管 URL
 
-### Phase 4: 托管方案
+### Phase 4: 托管方案（v0.63.3 修订 — 新奎 review）
 
-**默认 Vercel**（个人账户，5 分钟上线）：
+**渲染 `templates/hosting.md.tmpl` 到 `legal/hosting.md`**，展开 4 种方案按国内可访问性排序。
 
-```bash
-# 引导 PM 在 ~/.ae/legal/ 建立独立 Vercel 项目（一次配置，多产品复用）
-cd ~/.ae/legal
-vercel deploy legal/  # 产出 URL 如 https://legal-xxx.vercel.app/{product-slug}/privacy-policy.html
-```
+| 方案 | 国内可访问 | 推荐场景 |
+|------|----------|---------|
+| **A. 公司官网 `/legal/`** | ✅ | 长期运营 / 多产品复用（**首推**）|
+| **B. 阿里云 OSS + CDN** | ✅ | 中国区主发，1-2 小时上线 |
+| **C. Vercel + 自有域名 CNAME** | ✅ | 已有 Vercel，加 CNAME 过国内 |
+| D. Vercel 默认域名 `*.vercel.app` | ❌ **国内被墙** | **仅海外发布**；中国区发布必拒审（Apple 5.1.1 / 3.1.2a）|
 
-可选方案（`legal/hosting.md` 文档化 3 选 1）：
+**⚠️ 新奎 review 确认**：Vercel 默认域名 `*.vercel.app` 在中国大陆被墙，curl timeout。**中国区发布 = 必拒审**（Apple server 过审但用户看不到 Privacy Policy 属违规）。
 
-| 方案 | 优点 | 缺点 |
-|------|------|------|
-| Vercel（默认）| 5 分钟上线，自动 HTTPS，免费 | 个人账户，非公司主体 |
-| 公司官网子目录 | 正规，和品牌一致 | 需 IT/运维协作 |
-| CDN + OSS | 中间路线 | 需账号 + 配置 |
+**硬性流程**：
 
-PM 选定 → URL 写入 `legal/hosting.md` 的"最终 URL"段。
+1. PM 根据产品发行地区（是否含中国）选方案 A/B/C/D
+2. 最终 URL 写入 `legal/hosting.md`"最终 URL"段
+3. **双测 curl**：海外网络 + 中国大陆网络（VPN 外 / 国内 4G），两边都 200 才算通过
+4. 双测通过 → 进入 `/ae-asc-submit`
+
+### Phase 5: 一致性校验（v0.63.3 扩展）
+
+渲染 `templates/consistency-check.md.tmpl` 到 `legal/consistency-check.md`，按**五段**检查：
+
+1. **Apple 合规（Guideline 分章节）**：5.1.1(iv) 账户删除 / 5.1.1(v) 儿童保护（中国区 PIPL **14 岁**非 13）/ 3.1.2(a) Privacy Policy URL / 3.1.2(a) Schedule 2 / 5.1.1 SDK 披露
+2. **LLM 供应商合规**（按 `company.json.llm_vendors` 遍历）：跨境传输 / PIPL 通知 / 单独同意 / Privacy Policy 提及
+3. **敏感信息处理**（按 `company.json.sensitive_info_categories`）：PIPL 敏感个人信息逐项确认单独同意
+4. **内容与 App 一致性**（Privacy Policy 声明 vs 代码实现）：10+ 项逐行比对
+5. **优先级总表**：🔴 提审阻塞 / ⚠️ 需补 / ℹ️ 优化
 
 ### Phase 5: 一致性校验
 
@@ -192,15 +202,31 @@ ae-paywall-integrate  ae-app-review-check  ae-asc-submit
 | D1 | `legal/privacy-policy.html` 存在 + 无 `{{...}}` 残留 + 无历史品牌残留 |
 | D2 | `legal/terms-of-use.html` 存在 + 含 Schedule 2 subscription terms 段落（grep `auto-renewable` 命中）|
 | D3 | 付费 app：`legal/paywall-copy.md` 存在 + 7 要素齐全（关键词 7 项全部命中）|
-| D4 | `legal/hosting.md` 存在，最终 URL 填写 + curl 200（不是 404）|
-| D5 | `legal/consistency-check.md` 所有检查项 PASS（或已手工 review 标注）|
+| D4 | `legal/hosting.md` 存在，最终 URL 填写 + **国内外双测 curl 200**（中国大陆网络 + 海外网络两边都 200）|
+| D5 | `legal/consistency-check.md` 所有 🔴 提审阻塞项 PASS（🔴 未过 → 不允许进 `/ae-asc-submit`）|
+
+## 硬性规则
+
+1. **中国区发布必须国内可访问**（v0.63.3 新奎 review）— Privacy Policy URL 必须在中国大陆 curl 200；Vercel 默认域名 `*.vercel.app` 国内被墙，**仅海外发布才可用默认 Vercel**。方案优先级：公司官网 `/legal/` > 阿里云 OSS + CDN > Vercel + CNAME 自有域名 > 默认 `*.vercel.app`（仅海外）
+2. **`company.json.llm_vendors` 每个 LLM 必须标注 `data_region` + `cross_border`** — 直接决定 PP 是否生成"跨境传输"段落。跨境 LLM 触发 PIPL 单独同意要求
+3. **儿童最低年龄按司法区分别声明**（`child_min_age.*`）— 中国 PIPL = 14（不是 13），EU GDPR = 16，US COPPA = 13。Privacy Policy 必须按司法区列出，不能只写一个全球数值
+4. **敏感个人信息类别必须单独同意** — `company.json.sensitive_info_categories` 列出的每一类在 App 内首次采集时必须独立 consent UI（不能和一般 Privacy Policy 合并勾选）
+5. **产出 HTML 不得有 `{{...}}` 残留** — grep 自检，残留即 FAIL
 
 ## 已知限制
 
 - **模板语言覆盖**：首版仅产出英文 + 中文双语，其他语言暂时 fallback 到英文。扩展其他语言需先增加律师审阅的模板
 - **Nutrition Label 一致性**：ASC App Privacy 配置是 UI 产物，无法纯代码对照；Phase 5 只能产出"待 PM 手工 review 清单"
 - **法律主体变更**：`~/.ae/legal/company.json` 修改后需重跑所有已生成产品的 `ae-legal-generate`，没有增量更新机制
+- **首次使用必须法务 review**：本 skill 模板为工程参考框架，**首次使用前由公司法务 / 律师审阅过**之后再用
 
 ## 版本记录
 
+- v0.63.3 (2026-04-23) — 响应 [IJD7GE comment 49776525](https://e.gitee.com/turningsyn/repos/turningsyn/ae-pm/issues/table?issue=IJD7GE#note_49776525) 新奎 review：
+  - `company.json` 扩展 `llm_vendors` / `sensitive_info_categories` / `child_min_age` / `consent_withdrawal_path` 4 类新字段
+  - 新增 `templates/hosting.md.tmpl` 4 方案模板，强调中国区必须国内可访问（`*.vercel.app` 国内被墙警告）
+  - 新增 `templates/consistency-check.md.tmpl` 五段检查（Apple 合规 / LLM 供应商 / 敏感信息 / App 一致性 / 优先级总表）
+  - `privacy-policy.html.tmpl` 扩展：儿童年龄按司法区、LLM 供应商段（跨境标注）、敏感信息单独同意段
+  - 硬性规则新增 5 条
+  - Done Criteria D4 升级为双测 curl（国内 + 海外）
 - v0.62.0 (2026-04-23) — 首版发布（响应 #IJD7GE 伍新奎补充建议）

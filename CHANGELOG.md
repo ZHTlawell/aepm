@@ -1,5 +1,49 @@
 # Changelog
 
+## v0.63.3 (2026-04-23) — `/ae-legal-generate` 响应新奎 review：国内可访问 + LLM 供应商 / PIPL / 敏感信息支持 [`#IJD7GE note_49776525`](https://e.gitee.com/turningsyn/repos/turningsyn/ae-pm/issues/table?issue=IJD7GE#note_49776525)
+
+回应 [伍新奎 comment 49776525](https://e.gitee.com/turningsyn/repos/turningsyn/ae-pm/issues/table?issue=IJD7GE#note_49776525) 的两点反馈：Vercel 国内访问问题 + 产品特定合规内容（LLM / 敏感信息 / 儿童年龄）。
+
+### 新奎反馈 → 落地
+
+**反馈 1：Vercel 默认域名国内被墙** → 托管方案重构：
+
+- 新增 `templates/hosting.md.tmpl` — 4 方案按**国内可访问性排序**：
+  - A. 公司官网 `/legal/`（首推长期运营）
+  - B. 阿里云 OSS + CDN（中国区主发）
+  - C. Vercel + 自有域名 CNAME
+  - D. Vercel 默认 `*.vercel.app`（**仅海外发布**，中国区会拒审）
+- Done Criteria D4 升级为**国内外双测 curl**（中国大陆 + 海外两边都 200 才过）
+- 硬性规则 1 新增：中国区发布强制国内可访问
+
+**反馈 2：产品特定内容（LLM 供应商、敏感信息、儿童年龄）** → `company.json` + HTML 模板扩展：
+
+- `templates/company.json.example` 新增字段：
+  - `llm_vendors`：每个 LLM 标注 `data_region` + `cross_border` + `pipl_notice_required`（例 DeepSeek 国内 / OpenAI 跨境）
+  - `sensitive_info_categories`：biometric / health / location / financial / ethnicity 等 PIPL 敏感信息类别
+  - `child_min_age`：按司法区 `china_pipl: 14` / `eu_gdpr: 16` / `us_coppa: 13` / `default: 13`
+  - `consent_withdrawal_path`：同意撤回路径
+- `templates/privacy-policy.html.tmpl` 扩展：
+  - 儿童保护段按司法区分别列出年龄
+  - **新增 6b LLM 供应商段**（Mustache `{{#llm_vendors}}` 循环展开，跨境 LLM 自动触发 PIPL 跨境声明）
+  - **新增 6c 敏感信息单独同意段**（每类 `{{#sensitive_info_categories}}` 循环列出）
+
+**新增 `templates/consistency-check.md.tmpl` 五段检查**（之前是运行时生成）：
+
+1. Apple 合规（Guideline 分章节）
+2. **LLM 供应商合规**（遍历 llm_vendors，每个 LLM 独立检查跨境 / PIPL 通知 / 单独同意 / PP 提及）
+3. 敏感信息处理（遍历 sensitive_info_categories）
+4. 内容与 App 一致性（Privacy Policy 声明 vs 代码实现）
+5. 优先级总表（🔴 提审阻塞 / ⚠️ 需补 / ℹ️ 优化）
+
+**硬性规则新增 5 条**：中国区国内可访问 / LLM 跨境标注必填 / 儿童年龄按司法区 / 敏感信息单独同意 / HTML `{{...}}` 无残留。
+
+### 用户影响
+
+- `company.json` 从 5 字段扩到 10+ 字段（向后兼容，旧字段保留）
+- 已生成的 `legal/*.html` 如需合规升级，重跑 `/ae-legal-generate`
+- 中国区发布前必须用国内可访问方案（默认 Vercel 域名 = 必拒审）
+
 ## v0.63.2 (2026-04-23) — README 后续流程完善（integrate 接入时机 + 项目结构补全 + ae update 说明 + 关联 IJD7GE）[`#IJD7GE`](https://gitee.com/turningsyn/ae-pm/issues/IJD7GE)
 
 `templates/pm/README.md` 四处完善（之前 README 审计留下的未处理项）：

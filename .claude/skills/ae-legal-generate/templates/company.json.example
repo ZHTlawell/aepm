@@ -3,5 +3,49 @@
   "subject_en": "Hangzhou XX Technology Co., Ltd.",
   "email": "support@example.com",
   "jurisdiction": "China",
-  "website": "https://example.com"
+  "website": "https://example.com",
+
+  "// ---- 以下字段 v0.63.3 新增（新奎 review），产品特定，需每次 speckit 合并时填充 ----": "",
+
+  "llm_vendors": [
+    {
+      "name": "DeepSeek",
+      "data_region": "China",
+      "cross_border": false,
+      "pipl_notice_required": true,
+      "_note": "国内部署，无跨境；PIPL 标准通知"
+    },
+    {
+      "name": "OpenAI",
+      "data_region": "US",
+      "cross_border": true,
+      "pipl_notice_required": true,
+      "_note": "跨境传输，PIPL 跨境通知 + 单独同意必填"
+    },
+    {
+      "name": "Anthropic Claude",
+      "data_region": "US",
+      "cross_border": true,
+      "pipl_notice_required": true
+    }
+  ],
+
+  "sensitive_info_categories": [
+    "biometric_data",
+    "health_data",
+    "location_precise",
+    "financial_data",
+    "ethnicity_religion",
+    "children_age_profile"
+  ],
+
+  "child_min_age": {
+    "china_pipl": 14,
+    "eu_gdpr": 16,
+    "us_coppa": 13,
+    "default": 13
+  },
+
+  "consent_withdrawal_path": "Settings → Privacy → Withdraw Consent（或 email to {{email}}）",
+  "refund_policy_url": "https://example.com/refund-policy"
 }

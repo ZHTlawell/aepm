@@ -1,0 +1,82 @@
+# {{product_display_name}} — Privacy Policy / Terms 一致性检查报告
+
+> 自动生成于 `/ae-legal-generate` Phase 5；agent 产出后 PM 确认。任一 🔴 项未过 → 阻塞 `/ae-asc-submit`。
+
+## 一、Apple 合规检查（Guideline 分章节）
+
+| Guideline | 要求 | 当前实现 | 状态 |
+|-----------|------|---------|------|
+| **5.1.1(iv) 账户删除** | App 必须提供 In-app `DELETE /account` + Privacy Policy 说明 90 天内数据删除 | `<grep DELETE /account 代码实现位置>` / Privacy Policy 段 `<line>` | `<✅ / 🔴>` |
+| **5.1.1(v) 儿童保护** | 中国区 PIPL 最低 **{{child_min_age.china_pipl}} 岁**（非 13）；EU GDPR 最低 {{child_min_age.eu_gdpr}} 岁；US COPPA {{child_min_age.us_coppa}} 岁 | Privacy Policy 儿童年龄声明 | `<✅ / 🔴>` |
+| **3.1.2(a) Privacy Policy URL** | ASC 填写的 Privacy Policy URL 公网可访问 | `curl -I {hosting URL}` | `<✅ / 🔴>` |
+| **3.1.2(a) Terms of Use / Schedule 2** | 付费 app 必须在 Terms 含 Schedule 2（auto-renewable subscription）| `grep "auto-renewable" terms-of-use.html` | `<✅ / 🔴>` |
+| **5.1.1 第三方 SDK 披露** | Privacy Policy 披露所有 tracking-related SDK | `PrivacyInfo.xcprivacy` + `Podfile` 对照 | `<✅ / 🔴>` |
+
+## 二、LLM 供应商合规（v0.63.3 新奎 review 新增）
+
+> 产品特定：按 `company.json` 的 `llm_vendors` 数组逐项检查。不同 LLM 带来不同合规要求。
+
+{{#llm_vendors}}
+
+### LLM: {{name}}（data region = {{data_region}}）
+
+| 项 | 状态 | 说明 |
+|---|------|------|
+| **跨境传输** | `<✅ / 🔴>` | `{{#cross_border}}此 LLM 数据出境，Privacy Policy 必须含"跨境传输"章节 + 接收方信息 + 传输目的{{/cross_border}}{{^cross_border}}境内部署，无跨境风险{{/cross_border}}` |
+| **PIPL 标准通知** | `<✅ / 🔴>` | `{{#pipl_notice_required}}Privacy Policy 需明确告知 {{name}} 处理目的/字段/保存期限{{/pipl_notice_required}}{{^pipl_notice_required}}不适用{{/pipl_notice_required}}` |
+| **用户单独同意**（敏感信息时）| `<✅ / 🔴>` | 若 App 传敏感信息给 {{name}}（见 §三），需要用户**单独同意**（不能和一般隐私政策混为一谈） |
+| **Privacy Policy 提及** | `<✅ / 🔴>` | grep `{{name}}` privacy-policy.html 有命中 |
+
+{{/llm_vendors}}
+
+**无 LLM 接入**：跳过本段。
+
+## 三、敏感信息处理（PIPL 敏感个人信息）
+
+> 按 `company.json.sensitive_info_categories` 列出的类别逐项检查；命中的类别需要用户**单独同意**。
+
+{{#sensitive_info_categories}}
+- **{{.}}**：`<App 内是否处理 / 存储 / 传输此类信息？>` — `<是 → Privacy Policy 单独同意段落 + 代码实现路径；否 → 跳过>`
+{{/sensitive_info_categories}}
+
+## 四、内容与 App 一致性（Privacy Policy 声明 vs 代码实现）
+
+| 项 | Privacy Policy 声明 | 代码实现 | 一致 |
+|---|-------------------|---------|------|
+| 设备 UUID | `<Keychain UUID / 重装保留>` | `<代码位置>` | `<✅/⚠️>` |
+| 出生年龄 | `<日期/时间/精度/时区>` | `<代码位置>` | `<✅/⚠️>` |
+| 用户可见字段 | `<name/email>` | `<代码位置>` | `<✅/⚠️>` |
+| 会话与消息 | `<是否存储 / 多久>` | `<代码位置>` | `<✅/⚠️>` |
+| 推送 token | `<APNs 用途 + 事件跟踪>` | `Info.plist remote-notification + <service>` | `<✅/⚠️>` |
+| 不采集 IDFA | `<声明不 track>` | `grep AppTrackingTransparency` | `<✅/⚠️>` |
+| 不采集精确位置 | `<声明不采集>` | `NSLocationWhenInUseUsageDescription` 注"not currently used" | `<✅/⚠️>` |
+| 第三方 analytics | `<无 / 列出>` | `grep Firebase|Sensors|Mixpanel` | `<✅/⚠️>` |
+| 订阅 SKU | `<Weekly $X / Yearly $Y>` | `SkuType` enum + StoreKit 真实接入 | `<✅/⚠️>` |
+
+## 五、优先级总表（按影响度排序）
+
+| # | 问题 | 严重度 | 工作量 |
+|---|------|--------|--------|
+| 1 | `<提审阻塞项填入>` | 🔴 提审阻塞 | `<xh>` |
+| 2 | `<例：儿童年龄 13 → {{child_min_age.china_pipl}}>` | 🔴 中国区阻塞 | 改 1 行 |
+| 3 | `<敏感信息单独同意>` | 🔴 PIPL 违规风险 | Privacy Policy 加段 + Onboarding UI |
+| 4 | `<LLM 跨境说明>` | 🔴 PIPL | Privacy Policy 加段 |
+| 5 | `<填入>` | ⚠️ | `<填入>` |
+| ... | ... | ℹ️ | ... |
+
+---
+
+## 使用说明
+
+1. Agent 按 speckit + company.json 渲染此模板
+2. 占位符 `<...>` 处 Agent 通过 grep / 文件扫描自动填入**可机械发现**的事实
+3. 剩余 `<...>` 处留给 PM 人工确认（标注"待 PM 填"）
+4. 🔴 项任一未过 → 阻塞 `/ae-asc-submit`
+5. ⚠️ 项 → 发布前建议修复，不强制
+6. ℹ️ 项 → 后续优化
+
+---
+
+**生成时间：** `{{generated_at}}`
+**Skill 版本：** `ae-legal-generate v{{skill_version}}`
+**人工 review 要求**：本报告为工程参考框架，**首次使用前建议由公司法务 / 律师审阅**。

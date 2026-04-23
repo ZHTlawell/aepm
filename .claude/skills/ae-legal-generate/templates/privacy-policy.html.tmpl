@@ -74,7 +74,39 @@
 
 <h2>6. Children's Privacy</h2>
 
-<p>Our Service does not address anyone under the age of 13. We do not knowingly collect personally identifiable information from children under 13.</p>
+<p>Our Service does not address anyone under the minimum age required by applicable law in your jurisdiction:</p>
+<ul>
+  <li><strong>China (PIPL):</strong> under {{child_min_age.china_pipl}}</li>
+  <li><strong>European Union (GDPR):</strong> under {{child_min_age.eu_gdpr}}</li>
+  <li><strong>United States (COPPA):</strong> under {{child_min_age.us_coppa}}</li>
+  <li><strong>Other jurisdictions:</strong> under {{child_min_age.default}}</li>
+</ul>
+<p>We do not knowingly collect personally identifiable information from children below these thresholds.</p>
+
+{{#llm_vendors}}
+<h2>6b. Third-Party AI / LLM Processors</h2>
+
+<p>We use the following third-party AI/LLM service providers to process your inputs and generate responses:</p>
+<ul>
+{{#llm_vendors}}
+  <li><strong>{{name}}</strong> — data region: {{data_region}}{{#cross_border}}. <em>Your data may be transferred cross-border to the {{data_region}} region for processing. Under China PIPL, this constitutes a cross-border data transfer; by using this Service you consent to such transfer, provided that we ensure appropriate safeguards (standard contractual clauses, security assessments, or equivalent).</em>{{/cross_border}}{{^cross_border}}. Data is processed within {{data_region}} only; no cross-border transfer occurs.{{/cross_border}}</li>
+{{/llm_vendors}}
+</ul>
+
+<p>For users in China, in accordance with the Personal Information Protection Law (PIPL), you have the right to know the identity, processing purpose, categories of personal information, and retention period of each above processor, and to withdraw your consent at any time via {{consent_withdrawal_path}}.</p>
+{{/llm_vendors}}
+
+{{#sensitive_info_categories}}
+<h2>6c. Sensitive Personal Information</h2>
+
+<p>Our Service may process the following categories of sensitive personal information, which require your <strong>separate consent</strong> beyond general Privacy Policy acceptance:</p>
+<ul>
+{{#sensitive_info_categories}}
+  <li>{{.}}</li>
+{{/sensitive_info_categories}}
+</ul>
+<p>You will be prompted for separate consent at the first point of collection for each category. You may withdraw consent at any time via {{consent_withdrawal_path}}.</p>
+{{/sensitive_info_categories}}
 
 <h2>7. Changes to This Privacy Policy</h2>
 
