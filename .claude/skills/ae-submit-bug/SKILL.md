@@ -43,9 +43,30 @@ smoke_test:
 
 如果用户说不清，agent 根据问题描述草拟验证标准让用户确认。
 
+### Step 1.5: 目标仓库路由检测
+
+收集完信息后、查重前，先确定**默认推荐的目标仓库**。读当前 workspace 的 git remote：
+
+```bash
+git remote get-url origin 2>/dev/null
+```
+
+按以下规则推荐 target repo（最终以用户确认为准）：
+
+| git remote 模式 | 默认推荐 target | 关键词覆盖（推荐改 `ae-pm`） |
+|----------------|----------------|-----------------------------|
+| `gitee.com/<org>/product-*` | 当前 product repo（例 `product-reflow`） | bug 描述含 `/ae-*` slash command、`ae git`、`ae-speckit-to-app`、`ae-analytics-integrate`、`ae-paywall-integrate` 等 AE 工具关键词 |
+| `gitee.com/<org>/ae-pm` 或 `ae-go` 或 `ae-dev` 或 `ae-platform` | 当前 AE 仓库 | 无（AE 仓 = AE 仓） |
+| 不在 gitee 上 / 无 origin / 无法识别 | 读 `~/.ae/<role>/CLAUDE.md` 的「Issue 路由」表（默认 `ae-pm` / `ae-go`） | 同上 |
+
+向用户展示判断结果并请确认：
+> "检测到当前 workspace 在 `<repo>` 下，初判这是 {产品 bug / AE 工具 bug}，建议提到 `<推荐 repo>`。要改提到别的仓库吗？"
+
+**用户确认后**进入 Step 2，后续 Step 2/Step 5/Step 6 的「目标仓库」均使用此处确定的 target repo。
+
 ### Step 2: 查重（幂等保护）
 
-提交前搜索是否已有相似 issue：
+提交前搜索是否已有相似 issue（目标仓库 = Step 1.5 确定的 target repo）：
 
 ```bash
 ae git issues list --repo <目标仓库> --state open --pretty
@@ -87,7 +108,7 @@ ae git issues list --repo <目标仓库> --state open --pretty
 
 ### Step 5: 提交
 
-确定目标仓库：读取 AE 角色 CLAUDE.md（`~/.ae/go/CLAUDE.md` 或 `~/.ae/pm/CLAUDE.md`，**不是当前 workspace 的 CLAUDE.md**）中的「Issue 路由」表。
+目标仓库 = Step 1.5 经用户确认的 target repo（不要重新读 CLAUDE.md 推断）。
 
 ```bash
 ae git issues create --repo <目标仓库> --title "[BUG] 标题" --body "正文"
@@ -114,6 +135,7 @@ ae git issues list --repo <目标仓库> --state open --pretty
 4. **提交后必须验证** — 不验证就说"已提交" = 可能骗了用户
 5. **笼统描述必须追问具体化**
 6. **多个 bug 逐个提交，每个一个 issue**
+7. **目标仓库必须经用户确认** — Step 1.5 给出推荐后必须由用户确认，禁止 agent 自行决定 target repo
 
 ## Anti-Patterns
 
@@ -121,7 +143,9 @@ ae git issues list --repo <目标仓库> --state open --pretty
 - ❌ 不查重直接创建 → 先 `ae git issues list` 搜索相似 issue
 - ❌ 验证标准写"功能正常" → 必须是可执行的具体命令 + 预期输出
 - ❌ 提交后不验证就说"已提交" → 必须 list 确认 issue 存在
-- ❌ 读当前 workspace 的 CLAUDE.md 做路由 → 必须读 `~/.ae/<role>/CLAUDE.md`
+- ❌ 在 product repo workspace 下默认提到 `ae-pm` → 必须先看 git remote，产品 bug 应进 product repo
+- ❌ 在 product repo workspace 下报 `/ae-speckit-to-app` 报错却提到 product repo → AE 工具关键词应覆盖默认，推荐 `ae-pm`
+- ❌ 跳过 Step 1.5 直接读 `~/.ae/<role>/CLAUDE.md` → 仅在 git remote 不可识别时才回退到 CLAUDE.md 路由表
 
 ## Troubleshooting
 

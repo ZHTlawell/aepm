@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.64.0 (2026-04-27) — 冷启动完成 → product repo 接管 issue 跟踪：Stage A8 + skill 路由检测 [`#IJFJC3`](https://gitee.com/turningsyn/ae-pm/issues/IJFJC3)
+
+> 弥补冷启动结束后看板移交链路的缺失：让 builder 知道何时切到 product repo，让 `/ae-submit-bug` 和 `/ae-submit-requirement` 自动按 git remote 推荐 target repo（含 AE 工具关键词覆盖逻辑）。
+
+### 落地
+
+**1. `templates/pm/docs/builder-kickoff/README.md` 新增 Stage A8 — 冷启动完成 + 看板移交**
+
+- 触发条件：M3 完成 / M2 + PO 自决早毕业
+- ae-pm 主 issue 收尾 comment 模板（状态 / TestFlight 链接 / Wave 累计 / 后续路由说明）
+- 移交后看板纪律表：产品 issue → product repo / AE 工具 → ae-pm / 跨产品协调 → 项目群
+- 同步更新 Stage B4 卡点路由表：增加「冷启动期 vs 冷启动完成后」两列对比
+- 切换指令表新增「冷启动完成了 / 看板移交怎么做」「后续 issue 该开在哪」入口
+
+**2. `/ae-submit-bug` 和 `/ae-submit-requirement` 加 Step 1.5：目标仓库路由检测**
+
+- Step 1.5 在收集信息后、查重前执行 `git remote get-url origin`：
+  - `gitee.com/<org>/product-*` → 默认推荐当前 product repo
+  - `gitee.com/<org>/ae-pm|ae-go|ae-dev|ae-platform` → 默认推荐当前 AE 仓
+  - 不可识别 → 回退读 `~/.ae/<role>/CLAUDE.md` 路由表
+- AE 工具关键词覆盖（`/ae-*`、`ae git`、`ae-speckit-to-app`、`ae-analytics-integrate` 等）→ 即使在 product repo 下也推荐 `ae-pm`
+- 用户必须确认 target repo 后才进入 Step 2 查重；Step 5/Step 6 沿用同一 target repo
+- 新增硬规则：目标仓库必须经用户确认，agent 不得自决
+- 新增 Anti-Patterns：覆盖 product repo 下产品 bug 误提到 ae-pm、AE 工具 bug 误提到 product repo 两类反向场景
+
+### 验证
+
+- builder 在 `product-reflow` workspace 问 agent「该怎么把后续 issue 切到 product repo」，agent 读 Stage A8 给出收尾 comment 模板 + 路由切换说明
+- builder 在 `product-reflow` workspace 跑 `/ae-submit-bug` 描述「app 文字截断」→ skill 检测 git remote = `product-reflow` → 默认推荐 `product-reflow`，用户确认后提到 `product-reflow`
+- builder 在 `product-reflow` workspace 跑 `/ae-submit-bug` 描述「`/ae-speckit-to-app` 报错」→ skill 检测到关键词 `/ae-speckit-to-app` → 推荐切换 `ae-pm`，用户确认后提到 `ae-pm`
+
 ## v0.63.3 (2026-04-23) — `/ae-legal-generate` 响应新奎 review：国内可访问 + LLM 供应商 / PIPL / 敏感信息支持 [`#IJD7GE note_49776525`](https://e.gitee.com/turningsyn/repos/turningsyn/ae-pm/issues/table?issue=IJD7GE#note_49776525)
 
 回应 [伍新奎 comment 49776525](https://e.gitee.com/turningsyn/repos/turningsyn/ae-pm/issues/table?issue=IJD7GE#note_49776525) 的两点反馈：Vercel 国内访问问题 + 产品特定合规内容（LLM / 敏感信息 / 儿童年龄）。

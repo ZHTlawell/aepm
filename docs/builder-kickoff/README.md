@@ -186,6 +186,48 @@ review 前一天晚上准备：
 
 A7 完成后自然转路径 B 做下一轮节奏对齐。
 
+### Stage A8 — 冷启动完成 + 看板移交
+
+到此 builder 的「冷启动期」结束，主 tracking issue 中央看板的角色完成使命，后续迭代由 product repo 自管理。
+
+**触发条件（任一满足）：**
+
+- M3 完成：TestFlight 已分发 + 产品负责人确认进入正式迭代
+- M2 + 产品负责人自决早毕业：本地能跑、PO 决定不走 TestFlight 直接停在 demo 阶段长期迭代
+
+**移交动作（按顺序执行）：**
+
+1. 在 ae-pm 主 tracking issue 写一条收尾 comment（用 `ae git issues comment --repo ae-pm --number {主 issue} --body "..."`），模板：
+
+   ```markdown
+   ## 冷启动收尾 — {产品名} 看板移交
+
+   - **状态**：{M3 TestFlight 已分发 / M2 + PO 自决早毕业}
+   - **TestFlight 邀请链接**：{链接 / 不适用}
+   - **commit / build**：`{hash}` / Build {N}
+   - **Wave 累计**：{N} 个 Wave，{X} 项修复（详见上方 Wave 评论）
+   - **看板移交**：本 issue 后续不再回写 Wave 评论。
+     - 后续产品迭代 / bug / 功能需求 → `turningsyn/product-{name}`
+     - AE 工具链 / skill / CLI / 中台能力 gap → 继续提到 `turningsyn/ae-pm`
+
+   @AE Team @产品负责人
+   ```
+
+2. 主 issue 保留 open（产品方向终止再 close），AE Team 看完 comment 后由 PM 自决是否归档。
+3. 产品负责人 / AE Team 收到 @ 后视情况确认接收。
+
+**移交后看板纪律：**
+
+| 内容 | 去向 | 例 |
+|------|------|-----|
+| 产品 bug / UX / 文案 / 功能需求 | `turningsyn/product-{name}` | "Paywall 按钮无响应" / "想加聊天记录导出" |
+| AE 工具链 / skill / CLI / 中台能力 gap | `turningsyn/ae-pm` | "`/ae-speckit-to-app` 报错" / "想一键接 Adjust" |
+| 跨产品的运营 / 签名 / ASC 协调 | 项目群通知对应 owner，必要时同步主 issue | DEVELOPMENT_TEAM 复用 / Privacy URL |
+
+> 移交后 builder 不再每次 push 回写 ae-pm 主 issue 评论。冷启动期硬纪律解除，product repo 内的迭代 issue 自管理。
+
+**Skill 自动路由提示：** 在 product repo workspace 下跑 `/ae-submit-bug` 或 `/ae-submit-requirement` 时，skill 会先读 `git remote get-url origin` 推荐当前 product repo；如果描述涉及 AE 工具链关键词（`/ae-*`、`ae git`、`ae-speckit-to-app`、`ae-analytics-integrate` 等），会切换推荐 `ae-pm`。最终目标仓库以你确认为准。
+
 ---
 
 ## 路径 B：周期节奏对齐
@@ -250,11 +292,18 @@ TestFlight 时点之前必须逐项确认：
 
 ### Stage B4 — 卡点路由
 
-| 卡点类型 | 去哪 | 例子 |
-|---------|------|------|
-| 所有 AE 工具链 / skill / 中台能力 / 工程生成相关问题 | `turningsyn/ae-pm`（AE Team 内部路由，builder 不用自己分类） | `/ae-speckit-to-app` 报错 / 想一键接 Adjust / 生成的 Bundle ID 字段丢失 |
-| 签名 / ASC / Privacy URL / 订阅商品 | 项目群问，通知对应 owner | DEVELOPMENT_TEAM 复用哪个 |
-| 产品方向 / 竞品定位疑问 | 项目群问，通知产品负责人 | 想换参考 App |
+冷启动期（M0→M3 未完成）：所有产品自身的 bug / 功能需求都暂时归在 ae-pm 主 tracking issue 的 Wave 评论里跟踪，不另开 product repo 子 issue。
+
+冷启动完成后（Stage A8 已移交）：路由切换，看板分流见下表。
+
+| 卡点类型 | 冷启动期（M0→M3 进行中） | 冷启动完成后（A8 已移交） | 例子 |
+|---------|----------------------|------------------------|------|
+| 产品自身 bug / UX / 文案 / 功能需求 | 主 tracking issue Wave 评论 | `turningsyn/product-{name}` | "Paywall 按钮无响应" / "想加聊天记录导出" |
+| AE 工具链 / skill / CLI / 中台能力 / 工程生成 | `turningsyn/ae-pm` | `turningsyn/ae-pm` | `/ae-speckit-to-app` 报错 / 想一键接 Adjust / Bundle ID 字段丢失 |
+| 签名 / ASC / Privacy URL / 订阅商品 | 项目群问，通知对应 owner | 项目群问，通知对应 owner | DEVELOPMENT_TEAM 复用哪个 |
+| 产品方向 / 竞品定位疑问 | 项目群问，通知产品负责人 | 项目群问，通知产品负责人 | 想换参考 App |
+
+> Skill 路由提示：在 product repo workspace 下跑 `/ae-submit-bug` / `/ae-submit-requirement`，skill 会读 `git remote get-url origin` 自动推荐 target repo，按上表的「冷启动完成后」列默认；用户可手动改写。
 
 ### Stage B5 — 本阶段收尾
 
@@ -277,6 +326,8 @@ TestFlight 时点之前必须逐项确认：
 | 回到技术流程 | 跳到路径 A，从 Stage A1 重新开始 |
 | 建 repo 怎么做 | 跳路径 A 的 Stage A3 |
 | TestFlight 前规范检查 | 跳路径 B 的 Stage B3 |
+| 冷启动完成了 / 看板移交怎么做 | 跳路径 A 的 Stage A8 |
+| 后续 issue 该开在哪 | 跳路径 A 的 Stage A8（移交后看板纪律表）或路径 B 的 Stage B4 |
 | issue 模板是什么 | 读同目录 `issue-template.md` |
 | M0-M3 是怎么流转的 | 读同目录 `ae-pm-flow.md` |
 
