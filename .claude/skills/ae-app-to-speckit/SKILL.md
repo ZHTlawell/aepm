@@ -351,17 +351,20 @@ Phase 2a Level 2 每 batch / Phase 2b 每条 flow 默认由 **子 agent（`subag
 ## 上下文
 - workdir: {workdir 绝对路径}
 - 目标 App: {name} (bundle_id: {bundle_id})
-- 本 batch 要探索的子入口（{k} 个）：
-  - F01 扫描文档（入口 Tab：工具箱）
-  - F02 OCR 识别（入口 Tab：工具箱）
+- 本 batch 的 classified entries（{k} 个，来自 `exploration-plan.json`，每条带 tag + action_hint）：
+  - F01 扫描文档（Tab：工具箱）tag=functional action=explore
+  - F08 关于（Tab：设置）tag=non_functional_doc action=skip matched=About
+  - F12 Sleep Story（Tab：Library）tag=media_likely action=enter_then_short_stop matched=sleep
   - ... [8 个最多]
 - feature-checklist 路径: {workdir}/speckit/feature-checklist.md
 - exploration-state.json 路径: {workdir}/speckit/exploration-state.json
 - phase-summaries.md 路径: {workdir}/speckit/phase-summaries.md
 
 ## 执行规则（必须遵守）
-1. 每个子入口：`wda-cli.py tap-element` 进入 → `screenshot-save.py 2a-F{id}-{desc}` 存盘 →
-   返回上一级（iOS 手势 swipe from left-edge 或 tap 返回按钮）
+1. **按 entry 的 `action_hint` 分支执行**（来自 exploration-plan.json，#IJG519 / #IJG5HQ）：
+   a) `action=skip`（非功能页）：不 tap、不进入。feature-checklist 追加 `source="static_doc" priority="non_functional" status="skipped" notes="non-functional doc page (matched: <keyword>)"`，`exploration-state.json.notes` 记一条，**禁止**进入隐私政策正文 web view，跳到下一入口。
+   b) `action=enter_then_short_stop`（疑似媒体页）：`wda-cli.py tap-element` 进入 → `python3 wda-cli.py detect-media-player --json` 验证 → `is_media_player=true`：截图存盘（文件名加 `-media-player.png` 后缀） + 写 transition + screenshot_to_feature → **短停 10-15s 后主动退出**（返回箭头 / X / swipe down from top / swipe from left-edge），page-hash 验证已离开。`is_media_player=false`：降级走 c)。**不**操作播放控件、**不**等播放完、**不**算 health event。
+   c) `action=explore`（标准探索）：`wda-cli.py tap-element` 进入 → `screenshot-save.py 2a-F{id}-{desc}` 存盘 → 返回上一级（iOS 手势 swipe from left-edge 或 tap 返回按钮）
 2. 每张 Read 过的截图**立刻**把一句话结论写到 `exploration-state.json.screenshot_to_feature`
 3. 发现未列入的功能（Feature Discovery by Reasoning）→ 新增一行到 feature-checklist，source="discovered"
 4. 识别到静态资源（插画/图标）→ 记一条到 `exploration-state.json.asset_inventory`
@@ -411,6 +414,7 @@ Batch {n} 完成（F{start}-F{end}）
 3. 遇到需要物理输入（拍照/上传/输入手机号）→ 返回摘要并在摘要中标注 `[需 PM 物理操作]`，main agent 会接管
 4. 走到终点或 PAYWALL → 停止，进入 CP4 落盘
 5. **App 健康度检测**（#IJ87FB）：某步 tap-element 连续 2 次页面不符合预期 → 按「App 健康度检测与失败归因决策树」执行，crash/freeze 事件记录到 `exploration-state.json.app_health_events`，摘要中以 `[app_health_event: {type} at step{k}]` 显式标注，main agent 决定是否暂停
+6. **媒体页短停退出**（#IJG519）：某步进入的新页面 `python3 wda-cli.py detect-media-player --json` 返回 `is_media_player=true` 时：截图（`-media-player.png`）+ 写 transition + screenshot_to_feature → **短停 10-15s 后主动退出**（Back / X / swipe down from top / swipe from left-edge），page-hash 验证已离开。该步骤视为合法终点（flow 走通），**不**重试、**不**等播放完、**不**算 health event。flow 步骤本身从 priority=core 中选样（非功能页已被 classifier 过滤为 priority=non_functional 不进 flow 池），无需在 flow 内做 skip 处理
 
 ## 落盘动作
 - `phase-summaries.md` 追加 `## CP4 — Phase 2b Flow {n}: {flow_name}` 段落
@@ -762,6 +766,72 @@ curl -s -X POST -d '{"action":"accept","buttonLabel":"允许"}' \
 - **与 alert 检查的优先级**：`tap-element` 内置 alert 前置检查（Step 0），健康度检测是在 alert 排除后的第二道防线，不重复做
 - **subagent 场景**：Phase 2a/2b subagent 遇到健康事件时，摘要中明确返回 `[app_health_event: {type} at F{id}]`，main agent 决定是否派新 subagent 或暂停
 
+### 探索 backlog 分类（#IJG519 / #IJG5HQ）
+
+**核心矛盾**：默认所有 sub_entries 一视同仁地"全 tap、全截图"会浪费预算 — 非功能页（隐私/帮助/FAQ）+ 长音视频播放页占了 content-heavy app 一半的 entries，每张图 700-1500 tokens、每条 10 分钟空等都打在 Phase 2a Level 2 batch 上。
+
+**统一解法**：在 Phase 1.5 完成、Phase 2a Level 2 fan out **之前**，对 sub_entries 做一次自动分类，给每条 entry 打 `tag` + `action_hint`，subagent 按 tag 分支执行而非"全 tap"。
+
+**为什么不放进 subagent prompt 临时判断**：每多一类内容就要再补一条规则，结构发散；分类逻辑应该集中、可独立测试、跨 issue 复用。
+
+#### 分类器（pre-fan-out）
+
+**实现**：`python3 scripts/classify-entries.py --in raw-entries.json --out exploration-plan.json`
+
+| tag | 命中条件（label / title 关键词，大小写不敏感） | 默认 action_hint | 进入 coverage 分母？ |
+|-----|--------------------------------------------|--------------------|----------------------|
+| `non_functional_doc` | 关于 / 隐私政策 / 用户协议 / 服务条款 / 帮助 / 帮助中心 / FAQ / 常见问题 / 反馈 / 意见反馈 / 评价我们 / 给我们打分 / 法律声明 / 版权 / 开源许可 / About / Privacy / Terms / Help / Support / FAQ / Feedback / Rate Us / Legal / Copyright / Open Source Licenses / EULA | `skip` | ❌ |
+| `media_likely` | sleep / meditation / podcast / episode / track / song / audio / video / lesson / story / 睡眠 / 冥想 / 播客 / 音频 / 视频 / 单集 / 曲目 / 故事 | `enter_then_short_stop` | ✅ |
+| `functional` | 其他（fallback） | `explore` | ✅ |
+
+**输出 schema**（`exploration-plan.json`）：
+
+```json
+{
+  "entries": [
+    {"id": "F08", "label": "About", "tab": "Settings",
+     "tag": "non_functional_doc", "action_hint": "skip", "matched": "About"},
+    {"id": "F12", "label": "Sleep Story", "tab": "Library",
+     "tag": "media_likely", "action_hint": "enter_then_short_stop", "matched": "sleep"},
+    {"id": "F13", "label": "Tracker", "tab": "Stats",
+     "tag": "functional", "action_hint": "explore", "matched": null}
+  ],
+  "summary": {"non_functional_doc": 4, "media_likely": 7, "functional": 23, "total": 34}
+}
+```
+
+#### subagent 按 tag 分支执行
+
+batch 模板里 sub_entries 列表换成 classified entries（带 tag + action_hint）。每条按 action_hint 走对应分支：
+
+| action_hint | 子流程 |
+|-------------|--------|
+| `skip` | 不 tap、不进入。feature-checklist 追加 `source="static_doc" priority="non_functional" status="skipped" notes="non-functional doc page (matched: <keyword>)"`，`exploration-state.json.notes` 记一条，跳到下一入口。**禁止**进入隐私政策正文 web view |
+| `enter_then_short_stop` | tap 进入 → `python3 wda-cli.py detect-media-player --json` 验证 → `is_media_player=true`：短停 10-15s 取首屏 metadata（封面/标题/时长） → 主动退出（Back / X / swipe down from top / swipe from left-edge） → page-hash 验证已离开。**不**操作播放控件、**不**等播完、**不**算 health event。检测为 false 时降级为 `explore` |
+| `explore` | 标准 `wda-cli.py tap-element` → `screenshot-save.py` → 返回上一级（当前默认行为） |
+
+#### 媒体页识别细节（供 detect-media-player 兜底）
+
+播放页特征（满足任意 ≥2 项即判为播放页，由 `wda-cli.py detect-media-player` 自动判定）：
+
+| 信号 | 元素树/截图特征 |
+|------|-----------------|
+| 进度条 | `XCUIElementTypeSlider` 元素（宽度 ≥120pt，排除音量/亮度小滑条） |
+| 播放-暂停控件 | `name=Play / Pause / 播放 / 暂停 / Next / Previous / 上一首 / 下一首` 的 Button |
+| 时长标签 | StaticText 匹配 `\d+:\d+`（如 `10:00` / `29:34` / `1:23:45`） |
+| 大封面图 | 单张 Image 占屏幕 >25%（专辑封面 / 视频缩略图） |
+| 控制行 | 上一首/下一首组合按钮 |
+
+退出优先级：返回箭头 → X 关闭按钮 → swipe down from top（fullScreenCover/sheet）→ swipe from left-edge（push）。
+
+#### 关键纪律
+
+- **classifier 是关键词匹配，不调 LLM** — 结果是 hint 不是断言。subagent 有权推翻：看似 `functional` 的 entry 进去发现是播放页，运行时 `detect-media-player` 兜底走 short_stop。
+- **non_functional_doc 不进 coverage 分母** — `coverage-stats.py` 过滤 `priority=non_functional`，PM 看到的"覆盖率 80%"就是真功能比例。
+- **media_likely 进 coverage 分母** — 播放器是合法功能，短停 ≠ 跳过，feature-checklist 对应行 ✅。
+- **autonomous 0 干预** — main agent 直接调 classifier 写 plan、按 plan fan out。interactive 模式 PM 可在 CP1→CP2 间查 `exploration-plan.json`。
+- **不重叠 health check**：health check 处理"tap 没生效"（页面不变 / 回主屏），本机制处理"tap 生效但停留代价高 / 不该 tap"。
+
 #### Phase 2a: 广度遍历（分层，确保 100% 功能覆盖）
 
 **Level 1 — Tab 遍历**：
@@ -796,16 +866,33 @@ Step 6 (CP2): 全部 Tab 遍历完成后，Checkpoint：
 从 v0.46.0（#IJ864Z）起，Level 2 默认用 subagent 隔离执行——main agent 不直接 tap/截图，而是把每 batch 8 个子入口打包给 subagent，只接收 ≤200 字摘要。见「子 agent 隔离执行架构」章节的 prompt 模板。
 
 ```
-Step 6: 对每个 Tab 内的子功能卡片/入口，按 batch 分发给 subagent：
+Step 6: 对每个 Tab 内的子功能卡片/入口，先 classify、再按 batch 分发给 subagent：
 
-    collect all sub_entries across tabs → 按 tab 和 8 个一组切片 → List[batch]
+    collect all sub_entries across tabs
+
+    # Step 6.0 — 分类（#IJG519 / #IJG5HQ）
+    # 把 raw entries 写入 raw-entries.json，跑 classifier 得到 exploration-plan.json
+    write({workdir}/speckit/raw-entries.json, {"entries": [{"id": ..., "label": ..., "tab": ...}, ...]})
+    bash: python3 scripts/classify-entries.py \
+            --in {workdir}/speckit/raw-entries.json \
+            --out {workdir}/speckit/exploration-plan.json
+    # 读 plan summary 输出一行日志：
+    print(f"[CP3-classify] non_functional_doc={s.non_functional_doc} "
+          f"media_likely={s.media_likely} functional={s.functional}")
+    # interactive 模式：PM 可在此查 exploration-plan.json 后说 continue
+    # autonomous 模式：直接进入 batch 切片
+
+    classified_entries = read(exploration-plan.json).entries  # 带 tag + action_hint
+    按 tab 和 8 个一组切片 → List[batch]
 
     for n, batch in enumerate(batches):
         # 1. 构造 subagent prompt（用"Phase 2a Level 2 batch 版"模板填充）
+        #    sub_entries 现在是 classified entries（带 tag + action_hint），
+        #    subagent 按每条的 action_hint 走 skip / enter_then_short_stop / explore 分支
         prompt = fill_template(
             workdir=<绝对路径>,
             bundle_id=<from exploration-state.json>,
-            sub_entries=batch,
+            sub_entries=batch,  # classified entries with tag + action_hint
             batch_n=n+1,
         )
 

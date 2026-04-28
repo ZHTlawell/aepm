@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.64.2 (2026-04-28) — `/ae-app-to-speckit` 探索 backlog 分类（媒体页短停 + 非功能页跳过） + cli 模块全集打包 [`#IJG519`](https://gitee.com/turningsyn/ae-pm/issues/IJG519) [`#IJG5HQ`](https://gitee.com/turningsyn/ae-pm/issues/IJG5HQ)
+
+> Content-heavy app 探索时 subagent 把所有 sub_entries 一视同仁"全 tap、全截图"会浪费预算 — 进入 10 分钟睡眠音频空等耗光 batch（IJG519），打开"关于/隐私政策/帮助"web view 几千字吃掉 token（IJG5HQ）。两个 issue 同源，统一通过"探索 backlog 自动分类"解决：每个 entry 在 fan-out 前打 tag，subagent 按 tag 分支执行。同 release 顺手修了 `ae go submit-bug` 在 pm install 上模块缺失的发布卫生 bug。
+
+### 修复
+
+**1. 探索 backlog 分类器（核心机制）** — Phase 1.5 完成后、Phase 2a Level 2 fan-out 前跑一次：
+
+- `scripts/classify-entries.py` 把 raw entries → `exploration-plan.json`，每条带 `tag` ∈ {`non_functional_doc`, `media_likely`, `functional`} + `action_hint` ∈ {`skip`, `enter_then_short_stop`, `explore`}
+- 关键词匹配为 phrase（substring，多词专属如 "Privacy Policy" / "助眠故事"）+ bare（whole-label，单词如 "About" / "关于"），避免 "About Sleep Quality" 误判 doc、"Sleep Tracker" 误判 media
+- 不调 LLM，结果是 hint；subagent 运行时仍由 `detect-media-player` 兜底覆盖（false positive 自动降级）
+
+**2. SKILL.md 重构「探索 backlog 分类」章节** — 替代了原来散落的两条 ad-hoc 规则，集中描述分类 + 三种 action 子流程。Phase 2a Level 2 主流程加 Step 6.0（写 raw-entries.json + 跑 classifier）。
+
+**3. Subagent prompt 模板改为 tag-aware** — Phase 2a L2 batch 和 Phase 2b flow 都按每条 entry 的 `action_hint` 分支：
+- `skip`：不 tap，feature-checklist 记 priority=non_functional + status=skipped
+- `enter_then_short_stop`：进入 → `wda-cli.py detect-media-player` → 短停 10-15s 主动退出
+- `explore`：原默认行为
+
+**4. `scripts/wda-cli.py detect-media-player`** — 元素树启发式判定（slider / Play-Pause Button / 时长 `\d+:\d+` / 大封面 任意 ≥2 项），返回 `{"is_media_player": bool, "score": N, "evidence": [...]}`，exit 0/2。支持 `--tree` 离线测试。
+
+**5. `scripts/coverage-stats.py` 排除 non_functional** — `priority="non_functional"` 行从 total / core / app_store / in_app / discovered 分母里全部剔除，避免 PM 看 "覆盖率 3/7" 误以为漏 4 个。新增 `skipped` 报告项独立显示。
+
+**6. `scripts/build.sh` 打包 cli/lib/{pm,dev,go} 全集** — 修复附加 bug：原只 cp `cli/lib/$ROLE`，导致 `ae go submit-bug` 在 pm install 上找不到 `commands.sh`。改为始终拷三个 role 的命令模块。
+
+**7. `scripts/publish.sh` 加 cli 模块完整性硬校验** — Step 3f：dist 里若缺任一 role 的 `commands.sh`，publish 终止。仿 v0.64.1 的 skill 完整性校验，防 release 卫生问题再发。
+
+### 验证
+
+- `classify-entries.py` 跑 22 个混合 entries：12 个 non_functional_doc（关于/隐私政策/帮助/反馈/法务/中英文）、4 个 media_likely（Sleep Story / Sleep Music / Meditation / 助眠故事）、6 个 functional（含曾误判的 "Sleep Tracker" / "About Sleep Quality" / "Helper Bot" / "冥想练习"）
+- `wda-cli.py detect-media-player --tree pos.json --json` → `is_media_player=true, score=5, evidence=["slider×1","play_button:Next,Play,Previous","time_label:01:13,10:00","control_row","big_image(0.293)"]` exit 0
+- 同命令对 neg.json → `is_media_player=false, score=0` exit 2
+- `coverage-stats.py` 跑含 4 个真功能 + 3 个 non_functional 的 checklist：overall=3/4(75%) 而非 3/7(42.9%)，skipped=3 单列报告
+- `bash scripts/build.sh pm` 后 `dist/pm/cli/lib/{pm,dev,go}/commands.sh` + `dist/pm/scripts/classify-entries.py` 全部存在
+- 模拟删除 `dist/pm/cli/lib/go/commands.sh` → publish.sh Step 3f 触发硬错误
+
 ## v0.64.1 (2026-04-28) — hotfix: 恢复 v0.64.0 误删的 6 个 skill + publish 防御校验 [`#IJFZ8A`](https://gitee.com/turningsyn/ae-platform/issues/IJFZ8A)
 
 > CC 反馈 `/ae-app-to-speckit` 不可用。排查发现 v0.64.0 release commit 误删了 6 个 skill（`ae-app-to-speckit` / `ae-feedback-integrate` / `ae-image-decopyrighter` / `ae-notification-integrate` / `ae-onboarding-integrate` / `ae-speckit-brainstorm`）+ `ae-report-fix/evaluate.md`。源码端文件全部完整，问题在 release 管线。

@@ -32,6 +32,7 @@ import argparse
 import json
 import base64
 import os
+import re
 import urllib.request
 import urllib.error
 
@@ -521,6 +522,143 @@ def cmd_source(args):
         print(content)
 
 
+_MEDIA_PLAY_LABELS = {
+    "play", "pause", "播放", "暂停",
+    "next", "previous", "下一首", "上一首",
+    "rewind 15", "forward 15", "快进 15 秒", "快退 15 秒",
+}
+_TIME_RE = re.compile(r"^\d{1,2}:\d{2}(:\d{2})?$")
+
+
+def _walk_elements(node):
+    if not isinstance(node, dict):
+        return
+    yield node
+    for child in (node.get("children") or []):
+        yield from _walk_elements(child)
+
+
+def _media_player_evidence(tree):
+    """Inspect element tree → list[str] of evidence flags for media-player heuristic."""
+    sliders, play_buttons, time_labels, control_row = [], [], [], []
+    big_image = None
+    screen_w = screen_h = 0
+    root_rect = (tree or {}).get("rect") or {}
+    if isinstance(root_rect, dict):
+        screen_w = root_rect.get("width") or 0
+        screen_h = root_rect.get("height") or 0
+
+    for el in _walk_elements(tree or {}):
+        etype = (el.get("type") or "").strip()
+        name = (el.get("name") or "").strip()
+        label = (el.get("label") or "").strip()
+        value = el.get("value")
+        rect = el.get("rect") or {}
+        rect_w = rect.get("width") or 0
+        rect_h = rect.get("height") or 0
+        ident = (name or label).lower()
+
+        if etype == "XCUIElementTypeSlider":
+            # Filter out small sliders that look like volume / brightness widgets
+            if rect_w >= 120:
+                sliders.append({"name": name, "label": label, "value": value, "rect": rect})
+
+        if etype == "XCUIElementTypeButton" and ident in _MEDIA_PLAY_LABELS:
+            play_buttons.append({"name": name, "label": label, "rect": rect})
+
+        if etype == "XCUIElementTypeStaticText":
+            text = name or label or (value if isinstance(value, str) else "")
+            if isinstance(text, str) and _TIME_RE.match(text.strip()):
+                time_labels.append(text.strip())
+
+        if etype == "XCUIElementTypeImage" and screen_w and screen_h:
+            area_ratio = (rect_w * rect_h) / float(screen_w * screen_h or 1)
+            if area_ratio > 0.25 and (big_image is None or area_ratio > big_image["area_ratio"]):
+                big_image = {"area_ratio": round(area_ratio, 3), "rect": rect}
+
+    # Heuristic for "control row": play button + at least one of next/prev/like
+    has_control_row = any(
+        (e.get("name") or e.get("label") or "").lower() in {"next", "previous", "下一首", "上一首"}
+        for e in play_buttons
+    )
+
+    evidence = []
+    if sliders:
+        evidence.append(f"slider×{len(sliders)}")
+    if play_buttons:
+        labels = sorted({(e.get("name") or e.get("label") or "?") for e in play_buttons})
+        evidence.append("play_button:" + ",".join(labels))
+    if len(time_labels) >= 1:
+        evidence.append("time_label:" + ",".join(time_labels[:3]))
+    if has_control_row:
+        evidence.append("control_row")
+    if big_image:
+        evidence.append(f"big_image({big_image['area_ratio']})")
+    return {
+        "evidence": evidence,
+        "sliders": sliders,
+        "play_buttons": play_buttons,
+        "time_labels": time_labels,
+        "big_image": big_image,
+    }
+
+
+def cmd_detect_media_player(args):
+    """Heuristic detector for audio/video player pages — see #IJG519.
+
+    Returns is_media_player=true when the element tree contains ≥2 of:
+      - large slider (progress bar)
+      - Play/Pause/上一首/下一首 named button
+      - time label matching \\d+:\\d+
+      - big image (>25% of screen area, e.g. album cover / video thumbnail)
+
+    Usage from skill:
+        python3 wda-cli.py detect-media-player --json
+        # → {"is_media_player": true/false, "evidence": [...], "score": N}
+    """
+    if args.tree:
+        with open(args.tree, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        tree = data.get("value", data) if isinstance(data, dict) else {}
+    else:
+        data = wda_request("/source?format=json", url_base=args.url)
+        val = data.get("value", {})
+        if isinstance(val, str):
+            try:
+                val = json.loads(val)
+            except Exception:
+                val = {}
+        tree = val
+
+    info = _media_player_evidence(tree)
+    score = sum(1 for tag in info["evidence"] if not tag.startswith("big_image")) + (
+        1 if info["big_image"] else 0
+    )
+    is_player = score >= 2
+
+    out = {
+        "is_media_player": is_player,
+        "score": score,
+        "evidence": info["evidence"],
+        "details": {
+            "slider_count": len(info["sliders"]),
+            "play_button_labels": [
+                (e.get("name") or e.get("label")) for e in info["play_buttons"]
+            ],
+            "time_labels": info["time_labels"],
+            "big_image_ratio": (info["big_image"] or {}).get("area_ratio"),
+        },
+    }
+    if args.json:
+        print(json.dumps(out, ensure_ascii=False))
+    else:
+        verdict = "YES" if is_player else "no"
+        print(f"is_media_player: {verdict} (score={score})")
+        if info["evidence"]:
+            print("evidence: " + " | ".join(info["evidence"]))
+    sys.exit(0 if is_player else 2)
+
+
 def cmd_apps(args):
     sid = get_session_id(args.url)
     # List installed apps via idb or WDA
@@ -618,6 +756,13 @@ def main():
     p_src.add_argument("--format", choices=["xml", "json"], default="xml")
     p_src.add_argument("--save", metavar="PATH", help="Save to file")
 
+    p_dmp = sub.add_parser("detect-media-player",
+                            help="Detect audio/video player page (#IJG519). Exit 0 = player, 2 = not, score≥2 of {slider, play button, time label, big image}")
+    p_dmp.add_argument("--json", action="store_true",
+                       help="Output as JSON (is_media_player + evidence + details)")
+    p_dmp.add_argument("--tree", metavar="PATH",
+                       help="Use a saved element tree JSON instead of live WDA query (for offline tests)")
+
     sub.add_parser("apps", help="List installed apps")
 
     args = parser.parse_args()
@@ -636,7 +781,9 @@ def main():
         "terminate": cmd_terminate,
         "active-app": cmd_active_app,
         "page-hash": cmd_page_hash,
-        "source": cmd_source, "apps": cmd_apps,
+        "source": cmd_source,
+        "detect-media-player": cmd_detect_media_player,
+        "apps": cmd_apps,
     }
     cmds[args.command](args)
 

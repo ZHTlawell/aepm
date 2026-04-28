@@ -97,9 +97,17 @@ def parse_checklist(filepath):
 
 
 def compute_stats(features):
-    """Compute coverage statistics from parsed features."""
+    """Compute coverage statistics from parsed features.
+
+    priority="non_functional" rows (about/privacy/terms/help/feedback static doc
+    pages, see #IJG5HQ) are excluded from every denominator so PM doesn't see
+    them as "uncovered". They are reported separately under `skipped`.
+    """
+    skipped_features = [f for f in features if f["priority"] == "non_functional"]
+    features = [f for f in features if f["priority"] != "non_functional"]
+
     total = len(features)
-    if total == 0:
+    if total == 0 and not skipped_features:
         return {"total": 0, "error": "no features found"}
 
     by_status = {}
@@ -165,6 +173,11 @@ def compute_stats(features):
             "total": discovered_total,
             "pct": pct(discovered_covered, discovered_total),
         },
+        "skipped": {
+            "count": len(skipped_features),
+            "items": [{"id": f["id"], "name": f["name"], "notes": f["notes"]}
+                      for f in skipped_features],
+        },
         "uncovered": [
             {"id": f["id"], "name": f["name"], "status": f["status"], "notes": f["notes"]}
             for f in features if f["status"] in ("pending",)
@@ -213,6 +226,9 @@ def main():
         d = stats["discovered"]
         if d["total"] > 0:
             print(f"Discovered coverage: {d['covered']}/{d['total']} ({d['pct']}%)")
+        sk = stats.get("skipped", {})
+        if sk.get("count", 0) > 0:
+            print(f"Skipped (non_functional): {sk['count']} — excluded from denominators")
 
         if stats["uncovered"]:
             print(f"\nUncovered features ({len(stats['uncovered'])}):")
