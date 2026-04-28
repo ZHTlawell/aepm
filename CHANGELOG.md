@@ -1,5 +1,66 @@
 # Changelog
 
+## v0.65.0 (2026-04-28) — `/ae-app-to-testflight` Reflow Grain 实战回流：5 个 preflight/约束缺口 + 4 个 papercut [`#IJG76P`](https://gitee.com/turningsyn/ae-pm/issues/IJG76P)
+
+> PM 个人发 Reflow Grain 到 TestFlight 踩了 9 个坑 ~3 小时。回流时全部 9 条 claim 经 Apple 文档 + 源码核对：5 条完全成立，3 条方向对但描述需修正（24-72h Processing 触发条件不全 / Xcode 权限错误根因不只一种 / UDID 是 Xcode 15+ 新格式不是"两个 UDID"），1 条原方案不可实现（ASC API 无 self-introspection 端点，role 字段不能直接查询）— 改为探针式 effective_permissions。
+
+### 修复
+
+**1. ae-asc.py 加 `bundle-id delete`** — 清理 orphan bundle ID（改名试错时积累）。识别符或 ASC 资源 ID 二选一：
+```bash
+ae asc bundle-id delete --identifier com.example.orphan
+ae asc bundle-id delete --id DSQQ2WQQBD
+```
+ASC 会拒绝删除已绑定 App 的 bundle ID（HTTP 409，error 信息清晰）。
+
+**2. ae-asc.py 改 `auth validate` 为探针式** — ASC API 无 self-introspection 端点（社区共识，[forum 770673](https://developer.apple.com/forums/thread/770673)），role/permissions 不能直接查询。改成 GET 探针 4 个端点（`/apps`、`/bundleIds`、`/betaGroups`、`/users`），根据 200/403 反推 `effective_permissions` + `likely_role` 启发式 + `warnings`：
+```json
+{
+  "valid": true,
+  "effective_permissions": {"apps.read": true, "users.read": false, ...},
+  "likely_role": "Developer / App Manager",
+  "warnings": ["如果 Phase 1.5 ae asc app create 撞 HTTP 403, 改走 ASC Web UI fallback"]
+}
+```
+原方案承诺的 `"role": "Developer"` 字段会撒谎，**不要照抄实战记录承诺 API 没有的能力**。
+
+**3. SKILL.md 加 Phase 0d (Team 归属检测)** — 项目里写死的 `DEVELOPMENT_TEAM` 不一定跟 keychain 能签的 Team 对得上。新增 `security find-identity -p codesigning -v` 列全部 + 逐张查 cert OU.Org，让 PM 选。Reflow Grain 案例：项目 commit "Scale Global B798N3T6TK" 但 cert OU.Org 是 "li genjian US"（个人账号），花 30 分钟才意识到要切公司 team。**OU.Org 含 LLC/Inc 是粗筛启发式不是硬规则**，最终归属由 PM 当面确认。
+
+**4. SKILL.md 加 Phase 0e (Xcode 15+ 设备 ID 边界)** — `xcodebuild -showdestinations` 输出的是 24 字符 destination ID（前 8 位 SoC + 后 16 位 ECID 派生），与传统 40 字符 UDID 不同。`devicectl` 兼容多种 ID（UUID/ECID/serial/UDID/name）。**这不是"两个 UDID"，是 Xcode 15+ 引入的新硬件标识格式**——接命令的工具决定用哪种 ID，不要跨工具复用 ID 字符串。
+
+**5. SKILL.md 加 Step 2.4b (Manual Signing fallback)** — `you do not have permission to register them` 错误根因有 4 种：(a) Admin 主动开启了 "Prevent registration of new test devices" 限制开关（[Apple 文档](https://developer.apple.com/help/account/access/automatic-signing-controls/)），(b) Team 设备配额满 100/年，(c) 账号未付费/续费过期，(d) ios-pub-028 Processing 期。**Developer 角色默认有权限**，要 Admin 主动限制才会撞错——直接升级到 Admin 不一定能解，先确认根因。fallback 步骤：Portal Web UI 创建 Development Profile → 项目切 `CODE_SIGN_STYLE: Manual` + `PROVISIONING_PROFILE_SPECIFIER` → 重编译不带 `-allowProvisioningUpdates`。
+
+**6. SKILL.md 加约束 ios-pub-028 (24-72h Processing)** — 触发条件不是"所有新设备一律出现"，而是第 11-100 台 / 新开账号 / 续费过期场景才会触发。前 1-10 台立即可用。Apple 文档术语是 "Processing"（不是 "iPhoneProcessing"）。**TestFlight 不是"绕过 Processing"，是另一条签名链路**——distribution profile 不绑 UDID，本来就跟 device 注册无关。证据：[Apple Device Registration Updates](https://developer.apple.com/help/account/reference/device-registration-updates/)。
+
+**7. SKILL.md 加约束 ios-pub-029 (ASC register ≠ Portal/Xcode)** — ASC API 与 Developer Portal 是分离系统，ASC 注册的 bundle ID 在 Portal/Xcode 端可能延迟同步或要求二次操作。验证标准是 `xcodebuild -allowProvisioningUpdates` 通过，不是 ASC 返回 200。Reflow Grain 案例：`ai.scaleglobal.reflow` ASC 报 409 但 Portal team 早有了。
+
+**8. SKILL.md Phase 1.5 加 App 命名建议** — ASC App 名称是全球唯一的，短词形如 "Reflow"/"Reader"/"Bible" 几乎都被占。推荐 `<品牌>: <品类描述>` 双段命名（NoteFusion/WePray/BugID 都是这模式）。
+
+**9. SKILL.md 加附录: 占位 AppIcon 生成器** — 30 行 Swift+CoreText 脚本生成 1024×1024 PNG（实色背景 + 居中字母），项目完全没图时 archive 阶段兜底。已实测生成有效 RGBA PNG（macOS 14 + Swift 5.9）。**仅用于 TestFlight 内测，正式提审会被拒**。
+
+### 待办（暂未落地，等本机验证）
+
+**Playwright MCP headless 提示** — PM 提议 SKILL 文档加注 "Playwright 默认 headless 不可见"，但当前 MCP 配置是 `--user-data-dir` 持久化 profile，社区报告该模式**默认 headed**。"默认 headless" 的 claim 待 PM 在自己机器上实测后再补文档（不能直接抄实战记录）。
+
+### 验证
+
+- 改 `ae-asc.py` 后，对真实 ASC 凭据运行：
+  - `bundle-id list` 拉到 3 条 bundle ID（含 PM 提到的 orphan `DSQQ2WQQBD com.scale.bundleidtest001`）
+  - `bundle-id delete` 参数校验工作（`必须指定 --identifier 或 --id`）
+  - `auth validate --pretty` 输出新结构（4 探针 + role 推断 + warnings + note 全在）
+- Swift 占位 icon 脚本：`swift gen-placeholder-icon.swift /tmp/test.png R` → 生成有效 1024×1024 RGBA PNG（29737 bytes）
+- Python 语法 `py_compile` 通过
+
+### 用户清理提示（Reflow Grain 当前用户专用）
+
+- 4 个 ASC orphan bundle ID 现可清理（用新 `ae asc bundle-id delete --identifier <id>`）：
+  - `com.scaleglobal.reflow` (TKH2GMF6RA)
+  - `com.scaleglobal.reflowapp` (JCB4UGY733)
+  - `com.scale.bundleidtest001` (DSQQ2WQQBD) — 测试残留
+  - `com.scale.reflow` (L85256JPHM) — **当前在用，不要删**
+- 等 lgj iphone 15 (`00008120-0018598401D2201E`) 过完 24-72h Processing，删手动 "Reflow Dev" profile 让 Xcode 回归自动签名
+- `auth validate` 输出格式变化：现含 `effective_permissions` / `likely_role` / `warnings` / `note`，旧脚本如果 grep `"valid"` / `"apps_accessible"` 仍兼容
+
 ## v0.64.2 (2026-04-28) — `/ae-app-to-speckit` 探索 backlog 分类（媒体页短停 + 非功能页跳过） + cli 模块全集打包 [`#IJG519`](https://gitee.com/turningsyn/ae-pm/issues/IJG519) [`#IJG5HQ`](https://gitee.com/turningsyn/ae-pm/issues/IJG5HQ)
 
 > Content-heavy app 探索时 subagent 把所有 sub_entries 一视同仁"全 tap、全截图"会浪费预算 — 进入 10 分钟睡眠音频空等耗光 batch（IJG519），打开"关于/隐私政策/帮助"web view 几千字吃掉 token（IJG5HQ）。两个 issue 同源，统一通过"探索 backlog 自动分类"解决：每个 entry 在 fan-out 前打 tag，subagent 按 tag 分支执行。同 release 顺手修了 `ae go submit-bug` 在 pm install 上模块缺失的发布卫生 bug。

@@ -331,15 +331,95 @@ def resolve_bundle_id(identifier, jwt_token):
     return items[0]["id"]
 
 
+# ── Helper: Non-exiting GET probe (for auth validate) ──
+
+def try_get_probe(url, jwt_token, timeout=10):
+    """Lightweight GET probe. Returns HTTP status code (0 on network error).
+    Does NOT exit on error. Used by cmd_auth_validate to infer effective permissions.
+    """
+    clear_proxy()
+    ctx = _ssl_context()
+    headers = {
+        "Authorization": f"Bearer {jwt_token}",
+        "Content-Type": "application/json",
+    }
+    try:
+        req = urllib.request.Request(url, headers=headers, method="GET")
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+            return resp.status
+    except urllib.error.HTTPError as e:
+        return e.code
+    except (urllib.error.URLError, OSError):
+        return 0
+
+
 # ── Auth Commands ───────────────────────────────────────
 
 def cmd_auth_validate(args):
+    """Validate ASC credentials and probe effective permissions.
+
+    ASC API has NO self-introspection endpoint (no /me, no /v1/keys/current).
+    Team API keys are not Users. We infer permissions by probing GET endpoints
+    and observing 200/403 — this is heuristic, not a direct query.
+    """
     jwt_token = require_jwt(args)
-    # Verify by fetching apps list (lightest authenticated endpoint)
-    url = f"{ASC_API}/apps?limit=1"
-    result = api_request("GET", url, jwt_token=jwt_token)
-    app_count = len(result.get("data", []))
-    output({"valid": True, "apps_accessible": app_count > 0}, args.pretty)
+
+    # Probe a set of GET endpoints. 200 = read access; 403 = denied.
+    probes = [
+        ("apps.read",       f"{ASC_API}/apps?limit=1"),
+        ("bundleIds.read",  f"{ASC_API}/bundleIds?limit=1"),
+        ("betaGroups.read", f"{ASC_API}/betaGroups?limit=1"),
+        ("users.read",      f"{ASC_API}/users?limit=1"),  # Admin / App Manager signal
+    ]
+
+    effective = {}
+    auth_failed = False
+    for name, url in probes:
+        status = try_get_probe(url, jwt_token)
+        if status == 200:
+            effective[name] = True
+        elif status in (401,):
+            auth_failed = True
+            effective[name] = False
+        else:
+            # 403 / 404 / 0 (network) all treated as "no access"
+            effective[name] = False
+
+    if auth_failed:
+        error_exit("认证失败 (HTTP 401): JWT 签名失败或 .p8 文件错误", EXIT_AUTH_ERROR)
+
+    # Role heuristic based on probe results.
+    # ASC roles (relevant subset):
+    #   Admin / Account Holder: can list users + everything
+    #   App Manager:            apps/bundleIds/testflight CRUD, no users
+    #   Developer:              apps READ + bundleIds CRUD + betaTesters, NO apps:CREATE
+    #   Marketing:              read-only metadata
+    likely_role = "Unknown"
+    warnings = []
+
+    if effective.get("users.read"):
+        likely_role = "Admin / App Manager"
+    elif effective.get("apps.read") and effective.get("bundleIds.read") and effective.get("betaGroups.read"):
+        # Has app + bundle + tf access but no users → likely Developer or App Manager
+        likely_role = "Developer / App Manager (no users access)"
+        warnings.append(
+            "如果 Phase 1.5 `ae asc app create` 撞 HTTP 403，说明是 Developer 角色 "
+            "(无 apps:CREATE 权限) — 改走 ASC Web UI 或 Playwright fallback"
+        )
+    elif effective.get("apps.read"):
+        likely_role = "Marketing / 只读"
+        warnings.append("写权限受限，几乎所有 ae asc 写操作都会撞 HTTP 403")
+    else:
+        warnings.append("Apps 不可读 — credentials.env 中的 API Key 可能权限极低或绑错 team")
+
+    output({
+        "valid": True,
+        "apps_accessible": effective.get("apps.read", False),
+        "effective_permissions": effective,
+        "likely_role": likely_role,
+        "warnings": warnings,
+        "note": "ASC API 无 self-introspection 端点。permissions/role 通过 GET 探针推断，不是直接查询。",
+    }, args.pretty)
 
 
 # ── App Commands ────────────────────────────────────────
@@ -418,6 +498,34 @@ def cmd_bundle_id_register(args):
         "identifier": bid.get("identifier", ""),
         "name": bid.get("name", ""),
         "platform": bid.get("platform", ""),
+    }, args.pretty)
+
+
+def cmd_bundle_id_delete(args):
+    """Delete a Bundle ID by identifier (e.g. com.example.app) or by ASC resource ID.
+
+    Limitation: ASC will reject delete (HTTP 409) if the Bundle ID is currently
+    bound to an App. Detach the App first (or delete the App) before retrying.
+    """
+    if not args.identifier and not args.id:
+        error_exit("必须指定 --identifier 或 --id")
+    if args.identifier and args.id:
+        error_exit("--identifier 和 --id 互斥，只指定一个")
+
+    jwt_token = require_jwt(args)
+
+    if args.identifier:
+        resource_id = resolve_bundle_id(args.identifier, jwt_token)
+        identifier = args.identifier
+    else:
+        resource_id = args.id
+        identifier = ""
+
+    api_request("DELETE", f"{ASC_API}/bundleIds/{resource_id}", jwt_token=jwt_token)
+    output({
+        "id": resource_id,
+        "identifier": identifier,
+        "status": "deleted",
     }, args.pretty)
 
 
@@ -677,6 +785,11 @@ def build_parser():
     p.add_argument("--name", required=True, help="Display name")
     p.add_argument("--platform", default="IOS", choices=["IOS", "MAC_OS", "UNIVERSAL"])
 
+    p = bid_sub.add_parser("delete", help="Delete a Bundle ID (cleans up orphans)",
+                           parents=[global_opts])
+    p.add_argument("--identifier", help="Bundle ID (e.g. com.example.app); resolved to resource ID")
+    p.add_argument("--id", help="ASC resource ID (alternative to --identifier)")
+
     # ── testflight ──
     tf = sub.add_parser("testflight", help="TestFlight operations", parents=[global_opts])
     tf_sub = tf.add_subparsers(dest="action")
@@ -735,6 +848,7 @@ COMMANDS = {
     ("app", "create"): cmd_app_create,
     ("bundle-id", "list"): cmd_bundle_id_list,
     ("bundle-id", "register"): cmd_bundle_id_register,
+    ("bundle-id", "delete"): cmd_bundle_id_delete,
     ("testflight", "list-builds"): cmd_testflight_list_builds,
     ("testflight", "create-group"): cmd_testflight_create_group,
     ("testflight", "add-tester"): cmd_testflight_add_tester,

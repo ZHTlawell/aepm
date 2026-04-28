@@ -67,9 +67,11 @@ PM 需要将一个能本地编译的 iOS 工程发布到 TestFlight，典型场�
 Phase 1 和 Phase 4 通过 `ae asc` CLI 直接调用 App Store Connect REST API，无需浏览器自动化。
 
 ```bash
-# 确认 ASC API 凭据可用
+# 确认 ASC API 凭据可用，并探测 effective permissions
 ae asc auth validate --pretty
 ```
+
+输出包含 `effective_permissions`（GET 探针推断）+ `likely_role` 启发式 + `warnings`。**注意**：ASC API **没有 self-introspection 端点**，role/permissions 是通过 GET 探针（`/apps`, `/bundleIds`, `/betaGroups`, `/users`）的 200/403 响应反推的，不是直接查询。如果输出 `warnings` 里提示 `apps.create 可能不可用`（Developer 角色没有 apps:CREATE 权限），Phase 1.5 走到 `ae asc app create` 撞 403 时改走 Web UI / Playwright fallback。
 
 如果报错"缺少 ASC 凭据"，需要在 `~/.config/ae/credentials.env` 中配置：
 
@@ -131,6 +133,43 @@ xcodebuild -list 2>/dev/null | grep -A 20 "Schemes:"
 > - **首次** → 需要完成 Phase 1（Apple 注册）+ Phase 2-4
 > - **更新** → 跳到 Phase 2 Step 2.5（bump build number）→ Phase 3-4
 
+**0d. 列出本机签名身份与 Team 归属**
+
+项目 `project.yml` / `.xcodeproj` 里写死的 `DEVELOPMENT_TEAM` 不一定是当前 keychain 能签出来的 Team。本机有多个 Apple ID / 多个 Team 时容易混淆，提前列出来让 PM 选。
+
+```bash
+# 列出所有可用签名身份及 Team ID
+security find-identity -p codesigning -v | grep -E "Apple Development|Apple Distribution"
+
+# 查每张 cert 的 OU.Org（粗判个人 vs 公司）
+for hash in $(security find-identity -p codesigning -v | awk '/Apple (Development|Distribution)/{print $2}'); do
+  subject=$(security find-certificate -c "$hash" -p 2>/dev/null | openssl x509 -noout -subject 2>/dev/null)
+  echo "  $hash → $subject"
+done
+```
+
+输出示例：
+```
+ABC123... "Apple Development: foo (B798N3T6TK)"  → O = "li genjian US"
+DEF456... "Apple Development: bar (2P74ND2JUB)"  → O = "Scale Dynamics LLC"
+```
+
+> **个人 vs 公司粗判**: OU.Org 含 `LLC`/`Inc`/`Limited`/`Co.`/`Corp` 通常是公司账号；纯人名通常是个人账号。**这是粗筛启发式不是硬规则**——理论上个人账号也能起公司化的 OU。最终归属请向 PM 当面确认。
+>
+> **约束 ios-pub-024**（个人账号开发者名为中文影响海外转化，企业账号优先）。如果项目目标用户是海外而当前 team 是个人账号，建议切公司 team。Reflow Grain 案例：项目里写 "Scale Global B798N3T6TK"，但该 Team OU.Org 实际是 "li genjian US"（个人账号），不是 Scale Global。
+
+**0e. 设备识别符版本边界（Xcode 15+ 注意事项）**
+
+Xcode 15+ / iOS 17+ 引入新的设备 destination identifier 格式，与传统 UDID 不同。**接命令的工具决定用哪种 ID，不要跨工具复用 ID 字符串**：
+
+| 命令 | 输出 ID 格式 | 用于 |
+|------|------------|------|
+| `xcodebuild -showdestinations` | 24 字符 `XXXXXXXX-XXXXXXXXXXXXXXXX`（前 8 位 SoC 标识 + 后 16 位 ECID 派生） | `xcodebuild -destination "id=..."` |
+| `xcrun devicectl list devices` | 接受 UUID/ECID/serial/UDID/name 多种 | `devicectl --device <id>` |
+| 传统 UDID（Xcode 14 及之前老设备） | 40 字符全 hex 小写 | Provisioning Profile 内嵌 / 老 simctl |
+
+混用会直接卡（script 假定 40 字符 UDID 但拿到 24 字符 destination ID）。
+
 ---
 
 ## Phase 1: Apple 身份注册（ae asc CLI）
@@ -183,6 +222,10 @@ ae asc app list --filter-bundle-id <BUNDLE_ID> --pretty
 
 ### Step 1.5: 创建 App
 
+> **App 名称命名建议**: ASC App 名称是**全球唯一**的（与 Bundle ID 的全球唯一不同维度）。短词形如 "Reflow" / "Reader" / "Bible" 几乎都被占。推荐 `<品牌>: <品类描述>` 双段命名，重复率显著降低。
+>
+> 团队既有案例：`NoteFusion: AI Note Taker`、`WePray: Daily Bible Prayer`、`BugID: Insect Identifier`。Reflow 案例：`Reflow` / `Reflow Reader` 全被占用，最终用 `Reflow Grain` 通过。
+
 ```bash
 ae asc app create \
   --bundle-id <BUNDLE_ID> \
@@ -192,6 +235,8 @@ ae asc app create \
 ```
 
 > **SKU** = 唯一标识符，如 `FaithfulGuide001`。建议用 Bundle ID 最后一段或产品英文名。
+>
+> **如果 `auth validate` 的 warnings 里提示 `apps.create 可能不可用`**（API Key 是 Developer 角色），此处会撞 HTTP 403。改走 ASC Web UI 或 Playwright fallback：登录 https://appstoreconnect.apple.com/apps → My Apps → + → New App。
 
 成功输出包含 `id`（App ID，如 `6761982880`）。
 
@@ -286,6 +331,52 @@ security find-identity -p codesigning -v
 
 **约束 ios-pub-023：** 多 Apple ID 环境下，Xcode Automatic Signing 可能选错账号。确保只有一个 Apple ID 关联目标组织，或在 project 配置中明确指定 DEVELOPMENT_TEAM。
 
+### Step 2.4b: Automatic Signing 失败时的 Manual Signing fallback
+
+如果 `xcodebuild build -allowProvisioningUpdates` 报错 `you do not have permission to register them`（设备无法被自动注册），**先排查根因**：
+
+| 根因 | 检查方式 | 解决 |
+|------|---------|------|
+| **(a) Admin 开启了 "Prevent registration of new test devices" 限制** | Developer Portal → Membership → People → 你的 Apple ID 看 Automatic Signing Controls 列 | 让 Admin 关掉限制开关，或临时升级你为 App Manager 角色 |
+| **(b) Team 设备配额已满（100 台/年）** | Developer Portal → Devices 看计数 | 让 Admin 移除不再用的设备（每年 1 月可重置一次） |
+| **(c) 团队账号未付费 / 续费过期** | Developer Portal 顶部 banner 是否提示 "Your account has not yet been activated" | 让 Account Holder 续费 |
+| **(d) ios-pub-028: 24-72h Processing 期** | Devices 列表中目标设备 status 为 "Processing" | 等 Apple 处理完，或走 TestFlight（不依赖 device 注册） |
+
+> **注意**: Developer 角色**默认有权限**通过 Xcode 自动注册设备，要 Admin 主动开启 (a) 的限制开关才会撞这个错。直接升级到 Admin 不一定能解决 — 先确认根因。
+
+如果以上根因不适用且时间紧迫，走 **Manual Signing fallback**：
+
+**Step 2.4b.1: Developer Portal 创建 Development Profile**
+
+> ASC API **不支持 Profile 操作**（API 只到 Bundle ID 层面），必须走 Web UI 或 Playwright MCP。
+
+1. 打开 https://developer.apple.com/account/resources/profiles/add
+2. 选 iOS App Development → 选 Bundle ID → 选 Certificate → 选 Devices → 命名（如 `<App> Dev`）→ Generate → Download
+3. 双击下载的 `.mobileprovision` 安装到本地
+
+**Step 2.4b.2: 项目切到 Manual Signing**
+
+XcodeGen 项目 (`project.yml`):
+
+```yaml
+settings:
+  base:
+    CODE_SIGN_STYLE: Manual
+    PROVISIONING_PROFILE_SPECIFIER: "<Profile 名称>"
+    DEVELOPMENT_TEAM: "<Team ID>"
+```
+
+标准 Xcode 项目: Target → Signing & Capabilities → 取消 Automatically manage signing → 手动选 Profile。
+
+**Step 2.4b.3: 重新编译（不要带 -allowProvisioningUpdates）**
+
+```bash
+xcodebuild build -scheme "<SchemeName>" -destination "generic/platform=iOS"
+# 不要加 -allowProvisioningUpdates，避免 Xcode 重新走自动签名流程把 manual config 覆盖
+```
+
+> ⚠️ **Manual Profile 是设备列表的快照**: profile 中嵌入的 device 列表是**生成时定格**的。如果当前是 ios-pub-028 的 24-72h Processing 期，profile 里没有该设备 UDID，重新签名后装真机仍会失败 — 此时只能等 Apple 处理完，或走 TestFlight 安装（distribution profile 不绑 UDID）。
+
 ### Step 2.5: 验证编译 + Bump Build Number
 
 ```bash
@@ -349,7 +440,7 @@ xcodebuild archive \
 
 如果失败，常见原因：
 - iPad 方向未声明 → Step 2.2
-- App Icon 缺失或尺寸不对 → 需要 1024x1024 PNG
+- App Icon 缺失或尺寸不对 → 需要 1024x1024 PNG（项目完全没图时见**附录: 占位 AppIcon 生成器**，30 行 Swift+CG 兜底）
 - 代码签名错误 → 回到 Step 2.4 检查
 
 ### Step 3.3: 创建 ExportOptions.plist
@@ -604,6 +695,8 @@ testflight_publish:
 | ios-pub-014 | 同一 Apple ID 可能关联多个组织 | sunshinee_7 关联了 Hangzhou Yuancheng + qin xu |
 | ios-pub-015 | Xcode Automatic Signing 注册的 ID 仅对 Xcode 构建有效 | ASC 需要在 Portal 单独注册 |
 | ios-pub-016 | 2FA 是自动化唯一人工卡点 | ASC API Key 可绕过（一次性配置） |
+| ios-pub-028 | 新设备进入 24-72h "Processing" 等待期（仅在第 11-100 台 / 新开账号 / 续费过期场景触发，不是所有新设备） | 期间设备不会被加入任何 provisioning profile，USB 直装失败；TestFlight 走 distribution profile（不绑 UDID），所以**不依赖 device 注册**——但这是另一条签名链路，不是"绕过 Processing"。前 1-10 台设备立即可用，无等待期。Apple 文档原文术语是 "Processing"，不是 "iPhoneProcessing"。 |
+| ios-pub-029 | ASC `bundle-id register` 成功 ≠ Developer Portal / Xcode 立即可用 | ASC API 与 Portal 是分离系统，ASC 注册的 bundle ID 在 Portal/Xcode 端可能延迟同步或要求二次操作。验证标准是 `xcodebuild -allowProvisioningUpdates` 通过，不是 ASC 返回 200。Reflow Grain 案例：`ai.scaleglobal.reflow` ASC 报 409 但 Portal team 早有了。 |
 
 ### TestFlight 分发类
 
@@ -683,3 +776,67 @@ testflight_publish:
 ## 复用说明
 
 本 skill 适用于所有 iOS 项目的 TestFlight 首次发布和迭代更新。关键变量只有 3 个：Team ID、Bundle ID、Scheme Name。其余步骤完全通用。
+
+---
+
+## 附录: 占位 AppIcon 生成器
+
+如果项目完全没有 AppIcon 资产，archive 会失败。下面这段 Swift+CoreText 脚本生成一张 1024×1024 PNG 兜底（实色背景 + 居中字母），喂给 `Assets.xcassets/AppIcon.appiconset/Icon-1024.png` 即可。
+
+> ⚠️ **占位图不能用于正式 App Store 提审**——审核会拒。仅用于 TestFlight 内测期间快速跑通 archive。
+
+保存为 `gen-placeholder-icon.swift` 后运行 `swift gen-placeholder-icon.swift <output.png> [letter]`：
+
+```swift
+#!/usr/bin/env swift
+// gen-placeholder-icon.swift — Generate a 1024x1024 placeholder AppIcon PNG.
+// Usage: swift gen-placeholder-icon.swift <output.png> [letter]
+
+import CoreGraphics
+import CoreText
+import Foundation
+import ImageIO
+import UniformTypeIdentifiers
+
+let args = CommandLine.arguments
+guard args.count >= 2 else {
+    print("Usage: swift gen-placeholder-icon.swift <output.png> [letter]")
+    exit(1)
+}
+let outputPath = args[1]
+let letter = String((args.count > 2 ? args[2] : "A").prefix(1)).uppercased()
+
+let size = 1024
+let colorSpace = CGColorSpaceCreateDeviceRGB()
+guard let ctx = CGContext(
+    data: nil, width: size, height: size,
+    bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace,
+    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+) else { fatalError("Failed to create CGContext") }
+
+ctx.setFillColor(CGColor(red: 0.20, green: 0.50, blue: 0.95, alpha: 1.0))
+ctx.fill(CGRect(x: 0, y: 0, width: size, height: size))
+
+let font = CTFontCreateWithName("HelveticaNeue-Bold" as CFString, 600, nil)
+let attrs: [CFString: Any] = [
+    kCTFontAttributeName: font,
+    kCTForegroundColorAttributeName: CGColor(red: 1, green: 1, blue: 1, alpha: 1),
+]
+let attrString = CFAttributedStringCreate(nil, letter as CFString, attrs as CFDictionary)!
+let line = CTLineCreateWithAttributedString(attrString)
+let bounds = CTLineGetImageBounds(line, ctx)
+ctx.textPosition = CGPoint(
+    x: (CGFloat(size) - bounds.width) / 2 - bounds.minX,
+    y: (CGFloat(size) - bounds.height) / 2 - bounds.minY
+)
+CTLineDraw(line, ctx)
+
+guard let cgImage = ctx.makeImage() else { fatalError("Failed to create CGImage") }
+let url = URL(fileURLWithPath: outputPath) as CFURL
+guard let dest = CGImageDestinationCreateWithURL(url, UTType.png.identifier as CFString, 1, nil) else {
+    fatalError("Failed to create image destination")
+}
+CGImageDestinationAddImage(dest, cgImage, nil)
+CGImageDestinationFinalize(dest)
+print("Generated: \(outputPath) (\(size)x\(size))")
+```
