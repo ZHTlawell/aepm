@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.64.1 (2026-04-28) — hotfix: 恢复 v0.64.0 误删的 6 个 skill + publish 防御校验 [`#IJFZ8A`](https://gitee.com/turningsyn/ae-platform/issues/IJFZ8A)
+
+> CC 反馈 `/ae-app-to-speckit` 不可用。排查发现 v0.64.0 release commit 误删了 6 个 skill（`ae-app-to-speckit` / `ae-feedback-integrate` / `ae-image-decopyrighter` / `ae-notification-integrate` / `ae-onboarding-integrate` / `ae-speckit-brainstorm`）+ `ae-report-fix/evaluate.md`。源码端文件全部完整，问题在 release 管线。
+
+### 修复
+
+**1. 恢复全部误删的 skill** — 重新 build + publish 把丢失的 SKILL.md / README.md / evaluate.md / test-scenarios.md 全部补回 `~/.ae/pm/.claude/skills/`。
+
+**2. `scripts/publish.sh` 加硬校验（堵漏防再犯）** — Step 3 验证阶段新增 3b-2：
+
+- dist/`<role>`/.claude/skills/ 下 SKILL.md 数量必须 ≥ skills/`<role>`/ 下源码 SKILL.md 数量
+- 逐个 skill 比对，如有 dist 缺失则列出具体名字 + 终止 publish
+- 防止 build.sh 任何边界情况下输出残缺 dist 后被 `rsync --delete` 同步到发布仓
+
+### 历史背景
+
+`ae-app-to-speckit/SKILL.md` 在 v0.54.0 也被误删过、v0.55.0 又恢复，**v0.64.0 第二次复发**。属于间歇性 release bug。本次加防御校验后不再依赖 build.sh 自检。
+
+### 验证
+
+- 模拟 build.sh 漏拷 `ae-app-to-speckit` → `publish.sh --dry-run` 在 Step 3 fail：「缺失 skill: ae-app-to-speckit / 禁止 publish — rsync --delete 会把发布仓的这些 skill 删掉」
+- 正常 build → 25 个 skill 全部进 dist + 校验通过
+
 ## v0.64.0 (2026-04-27) — 冷启动完成 → product repo 接管 issue 跟踪：Stage A8 + skill 路由检测 [`#IJFJC3`](https://gitee.com/turningsyn/ae-pm/issues/IJFJC3)
 
 > 弥补冷启动结束后看板移交链路的缺失：让 builder 知道何时切到 product repo，让 `/ae-submit-bug` 和 `/ae-submit-requirement` 自动按 git remote 推荐 target repo（含 AE 工具关键词覆盖逻辑）。
