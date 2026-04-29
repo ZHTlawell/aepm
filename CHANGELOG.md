@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.65.5 (2026-04-29) — 修复 v0.65.3/v0.65.4 连续发布污染：手动 rsync 恢复全部 25 个 skill
+
+> v0.65.3 + v0.65.4 publish 阶段连续出现 build 异常（疑似 stale dist 残留 + 可能的并发文件系统事件），rsync --delete 把发布仓多个 skill 的 SKILL.md 误删。本次手动重 build + 手动 rsync，跳过 publish.sh 异常路径，恢复完整 25 skill。
+
+### 影响
+- 本次发布前，从 v0.65.2 → v0.65.3 → v0.65.4 升级的 PM 会丢失：ae-skill-creator / ae-onboarding-integrate / ae-notification-integrate / ae-i18n-integrate / ae-legal-generate / ae-demo-to-figma / ae-abtest-integrate / ae-asc-submit / ae-app-review-check 等 skill。
+- 升级到 v0.65.5 后全部恢复。
+
+**用户操作**：`cd ~/.ae/pm && git pull origin main`
+
+### 后续
+- `scripts/publish.sh` 增加 build 前 `rm -rf dist/$ROLE` 强制清理（防 stale 残留）
+- `scripts/publish.sh` rsync 前再次校验 dist/$ROLE/.claude/skills 完整性
+
+---
+
 ## v0.65.4 (2026-04-29) — 修复 v0.65.3 发布污染：恢复被误删的 4 个 skill SKILL.md + cli/lib/{pm,dev,go}/
 
 > v0.65.3 publish 时 build 阶段时序异常（疑似并发或 stale dist 残留），导致 rsync --delete 把发布仓里的：

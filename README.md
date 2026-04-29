@@ -341,7 +341,7 @@ ae pm submit-bug "问题标题" "问题描述"
 
 查看 [CHANGELOG.md](CHANGELOG.md) 了解完整更新记录。
 
-当前版本：**v0.65.4**
+当前版本：**v0.65.5**
 
 ## 由谁维护
 
