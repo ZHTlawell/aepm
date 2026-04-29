@@ -2,6 +2,12 @@ guideline: "4.2"
 chapter: "4-Design"
 title: "Minimum Functionality — 最低功能性"
 severity: high
+rubric:
+  dimension: D5
+  score_on_pass: 3
+  score_on_warn: 2
+  score_on_fail: 0
+  weight: 1
 official_text: |
   Your app should include features, content, and UI that elevate it beyond a
   repackaged website. If your app is not particularly useful, unique, or

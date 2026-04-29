@@ -48,6 +48,8 @@ M0 → M1 工具箱的一环。本 skill 不产源码、不跑 demo、不碰真�
 4. **冲突显式化** — 发现冲突不擅自裁决，列出所有候选 + 推荐项给 PM 选择
 5. **harness 薄，不写死 prompt** — 本 skill 是方法论 + 模板，具体 LLM 调用由 harness 层决定模型和参数
 
+> **mode=reference 的对话收敛阶段：先调用 `superpowers:brainstorming`。** PM 的 idea + 源 speckit 收敛成"新 speckit 该长什么样"的过程，本质是 brainstorming 通用方法论（一次问一个问题、确认设计后再执行）。本 skill 只负责 speckit 6 模块文件结构 + 来源标注 + merge/reference 双模式策略。Mode A (merge) 不依赖 brainstorming（结构化 6 模块合并，无开放对话）。
+
 ## 输入
 
 | 参数 | 必填 | 说明 |

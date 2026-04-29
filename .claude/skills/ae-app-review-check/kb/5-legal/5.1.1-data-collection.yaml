@@ -2,6 +2,12 @@ guideline: "5.1.1"
 chapter: "5-Legal"
 title: "Data Collection and Storage — 隐私政策 + 登录门槛 + 账户删除"
 severity: high
+rubric:
+  dimension: D1
+  score_on_pass: 3
+  score_on_warn: 2
+  score_on_fail: 0
+  weight: 1
 official_text: |
   (i) Privacy Policies: All apps must include a link to their privacy policy
   in the App Store Connect metadata field and within the app in an easily

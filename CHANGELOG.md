@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.65.6 (2026-04-29) — `ae-speckit-brainstorm` mode=reference 下沉 `superpowers:brainstorming` [`#IJH112`](https://gitee.com/turningsyn/ae-pm/issues/IJH112)
+
+> Mode B (reference) 是"PM idea + 源 speckit → 新 speckit"的对话收敛过程，本质是 brainstorming 通用方法论。本 skill 在核心原则段明确：reference 模式先调 `superpowers:brainstorming`，本 skill 只负责 speckit 6 模块文件结构 + 来源标注 + 双模式策略。Mode A (merge) 不变（结构化合并无开放对话）。
+
+### 变更
+- `skills/pm/ae-speckit-brainstorm/SKILL.md` 核心原则段加 superpowers:brainstorming 引用
+- 同时端到端验证 publish.sh 三重守门修复（[ae-platform#IJH17E](https://gitee.com/turningsyn/ae-platform/issues/IJH17E)）
+
+---
+
 ## v0.65.5 (2026-04-29) — 修复 v0.65.3/v0.65.4 连续发布污染：手动 rsync 恢复全部 25 个 skill
 
 > v0.65.3 + v0.65.4 publish 阶段连续出现 build 异常（疑似 stale dist 残留 + 可能的并发文件系统事件），rsync --delete 把发布仓多个 skill 的 SKILL.md 误删。本次手动重 build + 手动 rsync，跳过 publish.sh 异常路径，恢复完整 25 skill。

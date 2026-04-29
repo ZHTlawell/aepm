@@ -2,6 +2,12 @@ guideline: "3.1.2"
 chapter: "3-Business"
 title: "Subscriptions — 订阅披露 + 条款 + 续费透明"
 severity: high
+rubric:
+  dimension: D6
+  score_on_pass: 3
+  score_on_warn: 2
+  score_on_fail: 0
+  weight: 1
 official_text: |
   3.1.2 Subscriptions: Apps may offer auto-renewable in-app purchase
   subscriptions, regardless of category on the App Store.

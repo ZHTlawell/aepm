@@ -2,6 +2,12 @@ guideline: "2.3.1"
 chapter: "2-Performance"
 title: "Accurate Metadata — 元数据完整性 + Privacy Manifest"
 severity: high
+rubric:
+  dimension: D2
+  score_on_pass: 3
+  score_on_warn: 2
+  score_on_fail: 0
+  weight: 1
 official_text: |
   (a) Don't include any hidden, dormant, or undocumented features in your app;
   your app's functionality should be clear to end users and App Review.
