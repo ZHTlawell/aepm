@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.65.2 (2026-04-29) — 修复 v0.65.1 发布污染：清理 `.build/checkouts/swift-syntax` 误提交 submodule 指针
+
+> v0.65.1 publish 时 ae-pm 工作树残留的 `scripts/preflight-swiftui-lint/.build/` 被 `git add -A` 误识别为 submodule 并提交（mode 160000 gitlink），导致 `git pull` 后该路径变成空的损坏 submodule。本次修复：
+> - `publish.sh` rsync 增加 `--exclude='.build' --exclude='.swiftpm' --exclude='Package.resolved'`，永久阻断 SwiftPM build 产物泄漏到发布仓
+> - ae-pm 仓库 `git rm --cached` 清理已提交的 gitlink
+
+**用户操作**：从 v0.65.1 升级的 PM 直接 `cd ~/.ae/pm && git pull origin main`，损坏的 `.build/` 会自动被移除。
+
+---
+
 ## v0.65.1 (2026-04-29) — bible-app 12 轮 TF 复盘吸纳：5 条 ios-pub 规则 + 2 个 preflight 脚本 [`#IJGZN3`](https://gitee.com/turningsyn/ae-pm/issues/IJGZN3)
 
 > bible-app 12 轮 TF（2026-04-14 → 04-22）复盘列出 8 类技术翻车，本次吸纳 5 条**低成本静态规则**到 constraints + linter，bible-app 工作树 smoke test 全部命中：012（4 处 UUID 默认值含 ChatMessage build 6 watchdog 根因）/ 013（TTSService build 9 EXC_BAD_ACCESS 根因）/ 071（statusCode == 200）/ 080（NIV + NKJV 未授权）。
