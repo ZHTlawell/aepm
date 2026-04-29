@@ -69,6 +69,48 @@ python3 scripts/app-review-scan.py --project-dir <iOS 项目路径> --output bot
 3. 根据 `expected` + `match_pattern` 评估 pass/fail/warn/skip
 4. 输出 markdown 报告 + JSON 机读结果
 
+### Phase 2.5: Rubric 评分 + 档位判定（v0.66.0+）
+
+scan.py 在输出 PASS/WARN/FAIL 报告之前，先计算 6 维 Rubric 评分和 T0/T1/T2 档位结论。这是给"打样 App 是否可上架/投广"的最直接判断。
+
+**6 个维度**：
+
+| 维度 | 含义 | 主要 kb 条目 |
+|------|------|------------|
+| D1 | 法务合规（Privacy Policy / Terms / Subscription Terms） | `5.1.1-data-collection` · `3.1.2-subscriptions` (D1 部分) |
+| D2 | Privacy Manifest（PrivacyInfo.xcprivacy / Required Reason API / 第三方 SDK manifest） | `2.3.1-accurate-metadata` |
+| D3 | 模板纯净度（无 fork 自其他 App 的字符串残留） | `2.3.1-template-residue` |
+| D4 | 权限文案语义匹配（usage description 与业务对应） | `5.1.1-purpose-string-semantic` |
+| D5 | Free 路径完整度（无 vaporware / Free 用户核心功能可走通或前置告知） | `4.2-minimum-functionality` · `4.2-vaporware` |
+| D6 | Paywall 漏斗合规（Restore + Terms + Privacy + 自动续费披露 + 不强弹冷启动） | `3.1.2-subscriptions` · `3.2.1-paywall-frequency` |
+
+**评分规则**（每维 0-3 分）：
+- 维度内每个 kb 条目根据其 status 贡献分数（PASS = 3 / WARN = 2 / FAIL = 0，可在 yaml 内 override）
+- 多个条目按 weight 加权求和，归一化到 0-3
+- 该维度所有条目都未触发 → 记 N/A，不计入档位判定
+
+**档位判定**：
+- **T0 — 理论可过审**：D1 ≥ 2 AND D2 ≥ 2 AND 总分 ≥ 12 AND 无任一维度=0
+- **T1 — 可投广基线**：T0 AND 总分 ≥ 16 AND 至少 4 维有分 AND 无任一维度=0
+- **T2 — 数据闭环可读**：T1 AND 数据闭环（v1 留空，依赖 ae-analytics-integrate 漏斗事件就绪）
+
+报告头部会输出：
+```
+📊 RUBRIC 评分（RQ 打样模式 v0）
+档位：T1 ✅ 可投广基线
+总分：16/18    有分维度：5/6
+
+| 维度 | 名称 | 得分 | 命中条目 |
+| D1 | 法务合规 | 3/3 | ✅ 5.1.1 |
+| D2 | Privacy Manifest | 3/3 | ✅ 2.3.1 |
+| D3 | 模板纯净度 | 3/3 | ✅ 2.3.1 |
+| D4 | 权限文案语义 | 2/3 | ⚠️ 5.1.1 |
+| D5 | Free 路径完整度 | N/A | N/A — 该维度无 kb 条目触发 |
+| D6 | Paywall 漏斗合规 | 3/3 | ✅ 3.1.2 · ✅ 3.2.1 |
+```
+
+> 方法论起源：[ae-platform IJCBRW](https://e.gitee.com/turningsyn/issues/list?issue=IJCBRW) — RQ 打样 App 5 样本逆向调研。
+
 ### Phase 3: 报告解读
 
 报告分三档：
@@ -153,6 +195,11 @@ python3 scripts/app-review-kb-feedback.py --rejection-email <path>
 | review-007 | 有登录必须在 ASC Review Notes 提供 demo account | AI 审核要求 |
 | review-008 | 有账户注册必须提供账户删除入口 | 5.1.1(v) |
 | review-009 | 敏感 API（Camera/Location/Photos/Microphone）必须配置 Info.plist usage description | ITMS-90683 |
+| review-010 | 模板/竞品 App 字符串残留检测（FaceFlow/CoKnit/knitting/makeup/facial features 等关键词） | RQ 打样 IJCBRW · D3 |
+| review-011 | 权限文案语义与业务匹配（拼豆 App 不能写 'analyze facial features'） | RQ 打样 IJCBRW · D4 |
+| review-012 | Free 用户核心功能必须可走通或前置告知（不能让用户走完流程才看到 Failed） | RQ 打样 IJCBRW · D5 |
+| review-013 | Vaporware 检测：onboarding 承诺的功能必须在 App 内有入口 | RQ 打样 IJCBRW · D5 |
+| review-014 | Cold-launch paywall 不强弹（除首次），避免 3.2.1 frequent prompts | RQ 打样 IJCBRW · D6 |
 
 ## 与其他 skill 的关系
 

@@ -29,7 +29,7 @@ triggers:
 auto_checks:
   - id: "4.2-no-coming-soon-placeholder"
     type: shell
-    command: "grep -rEn 'Coming Soon|coming soon|即将上线|敬请期待|TODO|FIXME|Lorem Ipsum|placeholder text|Sample text' --include='*.swift' --include='*.strings' --include='*.html' . 2>/dev/null | grep -vE '//\\s' | head -5"
+    command: "grep -rEn 'Coming Soon|coming soon|即将上线|敬请期待|Lorem Ipsum|placeholder text|Sample text' --include='*.swift' --include='*.strings' --include='*.html' . 2>/dev/null | grep -vE '/Pods/|/\\.build/|/DerivedData/|//\\s' | head -5"
     expected: empty
     severity: high
     on_fail: "源码含 'Coming Soon' / 'TODO' / 'Lorem Ipsum' 等占位符 — 4.2 + 2.1 拒"

@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.66.0 (2026-04-29) — `ae-app-review-check` 引入 6 维 Rubric + T0/T1/T2 档位输出（RQ 打样模式 v0）[`#IJCBRW`](https://gitee.com/turningsyn/ae-platform/issues/IJCBRW)
+
+> 来自 RQ 打样 5 App 逆向调研（BakeWay/BeadSnap/ComicNani/Stylab/BabyNomi），把"上架/投广质量阈值"从抽象判断变成可执行的评分卡。kb 条目新增 `rubric` 字段，scan.py 在原 PASS/WARN/FAIL 报告之上输出 6 维评分 + 档位结论（T0 理论可过审 / T1 可投广基线 / T2 数据闭环 v1 留空）。
+
+### 变更
+- `skills/pm/ae-app-review-check/SKILL.md`：新增 Phase 2.5 Rubric 评分 + 档位判定章节；已验证约束追加 review-010..014 共 5 条
+- `skills/pm/ae-app-review-check/kb/SCHEMA.md`：新增 `rubric` 字段（dimension D1..D6 + score_on_pass/warn/fail + weight）
+- 现有 4 个 kb 条目加 rubric 映射：`5.1.1-data-collection`(D1) · `2.3.1-accurate-metadata`(D2) · `3.1.2-subscriptions`(D6) · `4.2-minimum-functionality`(D5)
+- 新建 4 个 kb 条目：
+  - `2-performance/2.3.1-template-residue.yaml`(D3) — grep 已知模板/竞品 App 字符串残留（FaceFlow/CoKnit/knitting/makeup/facial features 等）
+  - `4-design/4.2-vaporware.yaml`(D5) — onboarding 承诺与 App 内入口 cross-check 启发式
+  - `3-business/3.2.1-paywall-frequency.yaml`(D6) — cold-launch interstitial 检测
+  - `5-legal/5.1.1-purpose-string-semantic.yaml`(D4) — 权限文案语义匹配启发式
+- `cases/cases.jsonl` 新增 5 条 RQ 真实案例：case-2026-007/008/009/010/011（BeadSnap-FaceFlow / Stylab-CoKnit / ComicNani-Failed / BeadSnap-vaporware / Stylab-cold-launch）
+- `scripts/app-review-scan.py`：新增 `compute_rubric_scores()` + `render_rubric_section()`；JSON 输出 schema 改为 `{results, rubric}`
+- `scripts/app-review-kb-lint.py`：新增 `rubric` 字段校验（dimension 枚举 / score 区间 0..3 / weight 正整数）
+
+### 验证
+- `python3 scripts/app-review-kb-lint.py` → OK: 15 kb entries lint clean, 11 cases
+- 跨真实 iOS 项目 `bible-ios-template` 跑通：D3 检测到 share text 中 "knitting" 残留（真实 finding，非 false positive），档位判定 BELOW_T0 + Rubric 报告头部正常输出
+- 跨空目录跑：D1=0 D2=0（无 Privacy Policy / 无 manifest），档位 BELOW_T0，符合预期
+
+---
+
 ## v0.65.7 (2026-04-29) — `ae-verify-app` 收尾引用 `superpowers:verification-before-completion` [`#IJH112`](https://gitee.com/turningsyn/ae-pm/issues/IJH112)
 
 > "声称验证通过"前必须出具证据（diff report / coverage 数字 / 实际执行截图）。通用的"evidence before claims"纪律由 superpowers 提供，本 skill 只负责 E2E 对比的具体流程。
