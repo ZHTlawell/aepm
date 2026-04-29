@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.65.4 (2026-04-29) — 修复 v0.65.3 发布污染：恢复被误删的 4 个 skill SKILL.md + cli/lib/{pm,dev,go}/
+
+> v0.65.3 publish 时 build 阶段时序异常（疑似并发或 stale dist 残留），导致 rsync --delete 把发布仓里的：
+> - `cli/lib/dev/commands.sh` / `cli/lib/go/commands.sh` / `cli/lib/pm/commands.sh` / `cli/lib/pm/image_decopyrighter.py`
+> - `ae-analytics-integrate/SKILL.md` + `evaluate.md` / `ae-app-review-check/SKILL.md` / `ae-paywall-integrate/SKILL.md` + `README.md` + `test-scenarios.md` / `ae-submit-requirement/SKILL.md` + `evaluate.md`
+>
+> 全部误删。本次重 build 后这些文件已全部恢复。
+
+**用户操作**：从 v0.65.3 升级的 PM 直接 `cd ~/.ae/pm && git pull origin main` 即可恢复。
+
+---
+
 ## v0.65.3 (2026-04-29) — `ae-skill-creator` 下沉通用方法论到 `superpowers:writing-skills` [`#IJH112`](https://gitee.com/turningsyn/ae-pm/issues/IJH112)
 
 > superpowers 5.0.7 已提供成熟的 skill 编写方法论（TDD 写 skill），无需在 ae-skill-creator 内重复造。Phase 2 开头新增引用，明确 ae-skill-creator 只负责 ae-platform 特有的"六段标准"+ 发布闭环（publish.sh / CHANGELOG / issue 关闭），通用方法论交给 superpowers。
