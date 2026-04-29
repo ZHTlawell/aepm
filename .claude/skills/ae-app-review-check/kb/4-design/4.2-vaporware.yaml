@@ -1,0 +1,60 @@
+guideline: "4.2"
+chapter: "4-Design"
+title: "Vaporware — Onboarding 承诺但 App 内无实际入口"
+severity: high
+rubric:
+  dimension: D5
+  score_on_pass: 3
+  score_on_warn: 1
+  score_on_fail: 0
+  weight: 1
+official_text: |
+  4.2 Minimum Functionality + 2.3.1 Accurate Metadata 综合：
+  App 描述/onboarding 承诺的功能必须在 App 内可达。
+  典型反例（来自 RQ 打样调研 IJCBRW）：
+    - BeadSnap onboarding 承诺 4 项功能 (Virtual Inventory / Creator Marketplace /
+      Pricing Calculator / Collector Profile)，但 App 内无任何入口
+    - ComicNani Free 用户点 "Create Comic" → 后端永远返回 Failed，无前置
+      "需升级" 提示
+
+  Apple 人工审核会按 onboarding 中的卡片逐个找入口；找不到 → 4.2 拒。
+  Free 用户走核心流程被无理由阻断（不是 paywall 拦截，而是 Failed 错误）→ 4.2 + 3.1.2(c) + 2.1 综合拒。
+official_url: "https://developer.apple.com/app-store/review/guidelines/#4.2"
+
+triggers:
+  - "App 有 onboarding 营销页"
+  - "App 的 App Store description 列出多个功能点"
+  - "Free 用户能点击核心 CTA 但走不通"
+
+auto_checks:
+  - id: "4.2-no-coming-soon-placeholder"
+    type: shell
+    command: "grep -rEn 'Coming Soon|coming soon|即将上线|敬请期待|TODO|FIXME|Lorem Ipsum|placeholder text|Sample text' --include='*.swift' --include='*.strings' --include='*.html' . 2>/dev/null | grep -vE '//\\s' | head -5"
+    expected: empty
+    severity: high
+    on_fail: "源码含 'Coming Soon' / 'TODO' / 'Lorem Ipsum' 等占位符 — 4.2 + 2.1 拒"
+    case_refs: []
+
+  - id: "4.2-no-fail-without-fallback"
+    type: shell
+    command: "grep -rEn 'Task Failed|task failed|Generation failed|创建失败' --include='*.swift' --include='*.strings' . 2>/dev/null | head -3; grep -rEn 'tryAgain|retry|重试' --include='*.swift' . 2>/dev/null | head -1 | wc -l"
+    expected: non_empty
+    severity: low
+    on_fail: "存在失败态文案但未观察到 retry 入口 — 提醒人工复核 Free 路径是否友好"
+    case_refs: ["case-2026-009"]
+
+review_notes_template: |
+  - All features described in onboarding/App Store description are reachable within the app.
+  - Free-tier users can either complete core flows OR see an upfront upgrade prompt before attempting blocked actions.
+
+fix_suggestions:
+  - "对照 speckit feature-checklist：onboarding 承诺的每个 feature 必须有 in-app entry；vaporware 项要么实现，要么从 onboarding 移除"
+  - "Free 用户的核心 CTA 需要在点击前判定权限：非付费 → 弹 paywall 或 disable + tooltip；不要让用户走完流程才看到 Failed"
+  - "失败态必须有 retry 入口或明确说明（'Service temporarily unavailable, please try again later'）"
+
+known_limitations:
+  - "vaporware 的真扫需要 speckit feature-checklist 的 onboarding 承诺与 App 内入口的双向 diff，scan.py 当前不做（v1 计划）"
+  - "Free 路径完整性最佳验证方式是真机 UI walk + speckit 数据交叉，自动化扫描覆盖率有限"
+
+case_refs: ["case-2026-009"]
+updated_at: "2026-04-29"

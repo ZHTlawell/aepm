@@ -169,6 +169,8 @@ smoke_test:
 
 ## 完成后引导
 
+> **声称"验证通过"前，遵循 `superpowers:verification-before-completion`。** "evidence before claims" — 必须有 diff report、coverage 数字、AXe/Vision 实际执行截图为证。本 skill 是 E2E 对比的具体流程；通用的"声明完成前必须出具证据"纪律由 superpowers 提供，避免出现"看起来对就报通过"的失败模式。
+
 验证完成后，如果存在 non-pass 的 case（coverage < 100%），必须主动提示用户：
 
 > 验证发现 {N} 个差异（{missing} 个缺失 + {different} 个不同）。

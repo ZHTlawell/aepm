@@ -1,0 +1,64 @@
+guideline: "5.1.1"
+chapter: "5-Legal"
+title: "Purpose String Semantic — 权限文案与业务匹配"
+severity: high
+rubric:
+  dimension: D4
+  score_on_pass: 3
+  score_on_warn: 1
+  score_on_fail: 0
+  weight: 1
+official_text: |
+  5.1.1(i) Privacy Policies + 5.1.2 Data Use and Sharing 综合：
+  Apps must clearly and explicitly identify what data the app collects, how it
+  collects that data, and all uses of that data. Permission usage descriptions
+  (NSCameraUsageDescription / NSPhotoLibraryUsageDescription /
+  NSMicrophoneUsageDescription / NSLocationWhenInUseUsageDescription /
+  NSUserTrackingUsageDescription) must accurately describe the use case in
+  the app's actual business context.
+
+  典型反例（来自 RQ 打样调研 IJCBRW）：
+    - BeadSnap (拼豆 App) 的 NSCameraUsageDescription = "Capture photos and
+      analyze your facial features" → 拼豆业务不做人脸识别，文案与业务无关
+    - BeadSnap 的 NSUserTrackingUsageDescription = "personalize beauty
+      content and makeup recommendations" → 化妆 App 文案，与拼豆无关
+
+  此条与 2.3.1-template-residue 互补：template-residue 检查 "字符串是否含
+  其他 App 名"；本条检查 "usage description 是否泛化或与本 App 业务无关"。
+official_url: "https://developer.apple.com/app-store/review/guidelines/#5.1.1"
+
+triggers:
+  - "App 使用敏感 API (Camera / Photo / Mic / Location / ATT)"
+  - "App 由模板 fork 而来"
+
+auto_checks:
+  - id: "5.1.1-purpose-string-not-generic"
+    type: shell
+    command: "grep -rEn 'NSCameraUsageDescription|NSPhotoLibraryUsageDescription|NSMicrophoneUsageDescription|NSLocationWhenInUseUsageDescription|NSUserTrackingUsageDescription' --include='*.plist' . -A 1 2>/dev/null | grep -B1 -E '<string>.*(provide better service|enhance your experience|personalize content|for analytics|for our services|to use this feature)\\.?</string>' | head -10"
+    expected: empty
+    severity: medium
+    on_fail: "Info.plist 的 usage description 文案泛化（'enhance your experience' 等通用模板词）— 5.1.1 要求精确说明，含糊文案易被人工审核员标 misleading"
+    case_refs: []
+
+  - id: "5.1.1-purpose-string-business-keyword-match"
+    type: shell
+    command: "BUNDLE=$(grep -rEn 'CFBundleDisplayName|CFBundleName' --include='*.plist' . 2>/dev/null | grep -oE '<string>[^<]+</string>' | head -1 | sed 's/<[^>]*>//g'); if [ -n \"$BUNDLE\" ]; then grep -rEn 'NSCameraUsageDescription|NSPhotoLibraryUsageDescription|NSUserTrackingUsageDescription' --include='*.plist' . -A 1 2>/dev/null | grep -B1 -iE '<string>.*(facial|face|beauty|makeup|knitting|crafting)' | head -5; fi"
+    expected: empty
+    severity: medium
+    on_fail: "Info.plist usage description 含其他业务领域关键词（face/beauty/knitting 等）但 App 名不涉及该领域 — 疑似模板 fork 文案残留"
+    case_refs: ["case-2026-007"]
+
+review_notes_template: |
+  - All Info.plist usage descriptions accurately describe how the app uses each sensitive API in its specific business context.
+  - No generic placeholder text or cross-domain language.
+
+fix_suggestions:
+  - "每个 NSXxxUsageDescription 写具体业务句子，引用本 App 名 + 具体使用场景"
+  - "示例：拼豆 App NSCameraUsageDescription = 'Capture photos to convert into pixel bead patterns.' 而非 'analyze facial features'"
+  - "ATT 文案：'Personalize your bead pattern recommendations and help us improve [App Name].' 而非通用 marketing 词"
+
+known_limitations:
+  - "语义匹配的真扫需要 LLM 分析 (App 业务领域 vs usage description 内容)；当前 grep 启发式只覆盖已知反例 keyword 列表，建议人工复核"
+
+case_refs: ["case-2026-007"]
+updated_at: "2026-04-29"

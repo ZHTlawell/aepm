@@ -21,6 +21,7 @@ REQUIRED_TOP = ["guideline", "chapter", "title", "severity", "official_text", "o
 VALID_SEVERITY = {"high", "medium", "low"}
 VALID_CHECK_TYPES = {"grep", "file_exists", "file_content_match", "shell"}
 VALID_EXPECTED = {"non_empty", "empty", "match", "no_match"}
+VALID_RUBRIC_DIMENSIONS = {"D1", "D2", "D3", "D4", "D5", "D6", None}
 
 
 def lint_entry(path: Path) -> list[str]:
@@ -40,6 +41,23 @@ def lint_entry(path: Path) -> list[str]:
 
     if data.get("severity") not in VALID_SEVERITY:
         errs.append(f"{path}: severity must be one of {VALID_SEVERITY}, got {data.get('severity')!r}")
+
+    # rubric (optional)
+    rubric = data.get("rubric")
+    if rubric is not None:
+        if not isinstance(rubric, dict):
+            errs.append(f"{path}: rubric must be a dict if present")
+        else:
+            dim = rubric.get("dimension")
+            if dim not in VALID_RUBRIC_DIMENSIONS:
+                errs.append(f"{path}: rubric.dimension must be one of {VALID_RUBRIC_DIMENSIONS}, got {dim!r}")
+            for k in ("score_on_pass", "score_on_warn", "score_on_fail"):
+                v = rubric.get(k)
+                if v is not None and not (isinstance(v, int) and 0 <= v <= 3):
+                    errs.append(f"{path}: rubric.{k} must be int 0..3, got {v!r}")
+            w = rubric.get("weight", 1)
+            if not (isinstance(w, int) and w >= 1):
+                errs.append(f"{path}: rubric.weight must be positive int, got {w!r}")
 
     checks = data.get("auto_checks", [])
     if not isinstance(checks, list) or not checks:

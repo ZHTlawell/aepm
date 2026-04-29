@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.65.7 (2026-04-29) — `ae-verify-app` 收尾引用 `superpowers:verification-before-completion` [`#IJH112`](https://gitee.com/turningsyn/ae-pm/issues/IJH112)
+
+> "声称验证通过"前必须出具证据（diff report / coverage 数字 / 实际执行截图）。通用的"evidence before claims"纪律由 superpowers 提供，本 skill 只负责 E2E 对比的具体流程。
+
+### 变更
+- `skills/pm/ae-verify-app/SKILL.md` 完成后引导段顶部加 `superpowers:verification-before-completion` 引用
+
+### IJH112 umbrella 状态
+- 🔴 ae-skill-creator ✅ v0.65.3
+- 🔴 ae-speckit-brainstorm ✅ v0.65.6
+- 🟡 ae-bug-investigation (go) ✅ v0.22.0
+- 🟡 ae-deep-analysis (go) ✅ v0.22.0
+- 🟡 ae-system-design (go) ✅ v0.22.0
+- 🟡 ae-verify-app (pm) ✅ 本版
+- 🟢 不重叠的 skill 维持现状
+
+下沉清单全部完成，IJH112 待 PM 验收后关闭。
+
+---
+
 ## v0.65.6 (2026-04-29) — `ae-speckit-brainstorm` mode=reference 下沉 `superpowers:brainstorming` [`#IJH112`](https://gitee.com/turningsyn/ae-pm/issues/IJH112)
 
 > Mode B (reference) 是"PM idea + 源 speckit → 新 speckit"的对话收敛过程，本质是 brainstorming 通用方法论。本 skill 在核心原则段明确：reference 模式先调 `superpowers:brainstorming`，本 skill 只负责 speckit 6 模块文件结构 + 来源标注 + 双模式策略。Mode A (merge) 不变（结构化合并无开放对话）。

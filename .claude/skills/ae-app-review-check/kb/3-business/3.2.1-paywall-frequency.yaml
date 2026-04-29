@@ -1,0 +1,59 @@
+guideline: "3.2.1"
+chapter: "3-Business"
+title: "Paywall Frequency — 冷启动强弹付费墙风险"
+severity: medium
+rubric:
+  dimension: D6
+  score_on_pass: 3
+  score_on_warn: 2
+  score_on_fail: 0
+  weight: 1
+official_text: |
+  3.2.1 Acceptable: ... Apps and their metadata may not include or link to ...
+  Manipulative or Deceptive Behavior including ... Frequent prompts to upgrade
+  or paid alternatives that interfere with the basic functionality of the app.
+
+  来自 RQ 打样调研 IJCBRW：
+  Stylab (com.stylab.app) 的冷启动行为：每次 cold launch 都强制弹 paywall，
+  免费用户必须每次手动 tap 右上 X 才能进 Home。这种频率会触发 Apple 审核员
+  对 "frequent paywall interruption" 的怀疑，可能延审或软拒。
+
+  最佳实践：paywall 应在 onboarding 末段触发 1 次 + 关键功能边界触发 +
+  Settings 入口；不应每次 cold launch 强弹。
+official_url: "https://developer.apple.com/app-store/review/guidelines/#3.2.1"
+
+triggers:
+  - "App 有 paywall 且为 freemium 模式"
+  - "Cold launch 路径上有 paywall 触发"
+
+auto_checks:
+  - id: "3.2.1-paywall-not-on-cold-launch"
+    type: shell
+    command: "grep -rEn '(WindowGroup|@main|RootView|AppDelegate.*didFinishLaunching).*\\{' --include='*.swift' . 2>/dev/null | head -3; grep -rEn 'PaywallView\\(\\)|SuperwallService\\.show\\(|presentPaywall|\\.fullScreenCover.*Paywall' --include='*.swift' . 2>/dev/null | grep -vE '//\\s' | head -5"
+    expected: non_empty
+    severity: low
+    on_fail: "未找到 paywall 入口（可能 App 无订阅）"
+    case_refs: []
+
+  - id: "3.2.1-no-cold-launch-interstitial"
+    type: shell
+    command: "grep -rEn 'onAppear.*[Pp]aywall|\\.task\\b.*[Pp]aywall|appLaunchCount.*[Pp]aywall|RootView.*[Pp]aywall' --include='*.swift' . 2>/dev/null | grep -vE '//\\s|first.*launch|onboardingComplete' | head -5"
+    expected: empty
+    severity: medium
+    on_fail: "Root View / onAppear / .task 中疑似有 paywall 强弹逻辑且无 'first launch / onboarding complete' 限定 — 可能违反 3.2.1 frequent prompts"
+    case_refs: ["case-2026-011"]
+
+review_notes_template: |
+  - Paywall is presented at the end of onboarding (once per first launch).
+  - Subsequent cold launches go directly to Home; paywall accessible from Settings or feature gates.
+
+fix_suggestions:
+  - "Paywall 触发逻辑加 'isFirstLaunch || hasCompletedOnboarding' 条件"
+  - "把 paywall 改成 day-N 触发 (e.g., 第 3 次启动 / 试用结束前 1 天) 而非每次冷启动"
+  - "如果坚持每次冷启动弹，必须有清晰的 Cancel X 且 1 tap 关闭，否则 App Review 会判 frequent paywall"
+
+known_limitations:
+  - "Paywall 触发逻辑通常由 Superwall/RevenueCat 在远程后台配置，源码扫不到。PM 必须手动 cold launch 3 次确认行为"
+
+case_refs: ["case-2026-011"]
+updated_at: "2026-04-29"
