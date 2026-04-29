@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.65.3 (2026-04-29) — `ae-skill-creator` 下沉通用方法论到 `superpowers:writing-skills` [`#IJH112`](https://gitee.com/turningsyn/ae-pm/issues/IJH112)
+
+> superpowers 5.0.7 已提供成熟的 skill 编写方法论（TDD 写 skill），无需在 ae-skill-creator 内重复造。Phase 2 开头新增引用，明确 ae-skill-creator 只负责 ae-platform 特有的"六段标准"+ 发布闭环（publish.sh / CHANGELOG / issue 关闭），通用方法论交给 superpowers。
+
+### 变更
+- `skills/pm/ae-skill-creator/SKILL.md` Phase 2 段首加 superpowers:writing-skills 引用，划清职责边界
+
+---
+
 ## v0.65.2 (2026-04-29) — 修复 v0.65.1 发布污染：清理 `.build/checkouts/swift-syntax` 误提交 submodule 指针
 
 > v0.65.1 publish 时 ae-pm 工作树残留的 `scripts/preflight-swiftui-lint/.build/` 被 `git add -A` 误识别为 submodule 并提交（mode 160000 gitlink），导致 `git pull` 后该路径变成空的损坏 submodule。本次修复：

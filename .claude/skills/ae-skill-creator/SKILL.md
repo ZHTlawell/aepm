@@ -137,6 +137,8 @@ skills/<role>/<skill-name>/
 
 **目标：** 将 Phase 1 跑通的流程包装成标准化的 agent 操作指南。
 
+> **先调用 `superpowers:writing-skills`。** 通用的 skill 编写方法论（TDD 写 skill：测试场景→基线失败→写 skill→测试通过→闭环漏洞）由 superpowers 提供，本 skill 只负责 ae-platform 特有的"六段标准"和发布闭环。两者关系：superpowers:writing-skills 教你怎么写出 agent 真的会照做的 skill；本 phase 的六段标准是 AE Platform 对所有 skill 的硬性结构约束。
+
 SKILL.md 必须包含以下六段，缺一不可：
 
 #### 第 1 段：YAML Frontmatter
