@@ -1,5 +1,50 @@
 # Changelog
 
+## v0.65.1 (2026-04-29) — bible-app 12 轮 TF 复盘吸纳：5 条 ios-pub 规则 + 2 个 preflight 脚本 [`#IJGZN3`](https://gitee.com/turningsyn/ae-pm/issues/IJGZN3)
+
+> bible-app 12 轮 TF（2026-04-14 → 04-22）复盘列出 8 类技术翻车，本次吸纳 5 条**低成本静态规则**到 constraints + linter，bible-app 工作树 smoke test 全部命中：012（4 处 UUID 默认值含 ChatMessage build 6 watchdog 根因）/ 013（TTSService build 9 EXC_BAD_ACCESS 根因）/ 071（statusCode == 200）/ 080（NIV + NKJV 未授权）。
+
+### 新增
+
+**1. `constraints/ios-publish-constraints.md`** — 5 条新规则：
+- `ios-pub-012` ForEach 视图标识必须稳定（禁止 struct stored `let id = UUID()`，触发 watchdog 0x8BADF00D）
+- `ios-pub-013` AV 框架实例必须存为属性（禁 AVSpeechSynthesizer 局部 var + delegate，EXC_BAD_ACCESS）
+- `ios-pub-070` 所有 .swift 必须在 Xcode target 内（pre-archive 编译门禁）
+- `ios-pub-071` API 契约：禁 `/api/api` 双前缀 + 禁 `statusCode == 200` 严校验
+- `ios-pub-080` 受版权内容必须扫描 + 授权声明（NIV / ESV / NASB / NKJV / NLT / MSG / CSB）
+
+Part 3 ID 约定扩展：`07x` 构建门禁、`08x` 内容合规。
+
+**2. `scripts/preflight-swiftui-lint/Sources/PreflightSwiftUILint/main.swift`** — 3 个新 SwiftSyntax visitor：
+- `VariableDeclSyntax` → ios-pub-012 + ios-pub-013（context 感知 struct vs class、function body vs type member）
+- `StringLiteralExprSyntax` → ios-pub-071 part 1（双前缀字面量）
+- `SequenceExprSyntax` → ios-pub-071 part 2（statusCode == 200 严校验）
+
+**3. 2 个新 shell 脚本**：
+- `scripts/preflight-files-registered.sh` — 扫描业务 .swift 是否在 pbxproj 内（ios-pub-070）
+- `scripts/preflight-content-copyright.sh` — 扫描受版权译本标记 + Acknowledgments 授权声明匹配（ios-pub-080）
+
+### 验证
+
+bible-app（commit `360177d`）真实 smoke test：
+- `ios-pub-012` 4 hits（ChatMessage / BibleData / ParticleView / StudyPlanDetailView）— 含 build 6 watchdog 根因文件
+- `ios-pub-013` 1 hit（TTSService.swift:36 `let synth = AVSpeechSynthesizer()`）— 含 build 9 EXC_BAD_ACCESS 根因
+- `ios-pub-070` clean（xcodegen 已重跑）
+- `ios-pub-071` 1 hit（TTSService.swift:124 `httpResponse.statusCode == 200`）
+- `ios-pub-080` 2 hits（DevotionalDetailView NIV + PaywallView NKJV，均无 Acknowledgments）
+
+linter 编译：`swift build -c release` 通过（swift-syntax 600.0.1，~103s 首次）。
+
+### 关键发现
+
+bible-app build 6 watchdog 和 build 9 EXC_BAD_ACCESS 两次真机崩溃，新规则在**未崩溃前的源码里**直接抓到根因——意味着 6 周前 ae-pm 就有这两条规则，**Archive 前可拦截**。
+
+### 来源
+
+外部 agent 通过 `/ae-report-fix` 回流（[`#IJGZN3`](https://gitee.com/turningsyn/ae-pm/issues/IJGZN3)），驱动课题 [`ae-platform#II96KC`](https://gitee.com/turningsyn/ae-platform/issues/II96KC)。
+
+---
+
 ## v0.65.0 (2026-04-28) — `/ae-app-to-testflight` Reflow Grain 实战回流：5 个 preflight/约束缺口 + 4 个 papercut [`#IJG76P`](https://gitee.com/turningsyn/ae-pm/issues/IJG76P)
 
 > PM 个人发 Reflow Grain 到 TestFlight 踩了 9 个坑 ~3 小时。回流时全部 9 条 claim 经 Apple 文档 + 源码核对：5 条完全成立，3 条方向对但描述需修正（24-72h Processing 触发条件不全 / Xcode 权限错误根因不只一种 / UDID 是 Xcode 15+ 新格式不是"两个 UDID"），1 条原方案不可实现（ASC API 无 self-introspection 端点，role 字段不能直接查询）— 改为探针式 effective_permissions。

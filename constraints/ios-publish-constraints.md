@@ -101,6 +101,179 @@ Button {
 
 ---
 
+### `ios-pub-012` ForEach 视图标识必须稳定（禁止每次构建重新生成 UUID）
+
+**规则**：`Identifiable` 模型的 `id` 属性禁止使用 `UUID()` 作为存储属性默认值。每次 `init` 都会生成新 UUID，配合 SwiftUI `ForEach` 会让整列子视图被认为是新元素，整列重建。频繁重建（例如 stream chat 消息逐字追加、定时器驱动的列表）会触发 watchdog `0x8BADF00D` 主线程超时崩溃。
+
+**来源**：bible-app build 6（2026-04-17）真机崩溃，根因为 `ChatMessage.id = UUID()` 默认值，TTS 流式更新触发整列 ForEach 重建，主线程在 setNeedsLayout 中超过 watchdog 阈值。
+
+**❌ 错误**：
+```swift
+struct ChatMessage: Identifiable {
+    let id = UUID()              // ⚠️ 每次 init 重新生成
+    let role: Role
+    let content: String
+}
+
+ForEach(messages) { msg in
+    MessageRow(message: msg)     // 整列每次更新都被认为是新元素
+}
+```
+
+**✅ 正确**：
+```swift
+struct ChatMessage: Identifiable {
+    let id: UUID                 // 必须由调用方传入并稳定保留
+    let role: Role
+    let content: String
+
+    init(id: UUID = UUID(), role: Role, content: String) {
+        self.id = id
+        self.role = role
+        self.content = content
+    }
+}
+
+// 或：使用业务自带稳定主键（serverId / hash）
+struct ChatMessage: Identifiable {
+    let id: String               // 由后端返回，全程不变
+    let role: Role
+    let content: String
+}
+```
+
+**例外（不会被标记）**：
+- `let id = UUID()` 出现在 `class`（引用语义，init 只调用一次）— 但仍建议显式传入
+- 非 `Identifiable` 上下文中的 UUID 默认值
+
+---
+
+### `ios-pub-013` 音视频框架实例必须存为属性（禁止局部变量 + delegate）
+
+**规则**：`AVSpeechSynthesizer` / `AVAudioPlayer` / `AVAudioRecorder` 等使用 `weak` delegate 的 AV 框架对象，禁止以局部 `let` / `var` 形式创建后再设置 delegate 或调用 `speak/play/record`。函数返回时实例释放，delegate 也随之失效，回调路径访问已释放对象 → `EXC_BAD_ACCESS`。
+
+**来源**：bible-app build 9（2026-04-17）TTS Listen 按钮崩溃，根因为函数局部 `let synth = AVSpeechSynthesizer(); synth.delegate = self; synth.speak(...)`，`synth` 出函数即被释放。
+
+**❌ 错误**：
+```swift
+func play(text: String) {
+    let synth = AVSpeechSynthesizer()      // ⚠️ 局部变量
+    synth.delegate = self
+    let utterance = AVSpeechUtterance(string: text)
+    synth.speak(utterance)                  // 函数返回 → synth 释放 → delegate 回调时 EXC_BAD_ACCESS
+}
+```
+
+**✅ 正确**：
+```swift
+final class TTSService: NSObject {
+    private let synth = AVSpeechSynthesizer()   // ✅ 实例属性，与 service 同生命周期
+
+    override init() {
+        super.init()
+        synth.delegate = self
+    }
+
+    func play(text: String) {
+        let utterance = AVSpeechUtterance(string: text)
+        synth.speak(utterance)
+    }
+}
+```
+
+**适用类型清单**：`AVSpeechSynthesizer`、`AVAudioPlayer`、`AVAudioRecorder`、`AVAudioEngine`、`AVCaptureSession`。
+
+---
+
+### `ios-pub-070` 所有 .swift 源文件必须在 Xcode target 内（pre-archive）
+
+**规则**：项目源码目录下任何 `.swift` 文件必须在 `*.xcodeproj/project.pbxproj` 或对应 `Podfile` 引用的 Pod 内。Archive 前自动扫描，未注册文件 fail。
+
+**来源**：bible-app build 12 `cannot find 'XxxService' in scope` 编译失败，根因为新增 Swift 文件未跑 `pod install` / `xcodegen`，文件物理存在但 target 不可见。
+
+**❌ 错误**：
+```
+BibleAppDemo/Services/NewService.swift   ← 文件存在
+BibleAppDemo.xcodeproj/project.pbxproj   ← 未引用 NewService.swift
+```
+
+**✅ 正确**：
+```bash
+# 编辑 project.yml / Podfile / 直接 Xcode 添加文件 后必须重跑：
+xcodegen generate          # XcodeGen 项目
+pod install                # CocoaPods 项目
+
+# Pre-archive 自动扫描：
+bash ~/.ae/pm/scripts/preflight-files-registered.sh .
+```
+
+**扫描脚本**：`scripts/preflight-files-registered.sh` 列出业务源文件目录里所有 `.swift`，对每个 grep `*.pbxproj`，未命中 + 不在 `Pods/` 下 → fail。
+
+---
+
+### `ios-pub-071` API 契约：禁止双前缀路径与 `code==200` 严校验
+
+**规则**：
+
+1. **路径无双前缀**：`baseURL` 已含 `/api`（如 `https://app.bible.itemvaults.com/api`）时，请求路径**禁止**再以 `/api/` 开头，否则形成 `/api/api/v1/...`。
+2. **状态码非严等**：HTTP 200 区间判定必须用 `200..<300` 或 `code >= 200 && code < 300`，**禁止** `code == 200` 严校验。后端正常返回 201/204/206 都会被误判为失败。
+
+**来源**：bible-app build 8 chat API 联调失败，错误同时命中两个：(a) `/api/llm/v1/chat` 在 base URL 已含 `/api` 时变成 `/api/api/llm/v1/chat`；(b) ChatService 用 `if response.code == 200` 严校验，后端返 201 时被误判 500。
+
+**❌ 错误**：
+```swift
+let baseURL = "https://app.bible.itemvaults.com/api"
+let path = "/api/llm/v1/chat"               // ⚠️ 双 /api
+let url = URL(string: baseURL + path)!
+
+if response.statusCode == 200 {              // ⚠️ 严校验
+    handleSuccess()
+} else {
+    handleError()                            // 201/204 → 进 error
+}
+```
+
+**✅ 正确**：
+```swift
+let baseURL = Secrets.apiBaseURL             // 含 /api
+let path = "/llm/v1/chat"                    // 不重复前缀
+let url = URL(string: baseURL + path)!
+
+if (200..<300).contains(response.statusCode) {
+    handleSuccess()
+}
+```
+
+**扫描方式**：preflight-swiftui-lint 扫描字符串字面量含 `"/api/api"` 即报；扫描 `BinaryOperatorExpr` 中 `statusCode == 200` / `code == 200` 即报。
+
+---
+
+### `ios-pub-080` 受版权内容必须扫描并声明授权
+
+**规则**：app 内嵌的圣经经文、歌词、诗词、长段引用文本必须使用**公共版权**或已购授权来源，并在 app 内/隐私政策中标注。Bible 翻译版本：`KJV` / `ASV` / `WEB` / `BBE` 公共版权可直接使用；`NIV` / `ESV` / `NASB` / `NLT` / `MSG` / `CSB` 等需 Biblica/Crossway/Lockman/Tyndale 等授权。
+
+**来源**：bible-app 12 轮 TF 中曾误用 NIV 经文片段（受 Biblica 版权保护），后切换为 KJV（公共版权）。Apple Review 5.2.1 要求第三方知识产权合规，违规直接拒审。
+
+**❌ 错误**：
+```swift
+// 直接嵌入 NIV 译文
+let verse = "For God so loved the world that he gave his one and only Son... (John 3:16, NIV)"
+```
+
+**✅ 正确**：
+```swift
+// 使用 KJV 公共版权
+let verse = "For God so loved the world, that he gave his only begotten Son... (John 3:16, KJV)"
+
+// 或：取得授权后在 SubscriptionTerms / Acknowledgments 标注
+// "Scripture quotations marked NIV are taken from the Holy Bible, New International Version®, 
+//  NIV®. Copyright © 1973, 1978, 1984, 2011 by Biblica, Inc.®. Used by permission."
+```
+
+**扫描脚本**：`scripts/preflight-content-copyright.sh` grep 源文件中 `(NIV)` / `(ESV)` / `(NASB)` / `(NLT)` / `(MSG)` / `(CSB)` 等受版权标记，若发现且 `Acknowledgments.md` 不含对应授权声明则 fail。
+
+---
+
 ### `ios-pub-001` 禁止硬编码 API Key
 
 **规则**：任何 API Key / Secret / Token 禁止以明文字符串出现在 `.swift` 源码中。必须外部化到 `Secrets.plist`（加入 `.gitignore`）或 Environment Variable 或 Keychain。
@@ -263,12 +436,14 @@ StoreKit 2 要求 Paywall 提供 Restore 按钮且有实际恢复逻辑。空实
 ## Part 3 — 规则 ID 约定
 
 - `ios-pub-0xx` — 基础（签名、秘钥、隐私）
-- `ios-pub-01x` — 触控与交互
+- `ios-pub-01x` — 触控、交互、视图与框架生命周期（含 SwiftUI 反模式、AV 框架）
 - `ios-pub-02x` — 权限
 - `ios-pub-03x` — 资产
 - `ios-pub-04x` — 配置（Bundle ID、Team）
 - `ios-pub-05x` — 可访问性
 - `ios-pub-06x` — 技术选型
+- `ios-pub-07x` — 构建门禁（pre-archive 编译、文件注册、API 契约）
+- `ios-pub-08x` — 内容合规（版权、授权声明）
 - `ios-pub-1xx` — 建议项（非硬红线）
 
 新增规则时：

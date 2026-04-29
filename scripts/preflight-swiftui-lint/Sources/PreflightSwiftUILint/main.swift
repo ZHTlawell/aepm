@@ -44,6 +44,25 @@ final class LintVisitor: SyntaxVisitor {
         return .visitChildren
     }
 
+    // ios-pub-012 — UUID() default initializer on stored `id` property
+    override func visit(_ node: VariableDeclSyntax) -> SyntaxVisitorContinueKind {
+        checkUUIDDefaultID(node)
+        checkAVFrameworkLocalVar(node)
+        return .visitChildren
+    }
+
+    // ios-pub-071 (part 1) — string literals containing "/api/api"
+    override func visit(_ node: StringLiteralExprSyntax) -> SyntaxVisitorContinueKind {
+        checkDoubleAPIPrefix(node)
+        return .visitChildren
+    }
+
+    // ios-pub-071 (part 2) — strict statusCode == 200 (parser yields SequenceExpr, not InfixOp)
+    override func visit(_ node: SequenceExprSyntax) -> SyntaxVisitorContinueKind {
+        checkStrictStatusCodeEquality(node)
+        return .visitChildren
+    }
+
     // MARK: - Call identification
 
     private enum CallKind: Equatable {
@@ -276,6 +295,157 @@ final class LintVisitor: SyntaxVisitor {
         "highPriorityGesture",
         "simultaneousGesture"
     ]
+
+    // MARK: - Rule: ios-pub-012 — UUID() default on stored id
+
+    private func checkUUIDDefaultID(_ node: VariableDeclSyntax) {
+        // Only flag in struct context — class instances init once, not per render.
+        guard isInsideStruct(node) else { return }
+
+        for binding in node.bindings {
+            guard let pattern = binding.pattern.as(IdentifierPatternSyntax.self),
+                  pattern.identifier.text == "id" else { continue }
+            guard let initializer = binding.initializer else { continue }
+            guard isUUIDCallExpr(initializer.value) else { continue }
+
+            report(
+                ruleId: "ios-pub-012",
+                at: node.positionAfterSkippingLeadingTrivia,
+                message: "Stored `id = UUID()` regenerates per init — ForEach will rebuild every row, can trigger watchdog 0x8BADF00D",
+                context: "id default initializer in struct"
+            )
+        }
+    }
+
+    private func isUUIDCallExpr(_ expr: ExprSyntax) -> Bool {
+        guard let call = expr.as(FunctionCallExprSyntax.self),
+              let ref = call.calledExpression.as(DeclReferenceExprSyntax.self) else { return false }
+        return ref.baseName.text == "UUID"
+    }
+
+    private func isInsideStruct(_ node: SyntaxProtocol) -> Bool {
+        var parent: Syntax? = node.parent
+        while let p = parent {
+            if p.is(StructDeclSyntax.self) { return true }
+            if p.is(ClassDeclSyntax.self) { return false }
+            if p.is(ActorDeclSyntax.self) { return false }
+            parent = p.parent
+        }
+        return false
+    }
+
+    // MARK: - Rule: ios-pub-013 — local AV framework instance
+
+    private static let avFrameworkTypes: Set<String> = [
+        "AVSpeechSynthesizer",
+        "AVAudioPlayer",
+        "AVAudioRecorder",
+        "AVAudioEngine",
+        "AVCaptureSession"
+    ]
+
+    private func checkAVFrameworkLocalVar(_ node: VariableDeclSyntax) {
+        // Only flag when the var lives inside a function body (not type member).
+        guard isInsideFunctionBody(node) else { return }
+
+        for binding in node.bindings {
+            guard let initializer = binding.initializer,
+                  let typeName = initializerTypeName(initializer.value),
+                  Self.avFrameworkTypes.contains(typeName) else { continue }
+
+            let varName = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier.text ?? "(?)"
+            report(
+                ruleId: "ios-pub-013",
+                at: node.positionAfterSkippingLeadingTrivia,
+                message: "\(typeName) instance `\(varName)` is a local variable — released when function returns, weak delegate callbacks will EXC_BAD_ACCESS. Store as instance property.",
+                context: "local var \(typeName)"
+            )
+        }
+    }
+
+    private func initializerTypeName(_ expr: ExprSyntax) -> String? {
+        guard let call = expr.as(FunctionCallExprSyntax.self) else { return nil }
+        if let ref = call.calledExpression.as(DeclReferenceExprSyntax.self) {
+            return ref.baseName.text
+        }
+        return nil
+    }
+
+    private func isInsideFunctionBody(_ node: SyntaxProtocol) -> Bool {
+        var parent: Syntax? = node.parent
+        while let p = parent {
+            if p.is(FunctionDeclSyntax.self) { return true }
+            if p.is(InitializerDeclSyntax.self) { return true }
+            if p.is(AccessorDeclSyntax.self) { return true }
+            if p.is(ClosureExprSyntax.self) { return true }
+            // Hitting a type decl before any function => member-level, not local
+            if p.is(StructDeclSyntax.self) || p.is(ClassDeclSyntax.self)
+               || p.is(ActorDeclSyntax.self) || p.is(EnumDeclSyntax.self) {
+                return false
+            }
+            parent = p.parent
+        }
+        return false
+    }
+
+    // MARK: - Rule: ios-pub-071 — API contract (double prefix + strict 200)
+
+    private func checkDoubleAPIPrefix(_ node: StringLiteralExprSyntax) {
+        let raw = node.segments.description
+        guard raw.contains("/api/api") else { return }
+        report(
+            ruleId: "ios-pub-071",
+            at: node.positionAfterSkippingLeadingTrivia,
+            message: "URL string contains `/api/api` — base URL likely already includes `/api`, drop the prefix in the path",
+            context: raw.trimmingCharacters(in: .whitespaces)
+        )
+    }
+
+    private func checkStrictStatusCodeEquality(_ node: SequenceExprSyntax) {
+        // Walk the sequence looking for `<status-ish>  ==  200` triples.
+        let elements = Array(node.elements)
+        guard elements.count >= 3 else { return }
+
+        for i in 0..<(elements.count - 2) {
+            let lhs = elements[i]
+            let mid = elements[i + 1]
+            let rhs = elements[i + 2]
+
+            guard let op = mid.as(BinaryOperatorExprSyntax.self),
+                  op.operator.text == "==" else { continue }
+
+            let lhsIsStatus = exprMentionsStatusCode(lhs)
+            let rhsIsStatus = exprMentionsStatusCode(rhs)
+            guard lhsIsStatus || rhsIsStatus else { continue }
+
+            let intSide = lhsIsStatus ? rhs : lhs
+            guard let lit = intSide.as(IntegerLiteralExprSyntax.self),
+                  lit.literal.text == "200" else { continue }
+
+            report(
+                ruleId: "ios-pub-071",
+                at: node.positionAfterSkippingLeadingTrivia,
+                message: "Strict `statusCode == 200` rejects valid 2xx responses (201/204/206) — use `(200..<300).contains(...)`",
+                context: "\(lhs.description) == 200".trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+            return
+        }
+    }
+
+    private func exprMentionsStatusCode(_ expr: ExprSyntax) -> Bool {
+        // Match identifiers / member accesses ending in "statusCode" or whose final segment is "code"
+        if let ref = expr.as(DeclReferenceExprSyntax.self) {
+            return isStatusCodeName(ref.baseName.text)
+        }
+        if let member = expr.as(MemberAccessExprSyntax.self) {
+            return isStatusCodeName(member.declName.baseName.text)
+        }
+        return false
+    }
+
+    private func isStatusCodeName(_ name: String) -> Bool {
+        return name == "statusCode" || name == "code" || name == "httpStatusCode"
+    }
 
     // MARK: - Reporting
 
