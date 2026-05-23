@@ -71,6 +71,24 @@ ae qa product-init <product_dir>
 
 熟悉度达到 85/100 后，Agent 才能进入该产品的专属测试模式。
 
+初始化前，请先准备产品资料包。不要只给一句产品简介后就期待 Agent 熟悉产品：
+
+```text
+<product_dir>/qa-onboarding-input/
+  00-project-structure.md
+  01-product-overview.md
+  02-product-screens/
+  03-product-docs/
+  04-api-docs/
+  05-database-docs/
+  06-test-cases/
+  07-bug-history/
+  08-test-reports/
+  09-automation/
+```
+
+如果暂时没有完整资料，可以先放已有资料；Agent 会先做完整度评分，然后告诉你还缺什么。资料不足时，它应该要求补资料，而不是直接追问细碎产品细节。
+
 新测试人员接手项目时：
 
 ```bash

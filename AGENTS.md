@@ -29,6 +29,38 @@ Q4 测试资产
   -> /ae-qa-change-impact / /ae-qa-file-bugs / /ae-qa-release-check
 ```
 
+## 首次阅读项目时
+
+当用户说“阅读这个项目”“这个项目是做什么的”“我刚拿到这个开源项目”时，不要只总结仓库内容。必须引导用户进入下一步：
+
+1. 告诉用户这是一个“产品专属 QA Agent 框架”。
+2. 告诉用户先创建或选择一个产品目录。
+3. 提醒用户先准备产品资料包，而不是先回答零散业务问题。
+4. 给出命令：
+
+```bash
+cp .qa-agent.example.yml <product_dir>/.qa-agent.yml
+ae qa product-init <product_dir>
+```
+
+5. 给出资料包目录结构：
+
+```text
+<product_dir>/qa-onboarding-input/
+  00-project-structure.md
+  01-product-overview.md
+  02-product-screens/
+  03-product-docs/
+  04-api-docs/
+  05-database-docs/
+  06-test-cases/
+  07-bug-history/
+  08-test-reports/
+  09-automation/
+```
+
+在用户还没有提供产品资料包前，不要开始追问细碎产品细节。
+
 ## 当前能力
 
 | 能力 | 说明 | 状态 |
@@ -113,7 +145,8 @@ qa/
 11. **记忆更新需确认**：关键产品记忆变化必须保留旧记录、说明证据和影响，并等待用户确认后再更新。
 12. **不熟悉就追问**：当产品或模块信息不足时，追问策略以“保障 Agent 熟悉产品/模块”为目标，按优先级分批提问。
 13. **新模块先给任务清单**：后续新模块测试时，先输出可选择的测试任务，让用户选择后再执行。
-14. **问题回流**：执行 QA skill 遇到流程缺口时，先尝试修复；修复成功建议通过 PR 或 issue 回流，无法修复建议提交 bug。
+14. **资料优先**：产品初始化阶段，先引导用户提供产品图、PRD、接口、数据库、测试用例、测试报告、历史 Bug、自动化资料；资料未提供前，不追问细碎业务规则。
+15. **问题回流**：执行 QA skill 遇到流程缺口时，先尝试修复；修复成功建议通过 PR 或 issue 回流，无法修复建议提交 bug。
 
 ## 版本更新检查
 
