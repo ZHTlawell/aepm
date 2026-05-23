@@ -11,6 +11,17 @@ Product initialization must collect materials before asking detailed product que
 5. Run material completeness scoring.
 6. Only after materials are checked, ask targeted follow-up questions for missing or conflicting information.
 
+## Progressive Guidance Rule
+
+Each guidance turn should solve one problem only.
+
+- If the product directory is unknown, ask only for the product directory.
+- If the product directory exists but initialization has not run, ask only to initialize it.
+- If initialization is complete but no material exists, ask only for the first material.
+- If some materials exist, ask only for the highest-value missing material or the highest-priority clarification.
+- Do not list the full material checklist unless the user asks for it, or a completeness report is being generated.
+- After initialization, do not display all material directories by default. The default next step is only: ask for the first material.
+
 ## Material Checklist
 
 | Material | Purpose |
@@ -38,6 +49,8 @@ After materials are provided, ask targeted questions that improve readiness:
 - Unknown data state transitions.
 - Unknown release risks.
 
+Ask at most one question per turn. If several issues exist, choose the one that most improves readiness for the current task.
+
 ## Product Summary Only Input
 
-If the user only provides a short product summary, record it as initial identity but do not proceed as if the product is understood. Reply with the material checklist and ask the user to provide documents.
+If the user only provides a short product summary, record it as initial identity but do not proceed as if the product is understood. Ask for one concrete material next, preferably PRD or product screenshots.

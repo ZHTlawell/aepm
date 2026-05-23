@@ -47,8 +47,8 @@ ${BOLD}WHAT IT CREATES${NC}
     <product_dir>/.qa-memory/
 
 ${BOLD}NEXT${NC}
-    将 PRD、产品图、接口文档、数据库说明、测试用例、历史 Bug、
-    测试报告、自动化说明放入 qa-onboarding-input/ 后继续初始化。
+    下一步只做一件事：提供第一份产品资料。
+    建议优先提供 PRD 或产品截图。
 EOF
         return 0
     fi
@@ -129,10 +129,15 @@ EOF
 
     ok "已创建 QA 入驻目录结构"
     echo ""
-    info "下一步：请上传、粘贴或放入产品资料。资料不足时 Agent 只会做完整度评分，不会追问细碎业务规则。"
+    info "下一步只做一件事：请提供第一份产品资料，建议优先提供 PRD 或产品截图。"
     echo ""
 
-    _qa_run_skill "ae-qa-product-init" "$product_dir"
+    if command -v claude &>/dev/null; then
+        _qa_run_skill "ae-qa-product-init" "$product_dir"
+    else
+        warn "Claude Code 未安装，已完成本地初始化。"
+        info "请回到 AI 对话中提供第一份产品资料；Agent 会继续做资料归档和熟悉度判断。"
+    fi
 }
 
 _qa_usage() {
