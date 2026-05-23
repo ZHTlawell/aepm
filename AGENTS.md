@@ -39,11 +39,12 @@ Q4 测试资产
 4. 给出命令：
 
 ```bash
-cp .qa-agent.example.yml <product_dir>/.qa-agent.yml
 ae qa product-init <product_dir>
 ```
 
-5. 给出资料包目录结构：
+5. 说明该命令会自动创建 `.qa-agent.yml`、`qa-onboarding-input/`、`qa/` 和 `.qa-memory/`。
+6. 告诉用户可以上传文件、粘贴内容或提供已有目录路径，Agent 负责归档。
+7. 给出资料包目录结构：
 
 ```text
 <product_dir>/qa-onboarding-input/

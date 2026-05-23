@@ -11,7 +11,7 @@ ae_qa() {
     shift
 
     case "$cmd" in
-        product-init)      _qa_run_skill "ae-qa-product-init" "$@" ;;
+        product-init)      _qa_product_init "$@" ;;
         start)             _qa_run_skill "ae-qa-start" "$@" ;;
         intake-check)      _qa_run_skill "ae-qa-intake-check" "$@" ;;
         onboard)           _qa_run_skill "ae-qa-onboard-project" "$@" ;;
@@ -29,6 +29,110 @@ ae_qa() {
             exit 1
             ;;
     esac
+}
+
+_qa_product_init() {
+    local product_dir="${1:-}"
+    if [[ -z "$product_dir" || "$product_dir" == "--help" || "$product_dir" == "-h" ]]; then
+        cat <<EOF
+${BOLD}ae qa product-init${NC} - 初始化一个产品专属 QA Agent
+
+${BOLD}USAGE${NC}
+    ae qa product-init <product_dir>
+
+${BOLD}WHAT IT CREATES${NC}
+    <product_dir>/.qa-agent.yml
+    <product_dir>/qa-onboarding-input/
+    <product_dir>/qa/
+    <product_dir>/.qa-memory/
+
+${BOLD}NEXT${NC}
+    将 PRD、产品图、接口文档、数据库说明、测试用例、历史 Bug、
+    测试报告、自动化说明放入 qa-onboarding-input/ 后继续初始化。
+EOF
+        return 0
+    fi
+
+    mkdir -p "$product_dir"
+    product_dir="$(cd "$product_dir" && pwd)"
+
+    local repo_root
+    repo_root="$(cd "$(dirname "$AE_CLI_DIR")" && pwd)"
+
+    if [[ ! -f "$product_dir/.qa-agent.yml" ]]; then
+        if [[ -f "$repo_root/.qa-agent.example.yml" ]]; then
+            cp "$repo_root/.qa-agent.example.yml" "$product_dir/.qa-agent.yml"
+        else
+            cat > "$product_dir/.qa-agent.yml" <<'EOF'
+project:
+  name: ""
+  type: ""
+  default_language: zh-CN
+  product_agent_mode: false
+  readiness_threshold: 85
+output:
+  directory: qa
+  memory_directory: .qa-memory
+issue_provider:
+  type: manual
+onboarding:
+  minimum_score_to_continue: 40
+  minimum_score_for_full_cases: 60
+  minimum_score_for_product_agent_mode: 85
+EOF
+        fi
+        ok "已创建 $product_dir/.qa-agent.yml"
+    else
+        ok "$product_dir/.qa-agent.yml 已存在，保留现有配置"
+    fi
+
+    mkdir -p \
+        "$product_dir/qa-onboarding-input/02-product-screens" \
+        "$product_dir/qa-onboarding-input/03-product-docs" \
+        "$product_dir/qa-onboarding-input/04-api-docs" \
+        "$product_dir/qa-onboarding-input/05-database-docs" \
+        "$product_dir/qa-onboarding-input/06-test-cases" \
+        "$product_dir/qa-onboarding-input/07-bug-history" \
+        "$product_dir/qa-onboarding-input/08-test-reports" \
+        "$product_dir/qa-onboarding-input/09-automation" \
+        "$product_dir/qa" \
+        "$product_dir/.qa-memory"
+
+    [[ -f "$product_dir/qa-onboarding-input/00-project-structure.md" ]] || cat > "$product_dir/qa-onboarding-input/00-project-structure.md" <<'EOF'
+# Project Structure
+
+请补充产品源码/项目结构、启动方式、环境地址、账号角色、模块边界。
+EOF
+
+    [[ -f "$product_dir/qa-onboarding-input/01-product-overview.md" ]] || cat > "$product_dir/qa-onboarding-input/01-product-overview.md" <<'EOF'
+# Product Overview
+
+请补充产品名称、产品类型、目标用户、核心流程和一句话定位。
+EOF
+
+    [[ -f "$product_dir/qa-onboarding-input/README.md" ]] || cat > "$product_dir/qa-onboarding-input/README.md" <<'EOF'
+# QA Onboarding Input
+
+请把资料放入对应目录：
+
+- 02-product-screens/: 产品图、页面截图、流程图
+- 03-product-docs/: PRD、需求文档、验收标准
+- 04-api-docs/: 接口文档、错误码、第三方依赖
+- 05-database-docs/: 数据库、数据模型、状态流转
+- 06-test-cases/: 已有测试用例
+- 07-bug-history/: 历史 Bug、线上问题、回归热点
+- 08-test-reports/: 历史测试报告、发布结论
+- 09-automation/: 自动化脚本、执行说明、覆盖报告
+
+也可以在对话中上传或粘贴资料，由 Agent 帮你归档。
+EOF
+
+    ok "已创建 QA 入驻目录结构"
+    echo ""
+    info "下一步：请上传、粘贴或放入产品资料。资料不足时 Agent 只会做完整度评分，不会追问细碎业务规则。"
+    echo ""
+
+    _qa_run_skill "ae-qa-product-init" "$product_dir"
 }
 
 _qa_usage() {

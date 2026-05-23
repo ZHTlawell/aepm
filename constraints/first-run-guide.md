@@ -8,15 +8,15 @@ After reading this repository, respond with:
 
 1. What this project is: a product-specific QA Agent framework.
 2. The immediate next step: create or choose one product directory.
-3. The materials the user should prepare before product initialization.
+3. Explain that product initialization creates the product Agent skeleton automatically.
 4. The exact command to run:
 
 ```bash
-cp .qa-agent.example.yml <product_dir>/.qa-agent.yml
 ae qa product-init <product_dir>
 ```
 
-5. A warning: do not mix documents from multiple products in one product Agent.
+5. Tell the user they can provide product materials by uploading files, pasting content, or providing existing paths.
+6. A warning: do not mix documents from multiple products in one product Agent.
 
 ## Do Not
 
@@ -26,7 +26,7 @@ ae qa product-init <product_dir>
 
 ## Suggested User Guidance
 
-Tell the user to prepare a product onboarding package:
+Tell the user that `ae qa product-init <product_dir>` creates this structure:
 
 ```text
 <product_dir>/
@@ -42,5 +42,6 @@ Tell the user to prepare a product onboarding package:
     07-bug-history/
     08-test-reports/
     09-automation/
+  qa/
+  .qa-memory/
 ```
-

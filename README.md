@@ -65,29 +65,38 @@ Q4 验证结论
 第一次阅读本项目后，下一步应该先创建或进入某个产品目录，然后初始化产品专属 QA Agent：
 
 ```bash
-cp .qa-agent.example.yml <product_dir>/.qa-agent.yml
 ae qa product-init <product_dir>
 ```
 
 熟悉度达到 85/100 后，Agent 才能进入该产品的专属测试模式。
 
-初始化前，请先准备产品资料包。不要只给一句产品简介后就期待 Agent 熟悉产品：
+`product-init` 会自动创建配置和资料包目录：
 
 ```text
-<product_dir>/qa-onboarding-input/
-  00-project-structure.md
-  01-product-overview.md
-  02-product-screens/
-  03-product-docs/
-  04-api-docs/
-  05-database-docs/
-  06-test-cases/
-  07-bug-history/
-  08-test-reports/
-  09-automation/
+<product_dir>/
+  .qa-agent.yml
+  qa-onboarding-input/
+    00-project-structure.md
+    01-product-overview.md
+    02-product-screens/
+    03-product-docs/
+    04-api-docs/
+    05-database-docs/
+    06-test-cases/
+    07-bug-history/
+    08-test-reports/
+    09-automation/
+  qa/
+  .qa-memory/
 ```
 
-如果暂时没有完整资料，可以先放已有资料；Agent 会先做完整度评分，然后告诉你还缺什么。资料不足时，它应该要求补资料，而不是直接追问细碎产品细节。
+之后用户可以通过三种方式补资料：
+
+1. 上传文件到对话。
+2. 粘贴文档内容。
+3. 把文件放入 `qa-onboarding-input/` 对应目录。
+
+Agent 应负责归档和判断资料类型。资料不足时，它应该要求补资料，而不是直接追问细碎产品细节。
 
 新测试人员接手项目时：
 

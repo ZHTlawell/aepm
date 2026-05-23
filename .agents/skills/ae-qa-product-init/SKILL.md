@@ -28,35 +28,53 @@ smoke_test:
 ## 输入
 
 - 产品项目目录或 QA 入驻包。
+- 用户在对话中上传的文件、粘贴的内容或提供的已有资料路径。
 - 可选：`.qa-agent.yml`。
 - 可选：PRD、产品图、接口文档、数据库说明、测试用例、测试报告、历史 Bug、自动化说明。
 
 ## 执行流程
 
 1. 读取 `constraints/product-agent-memory.md`、`constraints/material-intake.md` 和 `constraints/qa-onboarding.md`。
-2. 先确认产品目录和资料包位置，不要先追问产品业务细节。
-3. 检查资料包是否存在：
+2. 先确认产品目录。能创建目录时，自动创建：
+   - `.qa-agent.yml`
+   - `qa-onboarding-input/`
+   - `qa/`
+   - `.qa-memory/`
+3. 告诉用户可以通过三种方式提供资料：
+   - 上传文件
+   - 粘贴内容
+   - 提供已有文件或目录路径
+4. 对用户提供的资料进行归档：
+   - 产品图/截图/流程图 -> `qa-onboarding-input/02-product-screens/`
+   - PRD/需求/验收标准 -> `qa-onboarding-input/03-product-docs/`
+   - 接口文档 -> `qa-onboarding-input/04-api-docs/`
+   - 数据库/数据模型 -> `qa-onboarding-input/05-database-docs/`
+   - 测试用例 -> `qa-onboarding-input/06-test-cases/`
+   - 历史 Bug -> `qa-onboarding-input/07-bug-history/`
+   - 测试报告 -> `qa-onboarding-input/08-test-reports/`
+   - 自动化说明/脚本 -> `qa-onboarding-input/09-automation/`
+5. 检查资料包是否存在真实资料：
    - `.qa-agent.yml`
    - `qa-onboarding-input/`
    - 产品图、PRD、接口、数据库、测试用例、历史 Bug、测试报告、自动化资料等至少一类真实资料。
-4. 如果用户只提供一句产品简介或少量自然语言描述：
+6. 如果用户只提供一句产品简介或少量自然语言描述：
    - 只记录为“初始产品身份”。
    - 明确说明当前资料不足，不能进入产品专属 QA Agent 模式。
    - 输出资料清单，要求用户先补充文档或目录。
    - 不要开始询问细碎产品业务规则。
-5. 资料存在后，再识别产品身份：
+7. 资料存在后，再识别产品身份：
    - 产品名称
    - 产品类型
    - 目标用户
    - 核心业务闭环
    - 所属仓库/目录
-6. 检查是否已有 `.qa-memory/product-profile.md`。
+8. 检查是否已有 `.qa-memory/product-profile.md`。
    - 如果已有且产品身份不同，停止并提示创建新产品 Agent。
    - 如果已有且产品身份相同，进入记忆更新流程。
-7. 执行资料完整性检查，计算产品熟悉度评分。
-8. 资料检查后，再主动追问缺失信息。问题数量不做固定上限，但必须按优先级分批提问，目标是补齐产品/模块理解。
-9. 当熟悉度达到 85 分，生成或更新 `.qa-memory/`。
-10. 输出是否进入产品专属模式。
+9. 执行资料完整性检查，计算产品熟悉度评分。
+10. 资料检查后，再主动追问缺失信息。问题数量不做固定上限，但必须按优先级分批提问，目标是补齐产品/模块理解。
+11. 当熟悉度达到 85 分，生成或更新 `.qa-memory/`。
+12. 输出是否进入产品专属模式。
 
 ## 追问策略
 
@@ -67,7 +85,7 @@ smoke_test:
 只引导用户补充资料，不追问细节业务规则。示例：
 
 ```text
-请先把可用资料放到 <product_dir>/qa-onboarding-input/：
+我已经创建资料包目录。你可以上传文件、粘贴内容，或把可用资料放到 <product_dir>/qa-onboarding-input/：
 - 产品图或流程图
 - PRD / 需求文档
 - 接口文档
