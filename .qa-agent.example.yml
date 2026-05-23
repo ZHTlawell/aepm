@@ -1,0 +1,50 @@
+# QA Agent configuration example
+
+project:
+  name: Example Product
+  type: mobile-app
+  default_language: zh-CN
+  product_agent_mode: false
+  readiness_threshold: 85
+  product_identity:
+    repository_or_directory: ""
+    owner: ""
+    description: ""
+
+output:
+  directory: qa
+  memory_directory: .qa-memory
+
+issue_provider:
+  # Supported examples: manual, github, gitlab, jira, gitee, zentao, testrail
+  type: manual
+  repository: ""
+  project_key: ""
+  default_labels:
+    - qa
+    - bug
+
+onboarding:
+  minimum_score_to_continue: 40
+  minimum_score_for_full_cases: 60
+  minimum_score_for_product_agent_mode: 85
+  required_sources:
+    - project_structure
+    - product_docs
+    - test_cases
+
+risk_model:
+  high_risk_keywords:
+    - login
+    - permission
+    - payment
+    - subscription
+    - delete
+    - migration
+    - async
+    - cache
+
+release_gate:
+  block_on_p0_failure: true
+  block_on_open_critical: true
+  allow_conditional_go: true

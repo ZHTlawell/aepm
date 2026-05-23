@@ -1,348 +1,185 @@
-# AE PM Agent
+# AE QA Agent
 
-> 让 PM 通过 vibe coding 产出可直接上架的 iOS App。
+> 让测试人员快速熟悉陌生产品项目，并高效完成测试分析、用例设计、执行验证、缺陷回流和发布风险判断。
 
 ## 这是什么
 
-AE PM Agent 是一套 **AI 编程助手的指令和能力包**，安装后你的 AI 编码工具（Claude Code / Codex / Cursor 等）就具备了产品经理专属的工作流支持。
+AE QA Agent 是一套面向测试人员的 **AI 测试工作流能力包**。安装或链接后，Codex / Claude Code / Cursor 等 AI 编程助手可以按标准流程帮助 QA 进入项目、理解产品、识别风险、生成测试资产，并把验证结果沉淀为可复用的质量知识。
 
-它解决的核心问题是：**PM 用 vibe coding 做出的 demo 原型，与真正能上架 App Store 之间存在大量工程化环节。**
+它解决的核心问题是：测试人员接手一个新项目时，资料分散在源码、产品图、PRD、测试用例、历史 bug、测试报告、接口文档、数据库说明和自动化脚本中。靠人工串起来成本高，靠 AI 随意阅读又容易漏重点。AE QA Agent 把这个过程标准化为可检查、可追溯、可复用的测试入驻流程。
 
-设计原则是 **skill = 人类可确认中间品之间的变换**：整条流水线被拆成 4 个人类可审阅的中间品（M0→M3），每个 skill 负责把一个中间品变成下一个。PM 在每个中间品处可以停下来检查，确认无误再推进下一段。
+本项目面向开源使用。默认流程不绑定某个公司、缺陷平台或测试管理系统；GitHub、GitLab、Jira、Gitee、ZenTao、TestRail 等平台应通过 `.qa-agent.yml`、overrides 或 provider 适配器接入。
 
-## 中间品流水线
+QA Agent 是 **产品专属** 的：一个产品对应一个仓库或目录，一个 Agent 只维护一个产品的 QA Memory。如果用户提供第二个产品的需求或文档，Agent 会提示创建新的产品目录并初始化新的产品 Agent，避免跨产品记忆污染。
 
+## 核心流水线
+
+```text
+Q0 项目输入
+  源码 / PRD / Speckit / 产品图 / 测试用例 / Bug 单 / 测试报告 / API / DB / 自动化
+  |
+  | [Q0 -> Q0.5] /ae-qa-product-init
+  v
+Q0.5 产品专属初始化
+  产品身份、熟悉度评分、QA Memory、是否达到 85 分门槛
+  |
+  | [Q0.5 -> Q1] /ae-qa-start 或 /ae-qa-intake-check + /ae-qa-onboard-project
+  v
+Q1 产品理解包
+  产品定位、核心用户、主流程、模块地图、页面地图、业务规则、待确认问题
+  |
+  | [Q1 -> Q2] /ae-qa-consistency-check + /ae-qa-risk-scan
+  v
+Q2 测试地图
+  覆盖缺口、资料冲突、风险分级、冒烟路径、回归热点、优先级
+  |
+  | [Q2 -> Q3] /ae-qa-generate-cases
+  v
+Q3 测试资产
+  P0 冒烟用例、P1 核心回归、P2 模块回归、边界用例、自动化候选点
+  |
+  | [Q3 -> Q4] /ae-qa-change-impact + 执行验证 + /ae-qa-file-bugs + /ae-qa-release-check
+  v
+Q4 验证结论
+  测试报告、缺陷列表、阻塞项、回归范围、发布风险、Go / No-Go 建议
 ```
-M0  Idea ─────────────────────── 产品想法 / demo 雏形 / 参考 App
- │
- │  [M0 → M1] PM 工具箱（集合）
- │
-M1  Speckit ────────────────────  6 模块标准规格书（产品/场景/架构/设计/数据/API）
- │
- │  [M1 → M2] ae-speckit-to-app（核心段）
- │
-M2  本地可用程序 ───────────────── Route B 代码骨架 + E2E 跑通
- │
- │  [M2 → M3] 发布段
- │
-M3  TestFlight ──────────────── 可测 Build 已分发
-```
 
-一次通过率（first-pass yield）是核心度量：每段 skill 都尽量做到"一次跑完即成"，失败时通过 `/ae-report-fix` 回流修复经验。
+## v0.1 能力
 
-## 各段 skill 详解
+| 能力 | 命令 | 产物 |
+|------|------|------|
+| 产品专属初始化 | `/ae-qa-product-init` | 产品身份、熟悉度评分、QA Memory、是否进入产品专属模式 |
+| 新项目入驻总入口 | `/ae-qa-start` | 入驻汇总、资料缺口、关键风险、第一周测试建议 |
+| 入驻资料检查 | `/ae-qa-intake-check` | 资料完整度评分、缺失项、影响说明、下一步建议 |
+| 项目入驻理解 | `/ae-qa-onboard-project` | 产品理解包、模块地图、用户路径、开放问题 |
+| 资料一致性检查 | `/ae-qa-consistency-check` | PRD / 用例 / API / DB / bug / 自动化之间的冲突清单 |
+| 风险扫描 | `/ae-qa-risk-scan` | 风险地图、优先级、历史回归热点 |
+| 测试用例生成 | `/ae-qa-generate-cases` | 分级测试用例、冒烟清单、回归清单、自动化候选 |
+| 变更影响分析 | `/ae-qa-change-impact` | 影响模块、建议回归范围、历史 bug 关联、风险提示 |
+| 缺陷回流 | `/ae-qa-file-bugs` | 结构化缺陷内容、查重、确认后提交 |
+| 发布准入检查 | `/ae-qa-release-check` | Go / Conditional Go / No-Go 结论 |
+| 新模块测试规划 | `/ae-qa-new-module-test` | 可选择的测试任务清单，用户选择后继续执行 |
 
-### M0 → M1：PM 工具箱（集合）
+## 推荐执行顺序
 
-把"想法/参考 App/demo"变成规范化的 Speckit。依据起点不同，选择合适的入口：
-
-| Skill | 说明 | 触发命令 |
-|-------|------|---------|
-| `/ae-app-to-speckit` | 从已上架 App 逆向提取 speckit（iPhone + USB + WDA） | `/ae-app-to-speckit` |
-| `/ae-demo-to-speckit` | 从 demo 源码自动提取 6 模块 Speckit | `/ae-demo-to-speckit` |
-| `/ae-speckit-brainstorm` | 从零开始与 PM 对话共创 Speckit（无 demo / 无参考 App） | `/ae-speckit-brainstorm` |
-
-**输出：** `speckit/` 目录，人类可审阅。
-
-### M1 → M2：ae-speckit-to-app（核心段）
-
-| Skill | 说明 | 触发命令 |
-|-------|------|---------|
-| `/ae-speckit-to-app` | Route B 约束 + 代码模板包 + Precheck P1~P6，从 Speckit 生成本地可用程序 | `/ae-speckit-to-app` |
-
-这是 PM 产品线最核心、技术约束最密集的一段。skill 本身是**薄 harness**，只做约束透传 + 模板装配 + precheck，具体构建由外部 harness（ae-dev / Claude Code / Codex）驱动。**生产就绪预检（CocoaPods 权限 / Apple ID / BCConfig / pod install / 后端 stage）已内置**，原独立 `/ae-preflight` 已退休合并。
-
-**输出：** 可在模拟器/真机本地运行的 iOS 工程（含后端）。
-
-### M2 → M3：发布段
-
-**主干：**
-
-| Skill | 说明 | 触发命令 |
-|-------|------|---------|
-| `/ae-app-to-testflight` | 签名 → Archive → Upload → TestFlight 分发 | `/ae-app-to-testflight` |
-
-**可选 integrate 能力（按产品需要后置补入，不影响主流程）：**
-
-| Skill | 说明 | 依赖 Pod |
-|-------|------|---------|
-| `/ae-analytics-integrate` | Firebase Analytics + Adjust 双轨埋点 | BCSensor / BCAdjust / BCTrack |
-| `/ae-paywall-integrate` | Paywall UI + BCStoreKit 订阅封装 + 沙盒验证 | BCStoreKit + BCAccount |
-| `/ae-notification-integrate` | 本地通知全流程（schedule / 权限 / 点击追踪） | BCUserNotification + BCPermission |
-| `/ae-feedback-integrate` | 业务嵌入反馈 + 弹窗式 survey | BCFeedback |
-| `/ae-i18n-integrate` | 多语言文案 + InfoPlist + 埋点英文一致性 | CL10nKit + BCLocalization |
-| `/ae-abtest-integrate` | AB 实验注册 + preload + 神策后台协同 | BCSensor (BCABTest) |
-| `/ae-onboarding-integrate` | HTML 原型 + Welcome_XX Pod + AB 变体 + 评分引导 | Welcome + BCAppReviewPrompt |
-
-**输出：** TestFlight 可测 Build。
-
-## Utility Skills
-
-下列 skill 不在主线 M0→M3 流水线上，但在日常 PM 工作中按需触发。源码保留在 `skills/pm/` 下。
-
-**产品质量类：**
-
-| Skill | 一句话定位 |
-|-------|-----------|
-| `/ae-verify-app` | E2E 对比 demo vs 成品，自动归因差异 |
-| `/ae-file-bugs` | 从 verify 报告批量生成 issue 并提交 |
-| `/ae-app-review-check` | 对照 Apple Review Guidelines + AI 审核规则自检 |
-| `/ae-legal-generate` | 法务三件套生成（Privacy Policy + Terms of Use + Subscription Terms 7 要素）|
-| `/ae-asc-submit` | ASC 元数据配置 + 截图上传 + Review Notes + 提交审核 |
-
-**素材/设计类：**
-
-| Skill | 一句话定位 |
-|-------|-----------|
-| `/ae-demo-to-figma` | 将 demo 原型导入 Figma 设计稿 |
-| `/ae-image-decopyrighter` | 图片 AI 重绘去版权化（Gemini Imagen 4.0） |
-
-**工程基础类：**
-
-| Skill | 一句话定位 |
-|-------|-----------|
-| `/ae-prod-to-local` | 将线上项目转为本地可编译运行的配置 |
-
-**反馈与能力请求：**
-
-| Skill | 一句话定位 |
-|-------|-----------|
-| `/ae-submit-bug` | 结构化 Bug 报告（含查重 + 验证标准）|
-| `/ae-submit-requirement` | 结构化能力需求提交 |
-| `/ae-report-fix` | 本地修复成功后结构化回流方案给 AE Team |
-| `/ae-lark-feishu` | 飞书消息读写、搜索、会议纪要 |
-
-**Meta：**
-
-| Skill | 一句话定位 |
-|-------|-----------|
-| `/ae-skill-creator` | 造 skill 的 skill（六段标准 + 审计模式） |
-
-## 路线：Route B
-
-PM 产品线路线定调为 **Route B**（Route A 不再维护）：
-
-- **工程形态：** CocoaPods 依赖管理（不用 SPM），多 target Xcode 工程
-- **SDK 栈：** BCStoreKit（支付）+ BCSensor（埋点）+ BCAdjust（归因）+ BCNetwork（网络）
-- **构建流程：** Work Chain 12 步（从环境预检到 Archive 的固定流水线）
-- **约束位置：** `/ae-speckit-to-app` skill 内置所有 Route B 约束 + 代码模板，harness 只负责透传
-
-关联 issue：[#II8UYE](https://gitee.com/turningsyn/ae-pm/issues/II8UYE) / [#II8RAE](https://gitee.com/turningsyn/ae-pm/issues/II8RAE) / [#IJC8D4](https://gitee.com/turningsyn/ae-platform/issues/IJC8D4)
-
-## 核心原则
-
-1. **Skill = 人类可确认中间品之间的变换** — 每段 skill 有明确输入输出中间品（M0/M1/M2/M3），PM 可在中间品处停检。
-2. **Harness 薄，透传约束** — skill 本身不重复造轮子，把 Route B 约束和代码模板打包交给外部 harness（ae-dev / Claude Code）执行。
-3. **一次通过率为核心度量** — 每段 skill 的目标都是 first-pass yield，失败即通过 `/ae-report-fix` 回流修复。
-
-## 快速开始
-
-### 前置要求
-
-- AI 编码工具（Claude Code / Codex / Cursor / Antigravity 任选）
-- Gitee 账号（[注册地址](https://gitee.com)）
-
-### 一键搭建（推荐）
+第一次阅读本项目后，下一步应该先创建或进入某个产品目录，然后初始化产品专属 QA Agent：
 
 ```bash
-# 1. 克隆 ae-pm 并运行安装脚本（首次安装）
-git clone https://gitee.com/turningsyn/ae-pm.git ~/.ae/pm
-bash ~/.ae/pm/cli/install.sh
-
-# 2. 一键搭建环境（安装依赖 + 配置 Token + 入驻确认）
-ae setup
+cp .qa-agent.example.yml <product_dir>/.qa-agent.yml
+ae qa product-init <product_dir>
 ```
 
-> 首次 `git clone` 需要你已在本机配置好 Gitee 企业版 git 凭证（`git config user.name/email` + 通过 SSH key 或 token 有 turningsyn 组织的读取权限）。如果 clone 报 403，联系 AE Team 开通权限。
+熟悉度达到 85/100 后，Agent 才能进入该产品的专属测试模式。
 
-`bash install.sh` 会把 ae CLI 软链到 `~/.ae/bin/ae`，并尝试克隆 ae-go / ae-dev（已有则跳过）。
-
-`ae setup` 会自动完成：
-- 交互式配置 Gitee Token（引导你生成并验证）
-- 环境健康检查
-- 自动完成入驻确认
-
-### 第一次使用（最小命令序列）
+新测试人员接手项目时：
 
 ```bash
-# 1. 在项目目录中启用
-cd 你的项目目录
-ae link pm .
-
-# 2. 打开 AI 编码工具（Claude Code / Codex / Cursor）
-# 然后根据起点选择入口 skill：
-
-# 起点是 demo 源码：
-/ae-demo-to-speckit
-# 起点是已上架 App：
-/ae-app-to-speckit
-# 起点只是想法：
-/ae-speckit-brainstorm
-
-# 3. Speckit 生成后，构建本地可用程序（M1→M2 核心）
-/ae-speckit-to-app
-
-# 4. 按产品需要接入后置 integrate（可选，不影响能否上 TestFlight）
-#    典型顺序：埋点先接（投放归因必需）→ 付费墙 → 通知/反馈/多语言/AB/onboarding
-/ae-analytics-integrate      # 必装（投放归因 + 埋点后台）
-/ae-paywall-integrate        # 有付费模型则装
-/ae-notification-integrate   # 需要本地提醒/召回则装
-/ae-feedback-integrate       # 需要用户满意度信号则装
-/ae-i18n-integrate           # 出海多语言则装
-/ae-abtest-integrate         # 需要 A/B 实验则装
-/ae-onboarding-integrate     # 需要欢迎引导 + AB 变体则装
-
-# 5. 发布到 TestFlight
-/ae-app-to-testflight
-
-# 6. 提审 App Store（可选）
-/ae-app-review-check  →  /ae-asc-submit
+ae qa start <project_or_package_dir>
 ```
 
-### 更新（一次更新，所有项目生效）
+或分步执行：
 
 ```bash
-ae update
+ae qa intake-check <project_or_package_dir>
+ae qa onboard <project_or_package_dir>
+ae qa consistency-check <project_or_package_dir>
+ae qa risk-scan <project_or_package_dir>
+ae qa generate-cases <project_or_package_dir>
 ```
 
-通过软链接挂载的 skills 自动更新，无需逐项目操作。
-
-**`ae update` 会自动处理的事：**
-
-- 拉取 `~/.ae/pm/` 最新 CHANGELOG 和 skill 源码
-- 刷新所有项目 `.claude/skills/` 的软链接指向新版本
-- **自动清理失效软链接**（指向已退休 skill 的链接，如 `ae-paywall-design` / `ae-onboarding-design` / `ae-preflight` / `ae-prod-data-feedback-report` 下线后，链接会被静默移除）
-- 共享 skill（如 `ae-lark-feishu` 同时存在于 pm/go）不再随每次 update 在角色之间来回切换
-- 重复运行幂等（无新变动时静默 no-op）
-
-### 手动搭建
-
-如果 `ae setup` 不适用，可以手动操作：
-
-<details>
-<summary>展开手动步骤</summary>
-
-**Step 1: 全局安装**
+版本迭代或需求变更时：
 
 ```bash
-mkdir -p ~/.ae
-git clone https://gitee.com/turningsyn/ae-pm.git ~/.ae/pm
+ae qa change-impact <diff_or_requirement>
+ae qa risk-scan <project_or_package_dir>
+ae qa generate-cases <project_or_package_dir>
+ae qa release-check <project_or_package_dir>
 ```
 
-**Step 2: 配置 Token**
+也可以在 AI 工具中直接触发：
 
-```bash
-mkdir -p ~/.config/ae
-cat > ~/.config/ae/credentials.env << 'EOF'
-GITEE_TOKEN=你的gitee_access_token
-EOF
-chmod 600 ~/.config/ae/credentials.env
+```text
+/ae-qa-product-init
+/ae-qa-start
+/ae-qa-intake-check
+/ae-qa-onboard-project
+/ae-qa-consistency-check
+/ae-qa-risk-scan
+/ae-qa-generate-cases
+/ae-qa-change-impact
+/ae-qa-file-bugs
+/ae-qa-release-check
+/ae-qa-new-module-test
 ```
 
-Token 生成地址：https://gitee.com/profile/personal_access_tokens（需要 `issues` 和 `projects` 权限）
+## 测试入驻包
 
-**Step 3: 在项目中启用**
+推荐把项目资料整理成一个入驻包，资料越完整，Agent 的判断越可靠。
 
-```bash
-cd 你的项目目录
-ae link pm .
+```text
+qa-onboarding-input/
+  00-project-structure.md
+  01-product-overview.md
+  02-product-screens/
+  03-product-docs/
+  04-api-docs/
+  05-database-docs/
+  06-test-cases/
+  07-bug-history/
+  08-test-reports/
+  09-automation/
 ```
 
-**Step 4: 验证**
+Agent 输出建议统一放到：
 
-```bash
-ae doctor
+```text
+qa/
+  01-product-brief.md
+  02-module-map.md
+  03-user-journeys.md
+  04-business-rules.md
+  05-api-data-map.md
+  06-risk-map.md
+  07-existing-test-coverage.md
+  08-regression-hotspots.md
+  09-test-cases.md
+  10-open-questions.md
 ```
 
-</details>
+## 设计原则
 
-### 项目结构示意
+1. **先校验资料，再做判断**：资料不全时必须标注缺口和影响，禁止自信补全。
+2. **结论必须可追溯**：关键判断要写明来源，例如 PRD、接口文档、历史 bug、源码路径或测试报告。
+3. **先理解，再覆盖，再执行**：不要跳过产品理解直接生成用例。
+4. **风险驱动优先级**：历史 bug、高复杂度链路、权限、支付、数据删除、状态流转、外部依赖优先。
+5. **沉淀项目 QA Memory**：入驻结果应能被后续回归、变更影响分析和缺陷提交复用。
 
-```
-~/.ae/                          ← 全局安装（只有一份）
-├── bin/
-│   └── ae                      ← ae CLI（由 install.sh 软链）
-├── pm/                         ← ae-pm（PM 角色）
-│   ├── CLAUDE.md
-│   ├── .claude/skills/
-│   │   ├── ae-speckit-brainstorm/SKILL.md
-│   │   ├── ae-speckit-to-app/SKILL.md
-│   │   ├── ae-paywall-integrate/SKILL.md
-│   │   ├── ae-analytics-integrate/SKILL.md
-│   │   ├── ae-app-to-testflight/SKILL.md
-│   │   └── ...
-│   ├── README.md
-│   └── CHANGELOG.md
-├── go/                         ← ae-go（全员通用，手机/桌面自动化）
-│   ├── .claude/skills/
-│   │   ├── ae-mobile-setup/SKILL.md
-│   │   ├── ae-mobile-agent/SKILL.md
-│   │   └── ...
-│   └── scripts/                ← wda-start.sh / mobile-precheck.sh 等
-└── dev/                        ← ae-dev（开发者角色）
+## 仓库结构
 
-~/.config/ae/
-├── credentials.env             ← GITEE_TOKEN / GEMINI_API_KEY 等
-└── .update-available           ← ae update 缓存（自动管理）
-
-~/Projects/YourApp/             ← 你的项目（任意多个）
-├── .claude/skills/             ← 软链接到 ~/.ae/pm/.claude/skills/
-├── CLAUDE.md
-└── ...
+```text
+AGENTS.md                 QA Agent 行为准则
+README.md                 项目说明
+manifest.yml              QA 能力清单
+cli/ae                    AE CLI 入口
+cli/lib/qa/commands.sh    QA 子命令
+constraints/              QA 方法、用例、缺陷、质量门禁约束
+.agents/skills/ae-qa-*    QA skills
+scripts/                  可选平台适配、截图、OCR、报告等辅助脚本
 ```
 
-## 已退休 skill
+## 配置
 
-下列 skill 已下线，源码目录已删除。新用户请直接使用替代方案：
+复制 [.qa-agent.example.yml](C:/Users/30203/Desktop/aepm/.qa-agent.example.yml:1) 为 `.qa-agent.yml` 后按项目调整：
 
-| 已退休 | 退休原因 | 替代方案 |
-|--------|---------|---------|
-| `/ae-superwall-setup` | Route A 遗产 | Route B → `/ae-speckit-to-app` |
-| `/ae-paywall-design` | 纯 UI 产出无订阅逻辑，不足端到端 | `/ae-paywall-integrate`（v0.51.0 合并）|
-| `/ae-onboarding-design` | 同上 | `/ae-onboarding-integrate`（v0.56.0 合并）|
-| `/ae-preflight` | 独立 precheck 已融入 M1→M2 核心 | `/ae-speckit-to-app` 内部 Precheck P1~P6 |
-| `/ae-prod-data-feedback-report` | 三件套不完整 + 使用频率低 | 暂无；如需产品数据分析，PM 自行 SQL 查神策 / Firebase |
-
-## 反馈与贡献
-
-### 遇到问题？
-
-在 Claude Code 中使用 `/ae-submit-bug`，或告诉 agent：
-
-> "帮我提一个 bug：[描述你的问题]"
-
-或直接用 CLI：
-
-```bash
-ae pm submit-bug "问题标题" "问题描述"
+```yaml
+issue_provider:
+  type: manual
+  repository: ""
+  project_key: ""
 ```
 
-### 想要新能力？
+`manual` 表示只生成结构化缺陷正文，不自动提交。团队可以扩展为 `github`、`gitlab`、`jira`、`gitee`、`zentao` 或 `testrail`。
 
-使用 `/ae-submit-requirement`。**每个需求必须是可复用机制**，而非一次性任务。
+## 开源贡献
 
-### Meta skill
-
-- `/ae-skill-creator` — 造 skill 的 skill，标准化 skill 构建流程（六段标准 + 审计模式）
-
-## 关联 Issue
-
-**活跃 review / umbrella（当前跟进）**：
-
-- [#IJD7GE](https://gitee.com/turningsyn/ae-pm/issues/IJD7GE) — `[REVIEW] ae-speckit-to-app SKILL.md` 技术合理性审核（含 26 条 P0 + integrate 系列拆分 + S1~T3 dogfood gap 跟进）
-
-**历史路线 / 结构性决策**：
-
-- [#IJC8D4](https://gitee.com/turningsyn/ae-platform/issues/IJC8D4) — PM 产品线结构性重写（M0→M3 中间品流水线）
-- [#II8UYE](https://gitee.com/turningsyn/ae-pm/issues/II8UYE) — Route B 路线定调
-- [#II8RAE](https://gitee.com/turningsyn/ae-pm/issues/II8RAE) — 埋点与支付整合
-
-## 版本历史
-
-查看 [CHANGELOG.md](CHANGELOG.md) 了解完整更新记录。
-
-当前版本：**v0.66.0**
-
-## 由谁维护
-
-AE Team（Agent Engineering Team）。代码变更仅通过 AE Team 发布，PM 通过 issue 和需求 skill 参与贡献。
+贡献指南见 [CONTRIBUTING.md](C:/Users/30203/Desktop/aepm/CONTRIBUTING.md:1)。新增能力时请保持通用、可配置、可追溯，不要把私有平台规则硬编码进 skill。

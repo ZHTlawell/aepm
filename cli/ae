@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ae — unified CLI for AE Platform (PM + Dev + Go agent infrastructure)
-# https://gitee.com/turningsyn/ae-platform
+# ae - unified CLI for AE QA Agent infrastructure
 
 AE_VERSION="0.1.0"
 AE_HOME="${AE_HOME:-$HOME/.ae}"
 
-# Resolve symlinks to find the real script location (fixes ~/.ae/bin/ae symlink)
 _AE_SCRIPT="${BASH_SOURCE[0]}"
 while [[ -L "$_AE_SCRIPT" ]]; do
     _AE_DIR="$(cd "$(dirname "$_AE_SCRIPT")" && pwd)"
@@ -17,7 +15,6 @@ done
 AE_CLI_DIR="$(cd "$(dirname "$_AE_SCRIPT")" && pwd)"
 AE_LIB_DIR="$AE_CLI_DIR/lib"
 
-# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
@@ -32,71 +29,52 @@ err()   { echo -e "${RED}[ae]${NC} $*" >&2; }
 
 usage() {
     cat <<EOF
-${BOLD}ae${NC} v${AE_VERSION} — AE Platform CLI
+${BOLD}ae${NC} v${AE_VERSION} - AE QA Agent CLI
 
 ${BOLD}USAGE${NC}
     ae <command> [args...]
 
 ${BOLD}COMMANDS${NC}
-    ${BOLD}setup${NC} [role]          一键搭建环境（install + creds + doctor + 入驻）
-    ${BOLD}install${NC}              安装所有依赖（AXe、Java 17 等）
-    ${BOLD}doctor${NC}               检查环境是否就绪
-    ${BOLD}update${NC}               更新 ae-pm + ae-dev + ae-speckit-examples
+    ${BOLD}qa${NC} <subcommand>       QA 项目入驻与测试工作流
+        product-init <dir>             初始化一个产品专属 QA Agent
+        start <dir>                    新项目 QA 入驻总入口
+        intake-check <dir>             检查测试入驻资料完整性
+        onboard <dir>                  生成产品理解包和 QA Memory
+        consistency-check <dir>        检查资料冲突和覆盖缺口
+        risk-scan <dir>                生成风险地图
+        generate-cases <dir>           生成分级测试用例
+        change-impact <target>         分析变更影响和回归范围
+        file-bugs <report>             结构化整理并提交缺陷
+        release-check <dir>            发布前质量门禁判断
+        new-module-test <target>       新模块测试任务规划
 
-    ${BOLD}pm${NC} <subcommand>      PM 工作流
-        demo-to-speckit <demo_dir>     从 demo 提取 speckit
-        verify-app <demo> <prod>       E2E 对比 demo vs 成品
-        submit-requirement             提交可复用能力需求
-        submit-bug <title> [body]      提交 bug 报告
-        file-bugs <report.json>        从 verify 报告批量提 bug
-        validate-speckit <dir>         校验 speckit 格式
-
-    ${BOLD}dev${NC} <subcommand>     Dev 工作流
-        speckit-receive <speckit_dir>  从 speckit 生成项目
-        ios-build <project_dir>        iOS 编译验证
-        ios-test <app_path>            iOS UI 测试
-        backend-build <project_dir>   后端编译+启动验证
-
-    ${BOLD}go${NC} <subcommand>      全员通用
-        submit-bug <title> [body]      向 AE Team 提交 bug 报告
-        submit-requirement <title>     向 AE Team 提交能力需求
-
-    ${BOLD}git${NC} <subcommand>     Gitee API 统一工具
+    ${BOLD}git${NC} <subcommand>      可选的 Gitee API 适配器
         issues list/get/create/comment/list-comments/close/edit/edit-comment
         upload-image --repo REPO --file PATH
         auth validate/user
 
-    ${BOLD}asc${NC} <subcommand>     App Store Connect API 工具
-        auth validate                      验证 ASC 凭据
-        app list/create                    App 管理
-        bundle-id list/register            Bundle ID 管理
-        testflight list-builds/create-group/add-tester/set-compliance
-
-    ${BOLD}sensors${NC} <subcommand>  神策数据查询工具
-        sql <SQL>                          执行自定义 SQL
-        events [--top N]                   列出事件及数量
-        count [--days N]                   查询事件总数
-        fields [--event NAME]              列出字段
-
-    ${BOLD}link${NC} <role> [dir]    在项目中启用 ae-pm / ae-dev / ae-go
-    ${BOLD}feedback${NC}             管理使用反馈（查看/上传/清除）
-    ${BOLD}manifest${NC} <sub> <role> 生成/查看能力清单（generate | show）
-    ${BOLD}version${NC}              显示版本
-    ${BOLD}help${NC}                 显示帮助
+    ${BOLD}setup${NC} [role]          一键搭建环境
+    ${BOLD}install${NC}               安装依赖
+    ${BOLD}doctor${NC}                检查环境
+    ${BOLD}update${NC}                更新 AE 组件
+    ${BOLD}link${NC} <role> [dir]     在项目中启用 AE 能力
+    ${BOLD}feedback${NC}              管理使用反馈
+    ${BOLD}manifest${NC} <sub> <role> 生成/查看能力清单
+    ${BOLD}version${NC}               显示版本
+    ${BOLD}help${NC}                  显示帮助
 
 ${BOLD}EXAMPLES${NC}
-    ae setup                          # 一键搭建环境
-    ae install                        # 安装所有依赖
-    ae doctor                         # 检查环境
-    ae pm demo-to-speckit ./ShoeLens  # 提取 speckit
-    ae link pm .                      # 在当前项目启用 ae-pm
-
-${BOLD}ENVIRONMENT${NC}
-    AE_HOME    安装目录（默认 ~/.ae）
+    ae qa product-init ./my-product
+    ae qa start ./qa-onboarding-input
+    ae qa intake-check ./qa-onboarding-input
+    ae qa onboard .
+    ae qa risk-scan .
+    ae qa generate-cases .
+    ae qa change-impact "git diff main...HEAD"
+    ae qa new-module-test ./docs/new-module-prd.md
 EOF
 }
 
-# Source sub-module (supports nested paths like "pm/commands")
 source_lib() {
     local lib="$AE_LIB_DIR/$1.sh"
     if [[ ! -f "$lib" ]]; then
@@ -106,7 +84,6 @@ source_lib() {
     source "$lib"
 }
 
-# Main dispatch
 main() {
     if [[ $# -eq 0 ]]; then
         usage
@@ -117,6 +94,10 @@ main() {
     shift
 
     case "$cmd" in
+        qa)
+            source_lib "qa/commands"
+            ae_qa "$@"
+            ;;
         setup)
             source_lib "setup"
             ae_setup "$@"
@@ -133,18 +114,6 @@ main() {
             source_lib "update"
             ae_update "$@"
             ;;
-        pm)
-            source_lib "pm/commands"
-            ae_pm "$@"
-            ;;
-        dev)
-            source_lib "dev/commands"
-            ae_dev "$@"
-            ;;
-        go)
-            source_lib "go/commands"
-            ae_go "$@"
-            ;;
         git)
             local ae_git="$(dirname "$AE_CLI_DIR")/scripts/ae-git.py"
             if [[ ! -f "$ae_git" ]]; then
@@ -152,22 +121,6 @@ main() {
                 exit 1
             fi
             python3 "$ae_git" "$@"
-            ;;
-        asc)
-            local ae_asc="$(dirname "$AE_CLI_DIR")/scripts/ae-asc.py"
-            if [[ ! -f "$ae_asc" ]]; then
-                err "ae-asc.py 未找到: $ae_asc"
-                exit 1
-            fi
-            python3 "$ae_asc" "$@"
-            ;;
-        sensors)
-            local ae_sensors="$(dirname "$AE_CLI_DIR")/scripts/sensors-query.py"
-            if [[ ! -f "$ae_sensors" ]]; then
-                err "sensors-query.py 未找到: $ae_sensors"
-                exit 1
-            fi
-            python3 "$ae_sensors" "$@"
             ;;
         link)
             source_lib "link"

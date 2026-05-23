@@ -1,28 +1,24 @@
 #!/usr/bin/env bash
-# ae link — enable ae-go / ae-pm / ae-dev in a project
-#
-# Shared skills (e.g., ae-lark-feishu) exist in every role's build.
-# When linking multiple roles, duplicate skills are simply skipped (dedup).
+# ae link - enable AE skills in a project
 
 ae_link() {
     if [[ $# -lt 1 ]]; then
         cat <<EOF
-${BOLD}ae link${NC} — 在项目中启用 ae-go / ae-pm / ae-dev
+${BOLD}ae link${NC} - 在项目中启用 AE 能力
 
 ${BOLD}USAGE${NC}
     ae link <role> [project_dir]
 
 ${BOLD}ROLES${NC}
-    go      启用全员通用能力（飞书、issue 等）
-    pm      启用 PM 工作流（skills + 约束）
-    dev     启用 Dev 工作流（skills + 约束）
-    all     同时启用 go + pm + dev
+    qa      启用 QA 测试入驻与测试工作流
+    go      启用通用能力（兼容）
+    pm      启用旧版 PM 能力（兼容）
+    dev     启用 Dev 能力（兼容）
+    all     同时启用 qa + go + pm + dev
 
 ${BOLD}EXAMPLES${NC}
-    ae link go .              # 在当前目录启用 ae-go
-    ae link pm .              # 在当前目录启用 ae-pm
-    ae link dev ./MyProject   # 在 MyProject 启用 ae-dev
-    ae link all .             # 同时启用
+    ae link qa .
+    ae link all ./MyProject
 EOF
         exit 0
     fi
@@ -32,171 +28,71 @@ EOF
     project_dir="$(cd "$project_dir" && pwd)"
 
     case "$role" in
-        go)   _link_role "go" "$project_dir" ;;
-        pm)   _link_role "pm" "$project_dir" ;;
-        dev)  _link_role "dev" "$project_dir" ;;
+        qa|go|pm|dev) _link_role "$role" "$project_dir" ;;
         all)
+            _link_role "qa" "$project_dir"
             _link_role "go" "$project_dir"
             _link_role "pm" "$project_dir"
             _link_role "dev" "$project_dir"
             ;;
         *)
-            err "未知角色: $role (可选: go, pm, dev, all)"
+            err "未知角色: $role (可选: qa, go, pm, dev, all)"
             exit 1
             ;;
     esac
 
     echo ""
-    ok "完成！启动你的 AI 编码工具即可使用 AE 能力。"
+    ok "完成。启动你的 AI 编程工具即可使用 AE 能力。"
 }
-
-# Extract permissions.allow from all SKILL.md frontmatter and merge into
-# the project's .claude/settings.local.json so users don't have to manually
-# configure allow rules for each skill.
-#
-# SKILL.md frontmatter format:
-#   ---
-#   name: ae-app-to-speckit
-#   permissions:
-#     allow:
-#       - "Bash(curl:*)"
-#       - "mcp__mobile-mcp__*"
-#   ---
-#
-# Template variable {workdir} is replaced with the actual project directory.
-_merge_skill_permissions() {
-    local project_dir="$1"
-    local ae_role_dir="$2"
-    local settings_file="$project_dir/.claude/settings.local.json"
-
-    # Extract permissions from:
-    #   1) cli/config/base-permissions.yml  — 日常开发通用权限
-    #   2) 各 SKILL.md frontmatter          — skill 专用权限
-    # 合并到 settings.local.json
-    mkdir -p "$project_dir/.claude"
-    local added
-    added=$(python3 - "$ae_role_dir" "$project_dir" "$settings_file" "$AE_CLI_DIR" <<'PYEOF'
-import sys, os, yaml, json
-
-ae_role_dir, project_dir, settings_file, cli_dir = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-skills_dir = os.path.join(ae_role_dir, ".claude", "skills")
-
-new_perms = []
-
-# 1. Load base permissions from cli/config/base-permissions.yml
-base_perm_file = os.path.join(cli_dir, "config", "base-permissions.yml")
-if os.path.isfile(base_perm_file):
-    try:
-        with open(base_perm_file) as f:
-            base = yaml.safe_load(f.read())
-        for p in (base.get("permissions") or {}).get("allow") or []:
-            p = p.replace("{workdir}", project_dir)
-            if p not in new_perms:
-                new_perms.append(p)
-    except:
-        pass
-
-# 2. Collect permissions from all SKILL.md frontmatter
-if os.path.isdir(skills_dir):
-    for name in sorted(os.listdir(skills_dir)):
-        skill_md = os.path.join(skills_dir, name, "SKILL.md")
-        if not os.path.isfile(skill_md):
-            continue
-        with open(skill_md) as f:
-            content = f.read()
-        parts = content.split("---", 2)
-        if len(parts) < 3:
-            continue
-        try:
-            fm = yaml.safe_load(parts[1])
-        except:
-            continue
-        if not isinstance(fm, dict):
-            continue
-        for p in (fm.get("permissions") or {}).get("allow") or []:
-            p = p.replace("{workdir}", project_dir)
-            if p not in new_perms:
-                new_perms.append(p)
-
-if not new_perms:
-    print("0")
-    sys.exit(0)
-
-# 3. Merge into settings.local.json
-settings = {}
-if os.path.isfile(settings_file):
-    try:
-        with open(settings_file) as f:
-            settings = json.load(f)
-    except:
-        pass
-
-existing = settings.setdefault("permissions", {}).setdefault("allow", [])
-added = 0
-for p in new_perms:
-    if p not in existing:
-        existing.append(p)
-        added += 1
-
-if added > 0:
-    with open(settings_file, "w") as f:
-        json.dump(settings, f, indent=2, ensure_ascii=False)
-        f.write("\n")
-
-print(added)
-PYEOF
-    ) || return 0
-
-    if [[ "$added" != "0" ]]; then
-        ok "  合并了 ${added} 条权限到 settings.local.json（含通用 + skill 专用）"
+_role_dir_candidates() {
+    local role="$1"
+    local repo_root
+    repo_root="$(cd "$(dirname "$AE_CLI_DIR")" && pwd)"
+    echo "$AE_HOME/$role"
+    if [[ "$role" == "qa" ]]; then
+        echo "$repo_root"
+        echo "$AE_HOME/pm"
     fi
 }
 
-# Register ~/.ae/<role>/.claude/skills in Claude Code global settings so
-# skills are available in every workspace without per-project symlinks.
-# Delegates to install.sh:_register_global_skills which handles:
-#   - additionalDirectories in ~/.claude/settings.json
-#   - skill permission merging
-#   - ~/.claude/skills/<name> symlink creation + stale-link pruning
-_register_link_global_skills() {
+_find_role_dir() {
     local role="$1"
-    source_lib "install"
-    _register_global_skills "$role"
+    local d
+    while IFS= read -r d; do
+        [[ -d "$d/.agents/skills" || -d "$d/.claude/skills" ]] && {
+            echo "$d"
+            return 0
+        }
+    done < <(_role_dir_candidates "$role")
+    return 1
 }
 
-# Record a (role, project_dir) pair in ~/.ae/.linked-projects so that
-# ae update can refresh symlinks when new skills are added.
-_track_linked_project() {
-    local role="$1"
-    local project_dir="$2"
-    local registry="$AE_HOME/.linked-projects"
-
-    local entry="$role	$project_dir"
-    if [[ -f "$registry" ]] && grep -qxF "$entry" "$registry" 2>/dev/null; then
-        return 0  # already tracked
-    fi
-    echo "$entry" >> "$registry"
-}
-
-# Sync skill symlinks for a single role into a project. Creates missing
-# symlinks and removes broken ones. Used by both ae link and ae update.
 _sync_skill_symlinks() {
     local role="$1"
-    local project_dir="$2"
-    local ae_role_dir="$AE_HOME/$role"
-
+    local role_dir="$2"
+    local project_dir="$3"
     local skills_dir="$project_dir/.claude/skills"
     mkdir -p "$skills_dir"
 
-    local linked=0
-    local skipped=0
-    local repaired=0
-    for skill_dir in "$ae_role_dir/.claude/skills/"*/; do
-        [[ -f "$skill_dir/SKILL.md" ]] || continue
-        local name
-        name=$(basename "$skill_dir")
+    local source_dir=""
+    if [[ -d "$role_dir/.agents/skills" ]]; then
+        source_dir="$role_dir/.agents/skills"
+    elif [[ -d "$role_dir/.claude/skills" ]]; then
+        source_dir="$role_dir/.claude/skills"
+    else
+        echo "0 0 0"
+        return 0
+    fi
 
-        # Repair broken symlinks (target was deleted/moved)
+    local linked=0 skipped=0 repaired=0
+    local skill_dir name
+    for skill_dir in "$source_dir"/*/; do
+        [[ -f "$skill_dir/SKILL.md" ]] || continue
+        name="$(basename "$skill_dir")"
+        if [[ "$role" == "qa" && "$name" != ae-qa-* ]]; then
+            continue
+        fi
+
         if [[ -L "$skills_dir/$name" && ! -e "$skills_dir/$name" ]]; then
             rm -f "$skills_dir/$name"
             ln -sf "$skill_dir" "$skills_dir/$name"
@@ -208,6 +104,7 @@ _sync_skill_symlinks() {
             ((skipped++))
             continue
         fi
+
         ln -sf "$skill_dir" "$skills_dir/$name"
         ((linked++))
     done
@@ -215,114 +112,62 @@ _sync_skill_symlinks() {
     echo "$linked $skipped $repaired"
 }
 
+_track_linked_project() {
+    local role="$1"
+    local project_dir="$2"
+    local registry="$AE_HOME/.linked-projects"
+    mkdir -p "$AE_HOME"
+    local entry="$role	$project_dir"
+    if [[ -f "$registry" ]] && grep -qxF "$entry" "$registry" 2>/dev/null; then
+        return 0
+    fi
+    echo "$entry" >> "$registry"
+}
+
+_setup_overrides_dir() {
+    local project_dir="$1"
+    local overrides_dir="$project_dir/.claude/overrides"
+    mkdir -p "$overrides_dir"
+    if [[ ! -f "$overrides_dir/README.md" ]]; then
+        cat > "$overrides_dir/README.md" <<'EOF'
+# AE Overrides
+
+本目录中的 `.md` 文件会作为项目级规则被读取，用于覆盖 AE 默认行为。
+`ae update` 不会修改本目录。
+EOF
+    fi
+}
+
 _link_role() {
     local role="$1"
     local project_dir="$2"
-    local ae_role_dir="$AE_HOME/$role"
+    local role_dir
 
-    if [[ ! -d "$ae_role_dir" ]]; then
-        err "ae-$role 未安装 ($ae_role_dir)。运行 ${BOLD}ae install${NC} 先安装。"
-        exit 1
+    if ! role_dir="$(_find_role_dir "$role")"; then
+        warn "ae-$role 未安装或没有 skills，跳过。"
+        return 0
     fi
 
     info "在 $project_dir 启用 ae-$role..."
 
-    # 1. Link skills (dedup: skip if already exists from any role)
-    local result
-    result=$(_sync_skill_symlinks "$role" "$project_dir")
-    local linked skipped repaired
-    linked=$(echo "$result" | cut -d' ' -f1)
-    skipped=$(echo "$result" | cut -d' ' -f2)
-    repaired=$(echo "$result" | cut -d' ' -f3)
+    local result linked skipped repaired
+    result="$(_sync_skill_symlinks "$role" "$role_dir" "$project_dir")"
+    linked="$(echo "$result" | cut -d' ' -f1)"
+    skipped="$(echo "$result" | cut -d' ' -f2)"
+    repaired="$(echo "$result" | cut -d' ' -f3)"
+    ok "  链接 ${linked} 个 skills，跳过 ${skipped} 个已存在，修复 ${repaired} 个失效链接"
 
-    local msg="  链接了 ${linked} 个 skills"
-    (( skipped > 0 )) && msg="${msg}，跳过 ${skipped} 个已存在的"
-    (( repaired > 0 )) && msg="${msg}，修复 ${repaired} 个失效链接"
-    ok "$msg"
-
-    # 1.5 Track this project for ae update refresh
     _track_linked_project "$role" "$project_dir"
-
-    # 2. Merge skill permissions into project settings.local.json
-    _merge_skill_permissions "$project_dir" "$ae_role_dir"
-
-    # 2.5 Register role skills in Claude Code global additionalDirectories
-    _register_link_global_skills "$role"
-
-    # 3. Set up user overrides directory
     _setup_overrides_dir "$project_dir"
 
-    # 4. Add reference to CLAUDE.md if not already present
     local claude_md="$project_dir/CLAUDE.md"
-    local marker="~/.ae/$role/CLAUDE.md"
-
-    if [[ -f "$claude_md" ]] && grep -q "$marker" "$claude_md" 2>/dev/null; then
-        ok "  CLAUDE.md 已包含 ae-$role 引用"
-    else
-        echo "" >> "$claude_md"
-        echo "## AE $(echo "$role" | tr '[:lower:]' '[:upper:]') 约束" >> "$claude_md"
-        echo "请同时遵守 $marker 中的技术选型约束和工作流。" >> "$claude_md"
+    local marker="AE $(echo "$role" | tr '[:lower:]' '[:upper:]') Agent"
+    if [[ ! -f "$claude_md" ]] || ! grep -q "$marker" "$claude_md" 2>/dev/null; then
+        {
+            echo ""
+            echo "## $marker"
+            echo "请遵守已链接的 ae-$role skills 和项目级 .claude/overrides/ 规则。"
+        } >> "$claude_md"
         ok "  已在 CLAUDE.md 中添加 ae-$role 引用"
     fi
-}
-
-# Create project/.claude/overrides/ directory for user customizations.
-# Overrides are .md files that Claude Code reads as additional context,
-# allowing users to override default AE behavior without modifying skills.
-# ae update does NOT touch this directory — it lives in the user's project.
-_setup_overrides_dir() {
-    local project_dir="$1"
-    local overrides_dir="$project_dir/.claude/overrides"
-
-    # Idempotent: skip if already set up
-    if [[ -d "$overrides_dir" && -f "$overrides_dir/README.md" ]]; then
-        ok "  overrides/ 目录已存在"
-    else
-        mkdir -p "$overrides_dir"
-        cat > "$overrides_dir/README.md" <<'READMEEOF'
-# AE Overrides
-
-此目录中的 `.md` 文件会被 Claude Code 自动读取，用于覆盖 AE 默认行为。
-`ae update` 不会修改此目录中的文件。
-
-## 示例
-
-创建文件 `skip-privacy-check.md`：
-
-```
-ae-speckit-to-app 执行时，跳过隐私声明（PrivacyInfo.xcprivacy）检查项。
-原因：本项目暂不上架 App Store，不需要隐私声明。
-```
-
-创建文件 `custom-issue-routing.md`：
-
-```
-提交 bug 和需求时，目标仓库使用 my-team-repo 而非 ae-pm。
-```
-READMEEOF
-        ok "  已创建 overrides/ 目录（用户自定义覆盖）"
-    fi
-
-    # Register overrides/ in settings.local.json as additionalDirectories
-    local settings_file="$project_dir/.claude/settings.local.json"
-    python3 - "$overrides_dir" "$settings_file" <<'PYEOF'
-import sys, os, json
-
-overrides_dir, settings_file = sys.argv[1], sys.argv[2]
-
-settings = {}
-if os.path.isfile(settings_file):
-    try:
-        with open(settings_file) as f:
-            settings = json.load(f)
-    except:
-        pass
-
-dirs = settings.setdefault("permissions", {}).setdefault("additionalDirectories", [])
-if overrides_dir not in dirs:
-    dirs.append(overrides_dir)
-    with open(settings_file, "w") as f:
-        json.dump(settings, f, indent=2, ensure_ascii=False)
-        f.write("\n")
-PYEOF
 }
