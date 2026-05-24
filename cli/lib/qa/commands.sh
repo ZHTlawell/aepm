@@ -17,7 +17,9 @@ ae_qa() {
         onboard)           _qa_run_skill "ae-qa-onboard-project" "$@" ;;
         consistency-check) _qa_run_skill "ae-qa-consistency-check" "$@" ;;
         risk-scan)         _qa_run_skill "ae-qa-risk-scan" "$@" ;;
+        review-requirements) _qa_run_skill "ae-qa-review-requirements" "$@" ;;
         generate-cases)    _qa_run_skill "ae-qa-generate-cases" "$@" ;;
+        review-cases)      _qa_run_skill "ae-qa-review-cases" "$@" ;;
         change-impact)     _qa_run_skill "ae-qa-change-impact" "$@" ;;
         file-bugs)         _qa_run_skill "ae-qa-file-bugs" "$@" ;;
         release-check)     _qa_run_skill "ae-qa-release-check" "$@" ;;
@@ -154,7 +156,9 @@ ${BOLD}COMMANDS${NC}
     onboard <dir>            生成产品理解包和 QA Memory
     consistency-check <dir>  检查 PRD / API / DB / 用例 / Bug / 自动化冲突
     risk-scan <dir>          生成风险地图和测试优先级
+    review-requirements <dir> 审核 PRD / 需求文档质量并评分
     generate-cases <dir>     生成分级测试用例
+    review-cases <dir>       审核测试用例质量并评分
     change-impact <target>   根据 diff / 需求 / 版本说明分析回归范围
     file-bugs <report>       结构化整理并提交缺陷
     release-check <dir>      发布前 Go / No-Go 质量门禁
@@ -166,7 +170,9 @@ ${BOLD}EXAMPLES${NC}
     ae qa intake-check ./qa-onboarding-input
     ae qa onboard .
     ae qa risk-scan .
+    ae qa review-requirements ./docs/new-module-prd.md
     ae qa generate-cases .
+    ae qa review-cases .
     ae qa change-impact "git diff main...HEAD"
     ae qa release-check .
     ae qa new-module-test ./docs/new-module-prd.md

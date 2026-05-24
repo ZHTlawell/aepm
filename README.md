@@ -54,7 +54,9 @@ Q4 验证结论
 | 项目入驻理解 | `/ae-qa-onboard-project` | 产品理解包、模块地图、用户路径、开放问题 |
 | 资料一致性检查 | `/ae-qa-consistency-check` | PRD / 用例 / API / DB / bug / 自动化之间的冲突清单 |
 | 风险扫描 | `/ae-qa-risk-scan` | 风险地图、优先级、历史回归热点 |
-| 测试用例生成 | `/ae-qa-generate-cases` | 分级测试用例、冒烟清单、回归清单、自动化候选 |
+| 需求评审 | `/ae-qa-review-requirements` | PRD/需求质量评分、可测试性检查、改进建议 |
+| 测试用例生成 | `/ae-qa-generate-cases` | 分级测试用例草案、冒烟清单、回归清单、自动化候选、飞书导出 |
+| 测试用例审核 | `/ae-qa-review-cases` | 用例质量评分、PRD/QA Memory 对齐检查、低分用例修改建议 |
 | 变更影响分析 | `/ae-qa-change-impact` | 影响模块、建议回归范围、历史 bug 关联、风险提示 |
 | 缺陷回流 | `/ae-qa-file-bugs` | 结构化缺陷内容、查重、确认后提交 |
 | 发布准入检查 | `/ae-qa-release-check` | Go / Conditional Go / No-Go 结论 |
@@ -108,6 +110,19 @@ Agent 应负责归档和判断资料类型。资料不足时，它应该要求�
 
 熟悉度达到 85/100 后，Agent 才能进入该产品的专属测试模式。
 
+达标后不会自动开始生成用例或风险扫描。Agent 应先让用户确认是否将当前产品知识固化为 QA Memory；确认后再给出可选择的测试任务菜单：
+
+```text
+1. 生成产品理解包
+2. 检查资料一致性
+3. 扫描高风险模块
+4. 生成测试用例
+5. 分析新模块测试任务
+6. 做发布前质量检查
+```
+
+用户选择一个任务后，Agent 再继续执行对应流程。
+
 新测试人员接手项目时：
 
 ```bash
@@ -142,7 +157,9 @@ ae qa release-check <project_or_package_dir>
 /ae-qa-onboard-project
 /ae-qa-consistency-check
 /ae-qa-risk-scan
+/ae-qa-review-requirements
 /ae-qa-generate-cases
+/ae-qa-review-cases
 /ae-qa-change-impact
 /ae-qa-file-bugs
 /ae-qa-release-check

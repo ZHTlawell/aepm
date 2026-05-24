@@ -21,6 +21,38 @@ The product agent can enter product-specific mode only when readiness score is a
 | 40-59 | Generate only partial onboarding and gap analysis. |
 | <40 | Stop and ask the user to provide missing materials. |
 
+## 85-Point Confirmation Gate
+
+When readiness reaches 85/100 or higher, do not automatically continue into test case generation, risk scanning, release checks, or new-module planning.
+
+Use a confirmation gate:
+
+1. Tell the user the readiness score has reached 85/100.
+2. Ask one question only: whether to freeze/update the current product knowledge into QA Memory.
+3. Show only the memory files that will be created or updated.
+4. Wait for user confirmation.
+5. After confirmation, update `.qa-memory/` and append `.qa-memory/changelog.md`.
+6. Then present a selectable task menu and ask the user to choose one task.
+
+Allowed wording:
+
+```text
+The product readiness score has reached 85/100.
+
+Next, do only one thing: confirm whether to save the current product knowledge into QA Memory.
+```
+
+After memory is saved, a task menu is allowed because it is a single choice point, not multiple simultaneous tasks.
+
+Default task menu:
+
+1. Generate product understanding package.
+2. Check material consistency.
+3. Scan high-risk modules.
+4. Generate test cases.
+5. Plan a new-module test.
+6. Run release quality gate.
+
 ## Memory Layout
 
 ```text
@@ -60,4 +92,3 @@ Every important conclusion must include source and confidence:
 - `missing`: cannot determine from available material.
 
 Release decisions, defect severity, and core workflow claims cannot rely only on `inferred` evidence.
-

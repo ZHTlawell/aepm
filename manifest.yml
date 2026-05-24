@@ -88,8 +88,36 @@ skills:
       expected_exit: 0
       description: "pure LLM skill"
 
+  ae-qa-review-requirements:
+    description: "Review PRD or requirement quality, score completeness, consistency, clarity, and testability, and output actionable improvements."
+    type: internal
+    deprecated: false
+    dependencies:
+      mcp: []
+      cli: []
+      api_keys: []
+      scripts: []
+    smoke_test:
+      command: "echo ok"
+      expected_exit: 0
+      description: "pure LLM skill"
+
   ae-qa-generate-cases:
-    description: "Generate P0/P1/P2/P3 test cases, smoke checklist, regression checklist, and automation candidates."
+    description: "Generate P0/P1/P2/P3 draft test cases, confirmation and persistence checklist, automation candidates, and optional Feishu mind-map Markdown export."
+    type: internal
+    deprecated: false
+    dependencies:
+      mcp: []
+      cli: []
+      api_keys: []
+      scripts: []
+    smoke_test:
+      command: "echo ok"
+      expected_exit: 0
+      description: "pure LLM skill"
+
+  ae-qa-review-cases:
+    description: "Review test case quality, score each case against PRD or QA Memory, and block cases below 60 points from approval."
     type: internal
     deprecated: false
     dependencies:
